@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## HexForge (v0.6.3)
+## HexForge (v0.6.4)
 
 HexForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about simple 3-polytopes, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures on p₆ — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -43,9 +43,22 @@ Conjecture-Gym/
 Run from the `Conjecture-Gym` root:
 
 ```bash
-python -m run hexforge        # run until Ctrl+C
-python -m run hexforge 50     # stop after 50 new conjectures
+python -m run hexforge                 # run until Ctrl+C
+python -m run hexforge 50               # 50 split_needed, then floor(50/4)=12 rounding_only
+python -m run hexforge --minutes 30     # run for 30 minutes
+python -m run hexforge 50 --minutes 30  # stop at whichever comes first
 ```
+
+Generation runs in two phases: a main phase that produces `N` harder
+`split_needed` conjectures, then a supplement phase that adds `floor(N/4)` easier
+`rounding_only` conjectures (so the easy tier is 20% of the record). With
+`--minutes M` the main phase gets 85% of the budget and the supplement phase the
+remaining 15%.
+
+Options: `--seed S` (base seed), `--workers W` (number of worker processes;
+default auto-sized from cores and memory). Generation runs across worker
+processes but results are consumed in strict premise-index order, so the record
+is independent of the worker count.
 
 ### Axiom base
 
@@ -57,6 +70,7 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v0.6.4** — Parallel generation with deterministic ordering, batched Lean compilation, automatic HexLemmas rebuild, time-budgeted runs; rounding-only conjectures added in a final phase as the easy tier (20%).
 - **v0.6.3** — Only conjectures whose proof requires a case split are kept; f_2 appears only in premises, never in conclusions; at most 3 terms besides p_6 in a conclusion.
 - **v0.6.2** — Candidates from systematic direction enumeration with case-split LP bounds instead of random pairing; big_faces (sum over k ≥ 7) restored as a premise expression and display form.
 - **v0.6.1** — Large faces listed individually (p_7 … p_10 plus a tail for k ≥ 11; upper limit configurable), arithmetic sharpness check via integer programming.

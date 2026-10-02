@@ -1,0 +1,263 @@
+{
+  "id": "C37",
+  "created_at": "2026-10-02T17:14:09.317852+00:00",
+  "generator": {
+    "version": "0.6.4",
+    "seed": 2024006648
+  },
+  "conjecture": {
+    "formula": "if ((is_simple) and (sum_pk_after_p6 >= 4) and (p_4 = 0)), then p6 >= ((((-0.5 * p5) + (-1 * sum_pk_after_p6)) + 5))",
+    "premises": [
+      {
+        "text": "sum_pk_after_p6 >= 4",
+        "coeffs": {
+          "sum_pk_after_p6": 1
+        },
+        "rel": ">=",
+        "rhs": 4
+      },
+      {
+        "text": "p_4 = 0",
+        "coeffs": {
+          "p_4": 1
+        },
+        "rel": "=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "2*p_6 >= -p_5 - 2*sum_pk_after_p6 + 10",
+      "coeffs": {
+        "p_6": 2,
+        "p_5": 1,
+        "sum_pk_after_p6": 2
+      },
+      "rel": ">=",
+      "rhs": 10
+    },
+    "natural_language": "Let M be a simple 3-polytope (a simple 3-connected planar map), with p_k the number of k-gonal faces, f_2 the total number of faces, and sum_{k>=7} p_k the number of faces of size at least 7. Suppose sum_pk_after_p6 >= 4, p_4 = 0. Then 2*p_6 >= -p_5 - 2*sum_pk_after_p6 + 10."
+  },
+  "proof": {
+    "inventory_used": [
+      "Barnette_P6Bound",
+      "Juc_EulerFormula",
+      "JucovicTheorem"
+    ],
+    "lemmas_used": [
+      "face_split",
+      "nonneg_p_6",
+      "tail_excess",
+      "tail_juc_lower"
+    ],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "2*sum_pk_after_p6 + 1*J_tail >= 0",
+        "coeffs": {
+          "J_tail": "1",
+          "sum_pk_after_p6": "2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "tail_juc_lower"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "1*p_6 >= 0",
+        "coeffs": {
+          "p_6": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_p_6"
+      },
+      {
+        "fid": 3,
+        "rule": "premise",
+        "text": "1*sum_pk_after_p6 + -4 >= 0",
+        "coeffs": {
+          "sum_pk_after_p6": "1"
+        },
+        "const": "-4",
+        "rel": ">=",
+        "note": "sum_pk_after_p6 >= 4"
+      },
+      {
+        "fid": 4,
+        "rule": "inventory",
+        "text": "-1*sum_pk_after_p6 + 1*W_tail >= 0",
+        "coeffs": {
+          "W_tail": "1",
+          "sum_pk_after_p6": "-1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "tail_excess"
+      },
+      {
+        "fid": 5,
+        "rule": "conditional",
+        "text": "-1*p_3 + 1*p_5 + 2*p_6 + 2*sum_pk_after_p6 + -4 >= 0",
+        "coeffs": {
+          "p_6": "2",
+          "p_3": "-1",
+          "p_5": "1",
+          "sum_pk_after_p6": "2"
+        },
+        "const": "-4",
+        "rel": ">=",
+        "inventory": "Barnette_P6Bound",
+        "tactic": "linarith",
+        "deps": [
+          3
+        ]
+      },
+      {
+        "fid": 6,
+        "rule": "inventory",
+        "text": "3*p_3 + 2*p_4 + 1*p_5 + -1*W_tail + -12 == 0",
+        "coeffs": {
+          "p_3": "3",
+          "p_4": "2",
+          "p_5": "1",
+          "W_tail": "-1"
+        },
+        "const": "-12",
+        "rel": "==",
+        "inventory": "Juc_EulerFormula"
+      },
+      {
+        "fid": 7,
+        "rule": "inventory",
+        "text": "-1*p_3 + -1*p_4 + -1*p_5 + -1*p_6 + -1*sum_pk_after_p6 + 1*f_2 == 0",
+        "coeffs": {
+          "f_2": "1",
+          "p_3": "-1",
+          "p_4": "-1",
+          "p_5": "-1",
+          "p_6": "-1",
+          "sum_pk_after_p6": "-1"
+        },
+        "const": "0",
+        "rel": "==",
+        "inventory": "face_split"
+      },
+      {
+        "fid": 8,
+        "rule": "combination",
+        "text": "1*f_2 + -10 >= 0",
+        "coeffs": {
+          "f_2": "1"
+        },
+        "const": "-10",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          4,
+          3,
+          5,
+          6,
+          7
+        ],
+        "mults": [
+          "1/2",
+          "1/2",
+          "1/2",
+          "1/2",
+          "1"
+        ]
+      },
+      {
+        "fid": 9,
+        "rule": "conditional",
+        "text": "2*p_4 + 3*p_5 + 3*p_6 + -1*J_tail + -12 >= 0",
+        "coeffs": {
+          "p_6": "3",
+          "p_4": "2",
+          "p_5": "3",
+          "J_tail": "-1"
+        },
+        "const": "-12",
+        "rel": ">=",
+        "inventory": "JucovicTheorem",
+        "tactic": "linarith",
+        "deps": [
+          8
+        ]
+      },
+      {
+        "fid": 10,
+        "rule": "premise",
+        "text": "1*p_4 == 0",
+        "coeffs": {
+          "p_4": "1"
+        },
+        "const": "0",
+        "rel": "==",
+        "note": "p_4 = 0"
+      },
+      {
+        "fid": 11,
+        "rule": "combination",
+        "text": "1*p_5 + 2*p_6 + 2*sum_pk_after_p6 + -28/3 >= 0",
+        "coeffs": {
+          "p_6": "2",
+          "p_5": "1",
+          "sum_pk_after_p6": "2"
+        },
+        "const": "-28/3",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          9,
+          10
+        ],
+        "mults": [
+          "1/3",
+          "1",
+          "4/3",
+          "1/3",
+          "-2/3"
+        ]
+      },
+      {
+        "fid": 12,
+        "rule": "rounding",
+        "text": "1*p_5 + 2*p_6 + 2*sum_pk_after_p6 + -10 >= 0",
+        "coeffs": {
+          "p_6": "2",
+          "p_5": "1",
+          "sum_pk_after_p6": "2"
+        },
+        "const": "-10",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          11
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.0044603033006244425,
+    "R": 0.4,
+    "L": 0.047891314261057576,
+    "score": 0.4523516175616821
+  },
+  "attained": "yes",
+  "touch": 5,
+  "arith_sharp": true,
+  "arith_min": 10,
+  "depth_type": "rounding_only",
+  "supersedes": [],
+  "hardness": 1.7142857142857142,
+  "lean": {
+    "theorem_name": "C37",
+    "status": "compiled"
+  }
+}

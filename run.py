@@ -1,13 +1,33 @@
-"""HexForge entry point.
+"""HexForge entry point (v0.6.4 — parallel generation, batched Lean).
 
 Usage (run from the Conjecture-Gym root):
 
-    python -m run hexforge          # run until Ctrl+C
-    python -m run hexforge N        # stop after N new conjectures
+    python -m run hexforge              # run until Ctrl+C
+    python -m run hexforge N            # N split_needed, then floor(N/4) rounding_only
+    python -m run hexforge --minutes M  # run for M minutes
+    python -m run hexforge N --minutes M  # stop at whichever comes first
 
-Only conjectures that pass every check *and* whose Lean file compiles are
-counted as "new".  On Ctrl+C the conjecture currently being written is finished
-before exiting.
+``N`` is the MAIN-phase target (``split_needed`` records); the SUPPLEMENT phase then
+adds ``floor(N * RO_TARGET_RATIO)`` = ``floor(N/4)`` ``rounding_only`` records.
+
+Options:
+    --seed S     base seed (default: random)
+    --workers W  number of worker processes (default: auto, see below)
+
+Each premise set is processed in a worker process (sampling, direction
+enumeration, proof reconstruction, all checks, the integer counter-model gate,
+and scoring).  The main process alone judges skeletons, numbers, compiles (in
+batches, so Mathlib loads once per batch), and writes records.  Results are
+consumed in strict premise-index order, so the output is independent of the
+number of workers.
+
+v0.6.4 §IV: generation runs in two phases.  The MAIN phase produces only
+``split_needed`` records (``N`` of them, or until the Ctrl+C / 85%-of-budget);
+rounding_only directions are dropped right after enumeration, never reconstructed.
+The SUPPLEMENT phase then produces ``floor(S * RO_TARGET_RATIO)`` ``rounding_only``
+records, where ``S`` is the main-phase count (so rounding_only settle at 20% of
+the total).  The supplement phase's premise seeds continue the main phase's index,
+so the whole record is reproducible regardless of worker count.
 """
 
 from __future__ import annotations
@@ -15,150 +35,534 @@ from __future__ import annotations
 import os
 import sys
 
-# Determinism: pin the hash seed so that set/dict iteration over string keys in
-# the deduction engine is reproducible across processes.  This makes every run
-# with the same seed byte-for-byte reproducible (and isolates the deduction
-# cache as a pure speed optimization with identical output).  Must happen before
-# anything hashes strings, so re-exec once if it is not already set.
+# Determinism: pin the hash seed so set/dict iteration over string keys in the
+# deduction engine is reproducible across processes.  Must happen before anything
+# hashes strings, so re-exec once if not already set.  Worker processes are forked
+# and inherit this environment.
 if os.environ.get("PYTHONHASHSEED") != "0":
     os.environ["PYTHONHASHSEED"] = "0"
+    # keep BLAS/OpenMP single-threaded so forked workers don't contend / deadlock
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
     os.execv(sys.executable, [sys.executable, "-m", "run", *sys.argv[1:]])
 
-import random
+import json
+import multiprocessing as mp
 import signal
+import threading
 import time
 from collections import defaultdict
 
 from HexForge.generator import generator as G
+from HexForge.formalizer import formalizer as F
+
+# ── tunables (v0.6.4) ─────────────────────────────────────────────────────────
+LEAN_BATCH_SIZE = 20            # §III.1: compile this many theorems at once
+BATCH_WAIT_SEC = 60.0           # §III.1: or after this long, compile a partial batch
+# Measured incremental RSS per worker is small (~0.15 GiB): the 25k-polytope pool
+# is forked copy-on-write and shared, so memory is not the binding constraint on
+# this machine.  0.5 GiB/worker keeps a safety margin while letting the core cap
+# dominate (cores-2 = 14 here).
+PER_WORKER_GB = 0.5             # memory budget assumed per worker (for auto sizing)
 
 
-def _print_summary(stats, sampled, added, elapsed, f2_upper):
-    print("\n" + "=" * 60)
-    print("HexForge run summary")
-    print("=" * 60)
-    print(f"  new conjectures written : {added}")
-    print(f"  premise sets sampled    : {sampled}")
-    print(f"  wall time               : {elapsed:.1f}s")
-    print("  discards by reason:")
-    for reason in ("empty_premises", "no_p6_canonical", "p6_only_via_f2",
-                   "p6_upper_bound", "p6_padding", "too_many_terms",
-                   "rounding_only", "proof_reconstruct_failed",
-                   "premise_weakening", "linear_only", "not_attained",
-                   "too_shallow", "duplicate", "premise_minimized_duplicate",
-                   "same_skeleton_worse", "recheck_failed", "compile_failed"):
-        print(f"      {reason:28s}: {stats.get(reason, 0)}")
-    print(f"  replacements (same skeleton, better) : {stats.get('replacements', 0)}")
-    # §5 statistics (not filters)
-    ratio = (100.0 * f2_upper / added) if added else 0.0
-    print("  statistics:")
-    print(f"      records with premise f_2 <= c : {f2_upper} / {added} "
-          f"({ratio:.0f}%)")
-    print(f"      conjectures skipping pool checks (f_2 >= c, c > 28): "
-          f"{stats.get('skipped_pool_checks', 0)}")
-    # v0.6.2 §4: direction-enumeration diagnostics
-    ns = stats.get("enum_samples", 0)
-    avg_dirs = (stats.get("directions_evaluated", 0) / ns) if ns else 0.0
-    avg_time = (stats.get("enum_time", 0.0) / ns) if ns else 0.0
-    print(f"      direction enumeration: {avg_dirs:.0f} dirs/sample avg, "
-          f"{avg_time:.2f}s/sample avg")
-    print(f"      proof_reconstruct_failed : "
-          f"{stats.get('proof_reconstruct_failed', 0)}")
-    print(f"      direction-budget truncations : "
-          f"{stats.get('dir_budget_truncated', 0)}")
-    # v0.6.2 §2: deductive-depth labels of the written conjectures
-    print(f"      depth_type: rounding_only {stats.get('depth_rounding_only', 0)}, "
-          f"split_needed {stats.get('depth_split_needed', 0)}")
-    if stats.get("compile_msgs"):
-        print("  sample compile failures:")
-        for nm, msg in stats["compile_msgs"][:3]:
-            print(f"      {nm}: {msg}")
+# ── worker-count selection (§II.1) ────────────────────────────────────────────
+def _total_mem_gb() -> float:
+    try:
+        with open("/proc/meminfo") as fh:
+            for line in fh:
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) / (1024 * 1024)
+    except Exception:
+        pass
+    return 8.0
+
+
+def choose_workers(override=None):
+    cores = os.cpu_count() or 4
+    mem_gb = _total_mem_gb()
+    mem_cap = max(1, int(mem_gb * 0.75 / PER_WORKER_GB))
+    core_cap = max(1, cores - 2)
+    auto = max(1, min(core_cap, mem_cap))
+    n = override if override else auto
+    basis = (f"cores={cores} (-2 → {core_cap}); mem={mem_gb:.1f} GiB "
+             f"(0.75·mem / {PER_WORKER_GB:.1f} GiB per worker → {mem_cap}); "
+             f"min = {auto}" + (f"; overridden to {n}" if override else ""))
+    return n, basis
+
+
+# ── memory sampler ────────────────────────────────────────────────────────────
+def _rss_bytes(pids, page):
+    total = 0
+    for pid in pids:
+        try:
+            with open(f"/proc/{pid}/statm") as fh:
+                total += int(fh.read().split()[1]) * page
+        except Exception:
+            pass
+    return total
+
+
+class MemMonitor(threading.Thread):
+    def __init__(self, pool):
+        super().__init__(daemon=True)
+        self.pool = pool
+        self.peak = 0
+        self._stop = threading.Event()
+        self._page = os.sysconf("SC_PAGE_SIZE")
+
+    def run(self):
+        while not self._stop.is_set():
+            pids = [os.getpid()]
+            try:
+                pids += [p.pid for p in self.pool._pool]
+            except Exception:
+                pass
+            self.peak = max(self.peak, _rss_bytes(pids, self._page))
+            self._stop.wait(1.0)
+
+    def stop(self):
+        self._stop.set()
+
+
+# ── record scan helpers (difficulty distribution / attainment) ────────────────
+def _quantiles(xs):
+    """Return (min, p20, p40, p60, p80, max) by nearest-rank; () if empty."""
+    if not xs:
+        return None
+    s = sorted(xs)
+    n = len(s)
+
+    def q(p):
+        if n == 1:
+            return s[0]
+        idx = min(n - 1, max(0, int(round(p * (n - 1)))))
+        return s[idx]
+
+    return (s[0], q(0.20), q(0.40), q(0.60), q(0.80), s[-1])
+
+
+def scan_records(record_dir):
+    """Return {depth_type: [hardness, ...]} and (n_unknown, n_total)."""
+    by_depth = defaultdict(list)
+    n_unknown = n_total = 0
+    if not record_dir.exists():
+        return by_depth, 0, 0
+    for d in sorted(record_dir.iterdir()):
+        j = d / f"{d.name}.json"
+        if not j.exists():
+            continue
+        data = json.load(open(j))
+        n_total += 1
+        if data.get("attained") == "unknown":
+            n_unknown += 1
+        by_depth[data.get("depth_type", "?")].append(data["hardness"])
+    return by_depth, n_unknown, n_total
+
+
+def _init_depth_counts(record_dir):
+    """record_depth {name: depth_type}, total, rounding_only count."""
+    rd = {}
+    if record_dir.exists():
+        for d in record_dir.iterdir():
+            j = d / f"{d.name}.json"
+            if j.exists():
+                rd[d.name] = json.load(open(j)).get("depth_type", "split_needed")
+    total = len(rd)
+    ro = sum(1 for v in rd.values() if v == "rounding_only")
+    return rd, total, ro
+
+
+# ── argument parsing ──────────────────────────────────────────────────────────
+def parse_args(argv):
+    if len(argv) < 2 or argv[1] != "hexforge":
+        return None
+    target = minutes = seed = workers = None
+    rest = argv[2:]
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        if a == "--minutes":
+            minutes = float(rest[i + 1]); i += 2
+        elif a == "--seed":
+            seed = int(rest[i + 1]); i += 2
+        elif a == "--workers":
+            workers = int(rest[i + 1]); i += 2
+        elif a.isdigit():
+            target = int(a); i += 1
+        else:
+            print(f"unrecognised argument: {a}"); return None
+    return {"target": target, "minutes": minutes, "seed": seed, "workers": workers}
 
 
 def main(argv):
-    if len(argv) < 2 or argv[1] != "hexforge":
-        print("usage: python -m run hexforge [N]")
+    import random
+    opts = parse_args(argv)
+    if opts is None:
+        print("usage: python -m run hexforge [N] [--minutes M] [--seed S] [--workers W]")
         return 1
-    target = int(argv[2]) if len(argv) >= 3 else None
-    base_seed = int(argv[3]) if len(argv) >= 4 else random.randrange(1 << 30)
+    target = opts["target"]
+    minutes = opts["minutes"]
+    base_seed = opts["seed"] if opts["seed"] is not None else random.randrange(1 << 30)
+    n_workers, worker_basis = choose_workers(opts["workers"])
 
     print(f"HexForge v{G.GENERATOR_VERSION}  (base seed {base_seed})")
+    print(f"  N_WORKERS = {n_workers}   [{worker_basis}]")
+    if target is not None:
+        print(f"  stop after {target} new conjectures")
+    if minutes is not None:
+        print(f"  time budget {minutes:g} minutes")
+
+    # §I: rebuild HexLemmas if the source changed (before any compile / import)
+    status = F.ensure_hexlemmas_fresh()
+    print(f"  HexLemmas: {status}")
+
     print("loading real-polytope pool ...")
     pvecs, features = G.load_pool()
     pvec_vars = [G.vars_from_pvec(pv) for pv in pvecs]
-    pool = (pvecs, features, pvec_vars)
+    pool_data = (pvecs, features, pvec_vars)
     print(f"  {len(pvecs)} real simple 3-polytopes loaded")
 
     existing_hashes, max_id = G.load_existing_hashes(G.RECORD)
     next_id = max_id + 1
-    skel_index = G.build_skeleton_index(G.RECORD, features)   # v0.6
+    skel_index = G.build_skeleton_index(G.RECORD, features)
+    _, total_written, _ = _init_depth_counts(G.RECORD)
+    snapshot_hashes = dict(existing_hashes)   # immutable view for workers
     print(f"  existing record: {len(existing_hashes)} conjectures, "
           f"{len(skel_index)} skeletons, next id C{next_id}")
 
-    stop = {"flag": False}
-
-    def handler(signum, frame):
-        stop["flag"] = True
-        print("\n[Ctrl+C] finishing current conjecture, then stopping ...")
-
-    signal.signal(signal.SIGINT, handler)
+    # share the pool and snapshot with forked workers (copy-on-write)
+    G.set_worker_globals(pool_data, snapshot_hashes, base_seed)
 
     stats = defaultdict(int)
     sampled = 0
-    added = 0
-    f2_upper = 0
-    t0 = time.time()
+    sample_time_total = 0.0
+    writes_by_depth = defaultdict(int)       # NEW writes by depth_type
+    new_skel_segments = defaultdict(int)     # premise-index//100 -> new skeletons
+    batch_count = 0
+    batch_time_total = 0.0
+    bisection_total = 0
 
-    # safety cap: with the strict v0.1 filters, stop and report rather than
-    # loosening standards if we sample far more than needed without reaching N
-    max_samples = max(400, (target or 0) * 40) if target is not None else None
+    queue_start = {"t": None}
+    disp = {"next": 1, "collect": 1}         # dispatch/collect indices (shared)
+    write_index_log = []                     # (name, idx, depth_type, mode) in commit order
+    compile_failed_idx = []                  # premise indices whose Lean compile failed
 
-    while not stop["flag"]:
-        if target is not None and added >= target:
-            break
-        if max_samples is not None and sampled >= max_samples:
-            print(f"\n[cap] sampled {sampled} premise sets with only {added} "
-                  f"accepted; stopping without loosening filters.")
-            break
-        sampled += 1
-        seed = base_seed * 1_000_003 + sampled
-        rng = random.Random(seed)
-        try:
-            result = G.attempt(rng, pool, next_id, existing_hashes, stats, seed,
-                               skel_index)
-        except AssertionError as exc:
-            print("\n!!! SOUNDNESS FAILURE — stopping immediately !!!")
-            print(exc)
-            return 2
-        if result is None:
-            continue
-        data = result["data"]
-        old_entry = skel_index.get(result["skeleton"])     # before overwrite
-        G.write_record(data, result["lean_src"])   # atomic; not interrupted
-        if result["mode"] == "replace":
-            stats["replacements"] += 1
-            print(f"  {data['id']} replaced:")
-            print(f"      old formula : {old_entry['formula']}")
-            print(f"      new formula : {data['conjecture']['formula']}")
-            print(f"      old touch/hardness : {old_entry['touch']} / "
-                  f"{old_entry['hardness']:.3f}")
-            print(f"      new touch/hardness : {data['touch']} / "
-                  f"{data['hardness']:.3f}")
-        else:
+    stop = {"flag": False}
+    soundness = {"err": None}
+
+    def handler(signum, frame):
+        stop["flag"] = True
+        print("\n[Ctrl+C] finishing in-flight work and flushing the compile queue ...")
+
+    signal.signal(signal.SIGINT, handler)
+
+    ctx = mp.get_context("fork")
+    wp = ctx.Pool(n_workers)
+    mem = MemMonitor(wp)
+    mem.start()
+
+    WINDOW = n_workers * 2 + 2
+
+    def run_phase(accept, target, deadline):
+        """Dispatch / compile / commit loop for ONE phase.  Produces up to ``target``
+        new records of depth_type ``accept`` (``target=None`` → until Ctrl+C or the
+        deadline).
+
+        Determinism / correctness (the record is exactly the first ``target``
+        premise sets, in index order, that pass EVERY check including Lean compile):
+
+        * Worker payloads are collected in strict premise-index order and held in
+          ``pending`` (also index order).
+        * A batch is compiled with *provisional* names (``HFprov{idx}``); the final
+          ``C{n}`` is assigned only at COMMIT, so a compile failure never burns a
+          number — the freed slot is filled by the next passing candidate (§rule 1).
+        * COMMIT happens in strict index order, only after the batch's compile
+          results are known; earlier batches are fully committed first.  Hence the
+          decision for candidate ``k`` always has every ``<k`` final result,
+          including Lean (§rule 1), independent of how batches were split (§rule 2).
+        * Once the ``target``-th new record is committed we stop; higher-index
+          candidates (already compiled or still in flight) are discarded and never
+          trigger a replacement (§rule 3).  The theorem name is the only thing that
+          differs between the batch-compiled source and the written ``C{n}.lean``;
+          Lean provability is name-independent and §9.5 re-verifies standalone.
+
+        Dispatch/collect indices in ``disp`` continue across phases so the supplement
+        phase's seeds follow the main phase's.  Returns (new_writes, replacements,
+        boundary_idx, wall_seconds); the caller resumes at ``boundary_idx + 1``."""
+        nonlocal next_id, total_written, sampled, sample_time_total
+        nonlocal batch_count, batch_time_total, bisection_total
+        phase_t0 = time.time()
+        added = replaced = 0
+        boundary = {"idx": disp["collect"] - 1}
+        done = {"flag": False}            # target slot filled during commit
+        pending = []                      # [(idx, prop)] awaiting compile+commit
+        inflight = {}
+
+        def commit(idx, prop):
+            """Decide and write ONE candidate whose Lean compile already succeeded.
+            Returns True iff it filled the final target slot (phase should stop)."""
+            nonlocal next_id, total_written, added, replaced
+            h = prop["hash"]
+            if h in existing_hashes:
+                stats["premise_minimized_duplicate" if not prop["premises"] else "duplicate"] += 1
+                return False
+            skel, metrics, dt = prop["skeleton"], prop["metrics"], prop["depth_type"]
+            mode, target_name, supersedes, old_entry = "new", None, [], None
+            if skel in skel_index:
+                ex = skel_index[skel]
+                if not G.skeleton_better(metrics, ex):
+                    stats["same_skeleton_worse"] += 1
+                    return False
+                mode, target_name = "replace", ex["name"]
+                old_entry = ex
+                supersedes = [ex["formula"]] + list(ex.get("supersedes", []))
+            if mode == "new":
+                target_name = f"C{next_id}"
+                next_id += 1
+                total_written += 1
+            data = G.assemble_data(prop, target_name, supersedes)
+            lean_full = F.LEAN_HEADER + F.build_theorem(
+                target_name, prop["premises"], prop["disp"], prop["tb"], display=True)
+            existing_hashes[h] = target_name
+            skel_index[skel] = {"name": target_name,
+                                "formula": data["conjecture"]["formula"],
+                                "supersedes": supersedes, **metrics}
+            G.write_record(data, lean_full)
+            if mode == "replace":
+                replaced += 1
+                write_index_log.append((target_name, idx, dt, "replace"))
+                print(f"  {target_name} replaced (idx {idx}): {old_entry['formula']}  ->  "
+                      f"{data['conjecture']['formula']}")
+                return False
             added += 1
-            next_id += 1
-            print(f"  {data['id']}: hardness={data['hardness']:.3f}  "
-                  f"iris={data['iris']['score']:.3f}  attained={data['attained']}  "
-                  f"inventory={sorted(result['inventory'])}")
-        # update the skeleton index with the newly written best-for-skeleton
-        skel_index[result["skeleton"]] = {
-            "name": result["target"], "formula": data["conjecture"]["formula"],
-            "supersedes": data["supersedes"], **result["metrics"]}
-        if any([v for v, c in pr["coeffs"].items() if c] == ["f_2"]
-               and pr["rel"] == "<=" for pr in data["conjecture"]["premises"]):
-            f2_upper += 1
+            boundary["idx"] = max(boundary["idx"], idx)
+            writes_by_depth[dt] += 1
+            new_skel_segments[idx // 100] += 1
+            write_index_log.append((target_name, idx, dt, "new"))
+            print(f"  {target_name}: {dt}  idx={idx}  "
+                  f"hardness={data['hardness']:.3f}  attained={data['attained']}")
+            return target is not None and added >= target
 
-    _print_summary(stats, sampled, added, time.time() - t0, f2_upper)
+        def flush():
+            nonlocal batch_count, batch_time_total, bisection_total
+            if not pending:
+                return
+            entries = [(f"HFprov{idx}",
+                        F.build_theorem(f"HFprov{idx}", prop["premises"], prop["disp"],
+                                        prop["tb"], display=True))
+                       for idx, prop in pending]
+            t = time.time()
+            results, meta = F.compile_batch(entries, timeout=300)
+            batch_count += 1
+            batch_time_total += time.time() - t
+            bisection_total += meta["bisections"]
+            for idx, prop in pending:            # strict index order
+                if done["flag"]:
+                    break                        # target met: ignore idx > boundary
+                if not results.get(f"HFprov{idx}"):
+                    stats["compile_failed"] += 1
+                    compile_failed_idx.append(idx)
+                    continue                     # slot stays open for the next passer
+                if commit(idx, prop):
+                    done["flag"] = True
+            pending.clear()
+            queue_start["t"] = None
+
+        def dispatch_full():
+            return target is not None and added + len(pending) >= target
+
+        def stop_dispatch():
+            if stop["flag"] or soundness["err"] or done["flag"]:
+                return True
+            if dispatch_full():
+                return True
+            if deadline is not None and time.time() >= deadline:
+                return True
+            return False
+
+        def should_flush(force):
+            if force and pending:
+                return True
+            if len(pending) >= LEAN_BATCH_SIZE:
+                return True
+            if pending and queue_start["t"] is not None \
+                    and time.time() - queue_start["t"] >= BATCH_WAIT_SEC:
+                return True
+            if dispatch_full() and pending:
+                return True
+            return False
+
+        while True:
+            halt = stop_dispatch()
+            while (not halt) and len(inflight) < WINDOW:
+                inflight[disp["next"]] = wp.apply_async(G.worker, (disp["next"], accept))
+                disp["next"] += 1
+            if halt and not inflight:
+                break
+            progressed = False
+            fut = inflight.get(disp["collect"])
+            if fut is not None and fut.ready():
+                tag, idx, payload, lstats, elapsed = fut.get()
+                del inflight[disp["collect"]]
+                disp["collect"] += 1
+                sampled += 1
+                sample_time_total += elapsed
+                for k, v in lstats.items():
+                    stats[k] += v
+                if tag == "soundness":
+                    soundness["err"] = (idx, payload)
+                    break
+                if payload is not None:
+                    pending.append((idx, payload))
+                    if queue_start["t"] is None:
+                        queue_start["t"] = time.time()
+                progressed = True
+            if should_flush(halt and not inflight):
+                flush()
+            if done["flag"]:
+                break
+            if not progressed:
+                time.sleep(0.02)
+        flush()
+        # resume the next phase at a deterministic index: everything up to the last
+        # new write has been committed; indices dispatched speculatively beyond it
+        # are discarded (they used this phase's ``accept``) and re-run next phase.
+        disp["collect"] = boundary["idx"] + 1
+        disp["next"] = boundary["idx"] + 1
+        inflight.clear()
+        return added, replaced, boundary["idx"], time.time() - phase_t0
+
+    t0 = time.time()
+    if minutes is not None:
+        # §IV (v0.6.4): 85% of the time budget for the main phase, 15% for supplement.
+        main_deadline = t0 + minutes * 60.0 * 0.85
+        full_deadline = t0 + minutes * 60.0
+    else:
+        main_deadline = full_deadline = None
+
+    phase1 = phase2 = None
+    try:
+        # ── main phase: split_needed only ─────────────────────────────────────
+        phase1 = run_phase("split_needed", target, main_deadline)
+        S = phase1[0]
+        if not soundness["err"]:
+            # ── supplement phase: rounding_only, floor(S * RO_TARGET_RATIO) ────
+            ro_target = int(S * G.RO_TARGET_RATIO)
+            if ro_target > 0:
+                stop["flag"] = False      # re-arm after a Ctrl+C-ended main phase
+                print(f"\nsupplement phase: {ro_target} rounding_only "
+                      f"(= floor({S} * {G.RO_TARGET_RATIO}))")
+                phase2 = run_phase("rounding_only", ro_target, full_deadline)
+            else:
+                print(f"\nsupplement phase skipped: S={S} → floor("
+                      f"{S} * {G.RO_TARGET_RATIO}) = 0 rounding_only")
+    finally:
+        mem.stop()
+        wp.terminate()
+        wp.join()
+
+    elapsed = time.time() - t0
+
+    if soundness["err"]:
+        idx, msg = soundness["err"]
+        print("\n!!! SOUNDNESS FAILURE — stopping immediately (premise set "
+              f"#{idx}) !!!")
+        print(msg)
+        return 2
+
+    added = phase1[0] + (phase2[0] if phase2 else 0)
+    replaced = phase1[1] + (phase2[1] if phase2 else 0)
+    # §rule 1/2: premise-index → record map and the indices skipped by a Lean
+    # compile failure (so the record = first-N-passing-by-index can be audited).
+    print("\npremise-index → record (commit order):")
+    print("  " + (", ".join(f"{n}=idx{ix}({md})" for n, ix, _dt, md in write_index_log)
+                  or "(none)"))
+    print(f"compile-failure-skipped premise indices: {compile_failed_idx or 'none'}")
+    _print_summary(stats, sampled, added, replaced, elapsed, sample_time_total,
+                   writes_by_depth, new_skel_segments, batch_count,
+                   batch_time_total, bisection_total, mem.peak, n_workers,
+                   phase1, phase2)
     return 0
+
+
+def _print_summary(stats, sampled, added, replaced, elapsed, sample_time_total,
+                   writes_by_depth, new_skel_segments, batch_count,
+                   batch_time_total, bisection_total, peak_bytes, n_workers,
+                   phase1=None, phase2=None):
+    by_depth, n_unknown, n_total = scan_records(G.RECORD)
+    mins = elapsed / 60.0 if elapsed else 0.0
+
+    print("\n" + "=" * 64)
+    print("HexForge v{} run summary".format(G.GENERATOR_VERSION))
+    print("=" * 64)
+
+    # §6.1 throughput
+    print("throughput:")
+    print(f"  new conjectures written : {added}  (+{replaced} in-place replacements)")
+    print(f"  premise sets processed  : {sampled}")
+    print(f"  wall time               : {elapsed:.1f}s ({mins:.2f} min), "
+          f"{n_workers} workers")
+    # §IV (v0.6.4): per-phase timing and output
+    if phase1 is not None:
+        print(f"  main  phase (split_needed) : {phase1[0]} written "
+              f"(+{phase1[1]} repl) in {phase1[3]:.1f}s")
+    if phase2 is not None:
+        print(f"  suppl phase (rounding_only): {phase2[0]} written "
+              f"(+{phase2[1]} repl) in {phase2[3]:.1f}s")
+    elif phase1 is not None:
+        print("  suppl phase (rounding_only): skipped")
+    if mins > 0:
+        print(f"  writes/min (overall)    : {added / mins:.2f}")
+        for dtp in ("split_needed", "rounding_only"):
+            print(f"  writes/min ({dtp:13s}): {writes_by_depth.get(dtp, 0) / mins:.2f}  "
+                  f"(total {writes_by_depth.get(dtp, 0)})")
+    if sampled:
+        print(f"  avg worker time / group : {sample_time_total / sampled:.2f}s "
+              f"(sum of per-group cpu time / groups)")
+
+    # §6.2 difficulty distribution
+    print("difficulty (hardness) distribution over the record:")
+    for dtp in ("split_needed", "rounding_only"):
+        q = _quantiles(by_depth.get(dtp, []))
+        cnt = len(by_depth.get(dtp, []))
+        if q:
+            print(f"  {dtp:13s} (n={cnt}): min={q[0]:.3f} p20={q[1]:.3f} "
+                  f"p40={q[2]:.3f} p60={q[3]:.3f} p80={q[4]:.3f} max={q[5]:.3f}")
+        else:
+            print(f"  {dtp:13s} (n=0): —")
+
+    # §6.3 skeleton saturation
+    print("skeleton saturation (new skeletons per 100 premise sets):")
+    if new_skel_segments:
+        for seg in sorted(new_skel_segments):
+            print(f"  premise sets {seg*100+1:>5}-{seg*100+100:<5}: "
+                  f"+{new_skel_segments[seg]} skeletons")
+    else:
+        print("  (none)")
+
+    # §6.4 attained unknown
+    ratio = (100.0 * n_unknown / n_total) if n_total else 0.0
+    print(f"attained == 'unknown': {n_unknown} / {n_total} ({ratio:.1f}%)")
+
+    # §6.5 discards
+    print("discards by reason:")
+    for reason in ("empty_premises", "no_p6_canonical", "p6_upper_bound",
+                   "p6_padding", "too_many_terms", "proof_reconstruct_failed",
+                   "premise_weakening", "linear_only", "not_attained",
+                   "too_shallow", "duplicate", "premise_minimized_duplicate",
+                   "same_skeleton_worse", "recheck_failed", "depth_mismatch",
+                   "rounding_only_skipped", "split_needed_skipped",
+                   "compile_failed"):
+        print(f"  {reason:28s}: {stats.get(reason, 0)}")
+
+    # §6.6 memory + Lean batches
+    print(f"peak memory (process tree) : {peak_bytes / (1024**3):.2f} GiB")
+    print(f"Lean batch compiles        : {batch_count}  "
+          f"(avg {batch_time_total / batch_count:.1f}s/batch)" if batch_count
+          else "Lean batch compiles        : 0")
+    print(f"bisection sub-compiles     : {bisection_total}")
 
 
 if __name__ == "__main__":

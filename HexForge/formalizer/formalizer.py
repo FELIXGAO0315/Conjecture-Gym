@@ -23,11 +23,38 @@ coefficient is stated in ℤ.
 from __future__ import annotations
 
 import subprocess
+import time
 from fractions import Fraction
 from math import gcd
 from pathlib import Path
 
 LEAN_DIR = Path(__file__).resolve().parent.parent / "lean"
+
+# v0.6.4 §III: the shared import header.  Every record / batch theorem uses the
+# identical preamble so Mathlib is elaborated once per batch file.
+LEAN_HEADER = ("import Mathlib\n"
+               "import Inventory\n"
+               "import HexLemmas\n\n"
+               "open Finset\n\n")
+
+
+# ── v0.6.4 §I: automatic HexLemmas rebuild ───────────────────────────────────
+def ensure_hexlemmas_fresh():
+    """If ``HexLemmas.lean`` is newer than its compiled ``.olean``, rebuild it with
+    ``lake build HexLemmas`` so records never import a stale module.  Raises on a
+    build failure (the whole run must stop — every proof imports HexLemmas)."""
+    src = LEAN_DIR / "HexLemmas.lean"
+    olean = LEAN_DIR / ".lake" / "build" / "lib" / "lean" / "HexLemmas.olean"
+    fresh = olean.exists() and olean.stat().st_mtime >= src.stat().st_mtime
+    if fresh:
+        return "up-to-date"
+    print("  HexLemmas.lean changed — running `lake build HexLemmas` ...")
+    res = subprocess.run(["lake", "build", "HexLemmas"], cwd=str(LEAN_DIR),
+                         capture_output=True, text=True)
+    out = (res.stdout + res.stderr).strip()
+    if res.returncode != 0 or "error:" in out:
+        raise RuntimeError("lake build HexLemmas failed:\n" + out[:4000])
+    return "rebuilt"
 
 # ── atom → Lean ℤ expression (M_MAX-aware) ──────────────────────────────────
 from ..anvil.inventory import M_MAX, TAIL_VAR, TAIL_COUNT_VARS
@@ -316,8 +343,10 @@ def _emit_step(step, lines, indent, text2hyp, case_hyps):
     lines.append(f"{indent}have {hid} : {stmt} := by omega")
 
 
-def build_lean(name: str, premises: list, conclusion: dict, proof_steps: list,
-               used_inventory: set = None, display: bool = False) -> str:
+def build_theorem(name: str, premises: list, conclusion: dict, proof_steps: list,
+                  used_inventory: set = None, display: bool = False) -> str:
+    """The single ``theorem … := by …`` block with NO import header (so many can
+    share one import header inside a batch file)."""
     prem_names = [f"h{i + 1}" for i in range(len(premises))]
     text2hyp = {pr.get("text", ""): nm for pr, nm in zip(premises, prem_names)}
     sig_prem = " ".join(_premise_hyp(pr, nm) for pr, nm in zip(premises, prem_names))
@@ -368,20 +397,47 @@ def build_lean(name: str, premises: list, conclusion: dict, proof_steps: list,
         extra = ", hBig"
     lines.append(f"  linarith [s{target_fid}, hFaceZ{extra}]")
 
-    header = (
-        "import Mathlib\n"
-        "import Inventory\n"
-        "import HexLemmas\n\n"
-        "open Finset\n\n"
+    theorem = (
         f"theorem {name} (maps : SimplyCon3ConnectedMap 0) (hM : IsMap maps)"
         f"{sig_prem} :\n    {goal} := by\n"
+        + "\n".join(lines) + "\n"
     )
-    return header + "\n".join(lines) + "\n"
+    return theorem
+
+
+def build_lean(name: str, premises: list, conclusion: dict, proof_steps: list,
+               used_inventory: set = None, display: bool = False) -> str:
+    """Full, standalone-compilable source (import header + single theorem)."""
+    return LEAN_HEADER + build_theorem(name, premises, conclusion, proof_steps,
+                                       used_inventory, display)
 
 
 # ── compilation ─────────────────────────────────────────────────────────────
-def compile_lean(name: str, source: str, timeout: int = 300) -> tuple:
-    target = LEAN_DIR / f"{name}.lean"
+import re as _re
+
+
+def _check_source(returncode, out, source):
+    """Shared success criteria (§2 v0.5, §III.4 v0.6.4): return code 0, no
+    ``error:``, no ``declaration uses 'sorry'`` warning, and no banned token in
+    the source itself.  Returns ``(ok, reason_str)``."""
+    banned = [w for w in ("sorry", "admit", "axiom", "native_decide")
+              if _re.search(r"\b" + w + r"\b", source)]
+    reasons = []
+    if returncode != 0:
+        reasons.append(f"return code {returncode}")
+    if "error:" in out:
+        reasons.append("error: in output")
+    if "declaration uses 'sorry'" in out:
+        reasons.append("declaration uses 'sorry'")
+    if banned:
+        reasons.append("banned tokens in source: " + ",".join(banned))
+    return (not reasons), "; ".join(reasons)
+
+
+def _run_lean(stem: str, source: str, timeout: int):
+    """Write ``{stem}.lean`` in the Lean project, run ``lake env lean`` on it,
+    and delete it.  Returns ``(ok, message)``."""
+    target = LEAN_DIR / f"{stem}.lean"
     target.write_text(source)
     try:
         res = subprocess.run(
@@ -392,25 +448,54 @@ def compile_lean(name: str, source: str, timeout: int = 300) -> tuple:
         target.unlink(missing_ok=True)
         return False, "compile timeout"
     out = (res.stdout + res.stderr).strip()
-    # §2 (v0.5): a compile counts as success only if ALL hold —
-    #   (1) return code 0 and no "error:" in output,
-    #   (2) no "declaration uses 'sorry'" warning (Inventory's own sorries live in
-    #       the pre-compiled module and never surface here),
-    #   (3) the source itself contains no sorry / admit / axiom / native_decide.
-    import re
-    banned = [w for w in ("sorry", "admit", "axiom", "native_decide")
-              if re.search(r"\b" + w + r"\b", source)]
-    reasons = []
-    if res.returncode != 0:
-        reasons.append(f"return code {res.returncode}")
-    if "error:" in out:
-        reasons.append("error: in output")
-    if "declaration uses 'sorry'" in out:
-        reasons.append("declaration uses 'sorry'")
-    if banned:
-        reasons.append("banned tokens in source: " + ",".join(banned))
-    ok = not reasons
-    if not ok:
-        target.unlink(missing_ok=True)
-        return False, (("; ".join(reasons)) + " || " + out)[:2000]
-    return True, "ok"
+    ok, reason = _check_source(res.returncode, out, source)
+    target.unlink(missing_ok=True)
+    if ok:
+        return True, "ok"
+    return False, (reason + " || " + out)[:2000]
+
+
+def compile_lean(name: str, source: str, timeout: int = 300) -> tuple:
+    """Compile a single full (header + theorem) source.  Used for standalone
+    record verification (checkpoint §9.5) and single-conjecture fallbacks."""
+    return _run_lean(name, source, timeout)
+
+
+def compile_batch(entries: list, timeout: int = 300):
+    """v0.6.4 §III: compile many theorems in ONE file (Mathlib loaded once).
+
+    ``entries`` is a list of ``(name, theorem_src)`` with header-less theorem
+    bodies and unique names.  On a whole-batch failure the batch is bisected to
+    locate the offender(s); only the failing theorems are reported as failed.
+
+    Returns ``(results, meta)`` where ``results`` maps name -> bool (compiled)
+    and ``meta`` is ``{"bisections": k}`` (number of extra sub-compiles beyond
+    the initial whole-batch attempt)."""
+    results = {}
+    meta = {"bisections": 0}
+
+    def src_of(subset):
+        return LEAN_HEADER + "\n\n".join(t for _n, t in subset) + "\n"
+
+    def stem_of(subset):
+        return "_HexBatch_" + "_".join(n for n, _t in subset[:1]) + f"_{len(subset)}"
+
+    def recurse(subset, is_top):
+        if not subset:
+            return
+        ok, _msg = _run_lean(stem_of(subset), src_of(subset), timeout)
+        if not is_top:
+            meta["bisections"] += 1
+        if ok:
+            for n, _t in subset:
+                results[n] = True
+            return
+        if len(subset) == 1:
+            results[subset[0][0]] = False
+            return
+        mid = len(subset) // 2
+        recurse(subset[:mid], False)
+        recurse(subset[mid:], False)
+
+    recurse(list(entries), True)
+    return results, meta

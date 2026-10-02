@@ -12,6 +12,7 @@ import json
 import os
 import random
 import shutil
+from collections import defaultdict
 from datetime import datetime, timezone
 from fractions import Fraction
 from math import gcd
@@ -32,16 +33,25 @@ ROOT = Path(__file__).resolve().parent.parent           # HexForge/
 DATA = ROOT / "data" / "plantri_pool.json"
 RECORD = ROOT / "record"
 
-GENERATOR_VERSION = "0.6.3"
+GENERATOR_VERSION = "0.6.4"
 MAX_COEFF = 6
 
 # v0.6.2 §2: per-premise-set time budget for direction enumeration.  If exceeded,
 # a random subset of the remaining directions is used (reported in the summary).
 DIRECTION_BUDGET_SEC = 30.0
 
-# v0.6.3 §1: keep only conjectures whose proof genuinely needs a case split
-# (v_int > ceil(v_lin)); plain-rounding candidates are discarded as rounding_only.
-REQUIRE_SPLIT = True
+# v0.6.4 §IV: rounding_only conjectures are the easy tier.  Generation now runs in
+# two phases (see run.py): a MAIN phase that produces only ``split_needed`` and a
+# SUPPLEMENT phase that produces only ``rounding_only``.  Each worker is told which
+# depth_type to ``accept``; a direction of the other type is dropped immediately
+# after enumeration (no proof reconstruction), exactly as v0.6.3 dropped
+# rounding_only via REQUIRE_SPLIT.
+#
+# v0.6.4 §IV.2: the per-record rounding_only quota (old RO_MAX_FRACTION) is gone.
+# Instead the supplement phase targets ``floor(S * RO_TARGET_RATIO)`` rounding_only
+# records, where S is the number of split_needed records written in the main phase
+# (so rounding_only end up at 20% of the total when RO_TARGET_RATIO = 0.25).
+RO_TARGET_RATIO = 0.25
 
 # v0.6.3 §3: at most this many terms besides p_6 in a conclusion (the merged
 # big_faces expression sum_pk_after_p6 counts as a single term).
@@ -716,12 +726,17 @@ def classify_depth(premises, direction_coeffs):
     return "rounding_only" if vint == _ceil(vlin - _LP_TOL) else "split_needed"
 
 
-def enumerate_candidates(premises, stats, rng):
+def enumerate_candidates(premises, stats, rng, accept="split_needed"):
     """§2: produce candidate conclusions ``{coeffs, rel:'>=', rhs}`` by enumerating
     directions and, for each, comparing the LP relaxation bound ``v_lin`` with the
     integer / case-split bound ``v_int``.  A direction is a candidate iff
     ``v_int > v_lin`` (it genuinely needs rounding or a case split).  The split
-    tree and the relaxation matrices are built once per premise set."""
+    tree and the relaxation matrices are built once per premise set.
+
+    ``accept`` (``"split_needed"`` | ``"rounding_only"``) keeps only directions of
+    that deductive depth; the other type is dropped here (reason
+    ``rounding_only_skipped`` / ``split_needed_skipped``) before any expensive proof
+    reconstruction, exactly as v0.6.3 dropped rounding_only via REQUIRE_SPLIT."""
     pf = _premise_forms(premises)
     # v_lin matrices (relaxation: unconditional + triggerable conditionals), once
     lin_base = pf + _unconditional_forms()
@@ -746,10 +761,13 @@ def enumerate_candidates(premises, stats, rng):
         if sint != "opt":
             continue
         if vint > vlin + _LP_TOL:
-            # §1 (v0.6.3): drop candidates that only need rounding (v_int =
-            # ceil(v_lin)); keep only those where the case split adds strictly more.
-            if REQUIRE_SPLIT and vint == _ceil(vlin - _LP_TOL):
-                stats["rounding_only"] += 1
+            # §IV (v0.6.4): classify the direction now (rounding_only when the case
+            # split adds nothing beyond ceil(v_lin)) and keep only the accepted
+            # depth — the other type is dropped before proof reconstruction.
+            dtype = "rounding_only" if vint == _ceil(vlin - _LP_TOL) else "split_needed"
+            if dtype != accept:
+                stats["rounding_only_skipped" if dtype == "rounding_only"
+                      else "split_needed_skipped"] += 1
                 continue
             out.append({"coeffs": dict(d), "rel": ">=", "rhs": int(vint)})
         else:
@@ -1502,11 +1520,21 @@ def build_md(data: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-# ── one attempt ──────────────────────────────────────────────────────────────
-def attempt(rng, pool, next_id, existing_hashes, stats, seed, skel_index):
-    """Try to produce one conjecture.  Returns ``(record_data, lean_src, ...)``
-    on success, or ``None`` (with ``stats`` updated) on any discard.  Raises on
-    a soundness violation."""
+# ── one attempt (worker side, v0.6.4 §II) ────────────────────────────────────
+def process_premise_set(rng, pool, existing_hashes, stats, seed, accept="split_needed"):
+    """Worker-side work for ONE premise set: sampling, direction enumeration, proof
+    reconstruction, every check, the integer counter-model gate, and scoring.
+
+    Returns a ``proposal`` dict (everything the main process needs to judge the
+    skeleton, apply the quota, number, formalise and write) or ``None`` on a
+    discard (with ``stats`` updated).  The main-process–only steps — intra-run
+    exact-duplicate / skeleton / quota judgement, numbering, Lean compilation and
+    record writing — are NOT done here.  Raises ``AssertionError`` on a soundness
+    violation or counter-model (the whole run must then stop).
+
+    ``existing_hashes`` is the immutable pre-run snapshot (so a candidate equal to
+    a pre-existing record is dropped here); intra-run duplicates are caught by the
+    main process."""
     pvecs, features, pvec_vars = pool
     # §4 (v0.4): the deduction cache is reused within one attempt (many
     # candidates re-run minimisation over the same premise subsets) but cleared
@@ -1529,7 +1557,7 @@ def attempt(rng, pool, next_id, existing_hashes, stats, seed, skel_index):
 
     # §2 (v0.6.2): candidates from systematic direction enumeration (LP + case
     # split), not from random pairing / a saturated pool.
-    candidates = enumerate_candidates(premises, stats, rng)
+    candidates = enumerate_candidates(premises, stats, rng, accept)
     if not candidates:
         stats["no_p6_canonical"] += 1
         return None
@@ -1655,26 +1683,17 @@ def attempt(rng, pool, next_id, existing_hashes, stats, seed, skel_index):
         amin = arith_min(pruned, disp)
         arith_sharp = (amin is not None and amin == int(disp["rhs"]))
 
-        # exact-duplicate dedup (same premises AND same constants)
+        # exact-duplicate dedup against the PRE-RUN snapshot (intra-run duplicates
+        # are caught by the main process, which owns the evolving record state).
         h = conjecture_hash(pruned, conclusion)
         if h in existing_hashes:
             stats["premise_minimized_duplicate" if not pruned else "duplicate"] += 1
             continue
 
-        # §2 (v0.6): skeleton de-duplication (judged before the counter-model gate
-        # and Lean compile; metrics computed first so worse candidates are dropped
-        # cheaply).  Replacement itself happens only after all checks pass.
+        # metrics for the main-process skeleton judgement (not judged here).
         skel = conjecture_skeleton(pruned, disp)
         new_metrics = {"attained": attained, "touch": touch_val,
                        "arith_sharp": arith_sharp, "hardness": hard}
-        mode, target, supersedes = "new", f"C{next_id}", []
-        if skel in skel_index:
-            ex = skel_index[skel]
-            if not skeleton_better(new_metrics, ex):
-                stats["same_skeleton_worse"] += 1
-                continue
-            mode, target = "replace", ex["name"]
-            supersedes = [ex["formula"]] + list(ex.get("supersedes", []))
 
         # exact re-check + soundness on the real pool
         ok, msg = recheck(ctx_m, fact, pruned)
@@ -1703,55 +1722,109 @@ def attempt(rng, pool, next_id, existing_hashes, stats, seed, skel_index):
         # deterministic fids (§4) so the record is independent of the cache
         renumber_steps(tb)
 
-        # step-by-step formalisation + compile (goal in display form)
-        lean_src = F.build_lean(target, pruned, disp, tb, display=True)
-        cok, cmsg = F.compile_lean(target, lean_src)
-        if not cok:
-            stats["compile_failed"] += 1
-            stats.setdefault("compile_msgs", []).append((target, cmsg[:200]))
+        # §2 (v0.6.2): deductive-depth label (diagnostic + v0.6.4 §IV tiering).
+        depth_type = classify_depth(pruned, cic)
+        # §IV (v0.6.4): the direction-level filter in enumerate_candidates classifies
+        # the raw direction; after strengthening/canonicalisation the final label can
+        # (rarely) differ.  Keep each phase pure: accept only the requested depth.
+        if depth_type != accept:
+            stats["depth_mismatch"] += 1
             continue
 
-        # §2 (v0.6.2): deductive-depth label (diagnostic only, never filters).
-        # Counted under a distinct key so it does not collide with the v0.6.3
-        # ``rounding_only`` enumeration discard reason.
-        depth_type = classify_depth(pruned, cic)
-        stats["depth_" + depth_type] += 1
-
-        data = {
-            "id": target,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "generator": {"version": GENERATOR_VERSION, "seed": seed},
-            "conjecture": {
-                "formula": formula_string(pruned, disp),
-                "premises": [{"text": pr.get("text", ""),
-                              "coeffs": {k: int(v) for k, v in pr["coeffs"].items()},
-                              "rel": pr["rel"], "rhs": int(pr["rhs"])}
-                             for pr in pruned],
-                "conclusion": {
-                    "text": display_text(disp),
-                    "coeffs": {k: int(v) for k, v in disp["coeffs"].items()},
-                    "rel": disp["rel"], "rhs": int(disp["rhs"])},
-                "natural_language": natural_language(pruned, disp),
-            },
-            "proof": {"inventory_used": inv_theorems,
-                      "lemmas_used": lemmas_used,
-                      "steps": tb},
+        return {
+            "seed": seed,
+            "premises": pruned,
+            "disp": disp,
+            "conclusion": conclusion,
+            "tb": tb,
+            "inv_theorems": inv_theorems,
+            "lemmas_used": lemmas_used,
             "iris": {k: iris[k] for k in ("T", "R", "L", "score")},
             "attained": attained,
             "touch": touch_val,
             "arith_sharp": arith_sharp,
             "arith_min": amin,
-            "depth_type": depth_type,
-            "supersedes": supersedes,
             "hardness": hard,
-            "lean": {"theorem_name": target, "status": "compiled"},
+            "depth_type": depth_type,
+            "hash": h,
+            "skeleton": skel,
+            "metrics": new_metrics,
         }
-        existing_hashes[h] = target
-        return {"data": data, "lean_src": lean_src, "conclusion": disp,
-                "inventory": inv_theorems, "mode": mode, "target": target,
-                "skeleton": skel, "metrics": new_metrics}
 
     return None
+
+
+# ── record assembly (main side, v0.6.4 §II) ──────────────────────────────────
+def assemble_data(proposal: dict, target: str, supersedes: list) -> dict:
+    """Build the record ``data`` dict from a worker proposal (main process)."""
+    pruned, disp = proposal["premises"], proposal["disp"]
+    return {
+        "id": target,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "generator": {"version": GENERATOR_VERSION, "seed": proposal["seed"]},
+        "conjecture": {
+            "formula": formula_string(pruned, disp),
+            "premises": [{"text": pr.get("text", ""),
+                          "coeffs": {k: int(v) for k, v in pr["coeffs"].items()},
+                          "rel": pr["rel"], "rhs": int(pr["rhs"])}
+                         for pr in pruned],
+            "conclusion": {
+                "text": display_text(disp),
+                "coeffs": {k: int(v) for k, v in disp["coeffs"].items()},
+                "rel": disp["rel"], "rhs": int(disp["rhs"])},
+            "natural_language": natural_language(pruned, disp),
+        },
+        "proof": {"inventory_used": proposal["inv_theorems"],
+                  "lemmas_used": proposal["lemmas_used"],
+                  "steps": proposal["tb"]},
+        "iris": proposal["iris"],
+        "attained": proposal["attained"],
+        "touch": proposal["touch"],
+        "arith_sharp": proposal["arith_sharp"],
+        "arith_min": proposal["arith_min"],
+        "depth_type": proposal["depth_type"],
+        "supersedes": supersedes,
+        "hardness": proposal["hardness"],
+        "lean": {"theorem_name": target, "status": "compiled"},
+    }
+
+
+# ── multiprocessing worker plumbing (v0.6.4 §II) ──────────────────────────────
+# Set in the parent before the Pool is forked so each worker inherits the loaded
+# pool (copy-on-write) rather than receiving it pickled per task.
+_W_POOL = None
+_W_HASHES = None
+_W_BASE_SEED = None
+
+
+def set_worker_globals(pool, existing_hashes_snapshot, base_seed):
+    global _W_POOL, _W_HASHES, _W_BASE_SEED
+    _W_POOL = pool
+    _W_HASHES = existing_hashes_snapshot
+    _W_BASE_SEED = base_seed
+
+
+def seed_for(idx: int) -> int:
+    """Deterministic per-premise-set seed from the base seed and the index (§II.2)."""
+    return _W_BASE_SEED * 1_000_003 + idx
+
+
+def worker(idx: int, accept: str = "split_needed"):
+    """Top-level (picklable) worker entry.  Returns a tuple whose first element is
+    one of ``"ok"`` / ``"soundness"`` describing the outcome.  ``accept`` selects the
+    depth_type this call produces (``"split_needed"`` for the main phase,
+    ``"rounding_only"`` for the supplement phase)."""
+    import time as _t
+    _ctx_cache_clear()
+    seed = seed_for(idx)
+    rng = random.Random(seed)
+    local_stats = defaultdict(int)
+    t0 = _t.time()
+    try:
+        prop = process_premise_set(rng, _W_POOL, _W_HASHES, local_stats, seed, accept)
+    except AssertionError as exc:
+        return ("soundness", idx, str(exc), dict(local_stats), _t.time() - t0)
+    return ("ok", idx, prop, dict(local_stats), _t.time() - t0)
 
 
 # ── atomic record writing ────────────────────────────────────────────────────
