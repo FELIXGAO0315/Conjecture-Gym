@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## HexForge (v0.6.2)
+## HexForge (v0.6.3)
 
 HexForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about simple 3-polytopes, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures on p₆ — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -57,6 +57,7 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v0.6.3** — Only conjectures whose proof requires a case split are kept; f_2 appears only in premises, never in conclusions; at most 3 terms besides p_6 in a conclusion.
 - **v0.6.2** — Candidates from systematic direction enumeration with case-split LP bounds instead of random pairing; big_faces (sum over k ≥ 7) restored as a premise expression and display form.
 - **v0.6.1** — Large faces listed individually (p_7 … p_10 plus a tail for k ≥ 11; upper limit configurable), arithmetic sharpness check via integer programming.
 - **v0.6** — Skeleton de-duplication: conjectures differing only in constants share a skeleton; each skeleton keeps only its best conjecture (attained, then number of real polytopes attaining equality, then hardness), replaced in place.

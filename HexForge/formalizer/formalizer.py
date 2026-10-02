@@ -29,40 +29,48 @@ from pathlib import Path
 
 LEAN_DIR = Path(__file__).resolve().parent.parent / "lean"
 
-# ── atom → Lean ℤ expression (v0.6.1) ───────────────────────────────────────
-_SUM_TAIL = "∑ k ∈ Finset.Ico 11 (maps.m + 1), (maps.p_i k : ℤ)"
-_SUM_BIG = "∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ)"
+# ── atom → Lean ℤ expression (M_MAX-aware) ──────────────────────────────────
+from ..anvil.inventory import M_MAX, TAIL_VAR, TAIL_COUNT_VARS
+
+_TAIL_START = M_MAX + 1                       # 7 for M_MAX=6, 11 for M_MAX=10
+_HAS_LARGE = M_MAX >= 7                       # are p_7..p_{M_MAX} individual?
+_SUM_TAIL = f"∑ k ∈ Finset.Ico {_TAIL_START} (maps.m + 1), (maps.p_i k : ℤ)"
+_SUM_BIG = "∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ)"   # Σ_{k≥7}
 _INT = {
     "p_3": "(maps.p_i 3 : ℤ)", "p_4": "(maps.p_i 4 : ℤ)",
     "p_5": "(maps.p_i 5 : ℤ)", "p_6": "(maps.p_i 6 : ℤ)",
-    "p_7": "(maps.p_i 7 : ℤ)", "p_8": "(maps.p_i 8 : ℤ)",
-    "p_9": "(maps.p_i 9 : ℤ)", "p_10": "(maps.p_i 10 : ℤ)",
-    "sum_pk_after_p10": _SUM_TAIL,
+    TAIL_VAR: _SUM_TAIL,
     "sum_pk_after_p6": _SUM_BIG,
     "f_2": "∑ k ∈ Finset.Ico 3 (maps.m + 1), (maps.p_i k : ℤ)",
-    "W_tail": "∑ k ∈ Finset.Ico 11 (maps.m + 1), ((k : ℤ) - 6) * (maps.p_i k : ℤ)",
-    "J_tail": "∑ k ∈ Finset.Ico 11 (maps.m + 1), (((k : ℤ) + 1) / 2 - 6) * (maps.p_i k : ℤ)",
+    "W_tail": f"∑ k ∈ Finset.Ico {_TAIL_START} (maps.m + 1), ((k : ℤ) - 6) * (maps.p_i k : ℤ)",
+    "J_tail": f"∑ k ∈ Finset.Ico {_TAIL_START} (maps.m + 1), (((k : ℤ) + 1) / 2 - 6) * (maps.p_i k : ℤ)",
 }
 _NAT = {
     "p_3": "maps.p_i 3", "p_4": "maps.p_i 4", "p_5": "maps.p_i 5",
-    "p_6": "maps.p_i 6", "p_7": "maps.p_i 7", "p_8": "maps.p_i 8",
-    "p_9": "maps.p_i 9", "p_10": "maps.p_i 10",
-    "sum_pk_after_p10": "∑ k ∈ Finset.Ico 11 (maps.m + 1), maps.p_i k",
+    "p_6": "maps.p_i 6",
+    TAIL_VAR: f"∑ k ∈ Finset.Ico {_TAIL_START} (maps.m + 1), maps.p_i k",
     "f_2": "∑ k ∈ Finset.Ico 3 (maps.m + 1), maps.p_i k",
 }
-_ORDER = ["p_3", "p_4", "p_5", "p_6", "p_7", "p_8", "p_9", "p_10",
-          "sum_pk_after_p10", "sum_pk_after_p6", "f_2", "W_tail", "J_tail"]
+for _k in range(7, M_MAX + 1):                # individual large faces (none at M_MAX=6)
+    _INT[f"p_{_k}"] = f"(maps.p_i {_k} : ℤ)"
+    _NAT[f"p_{_k}"] = f"maps.p_i {_k}"
+
+_ORDER = (["p_3", "p_4", "p_5", "p_6"] + [f"p_{k}" for k in range(7, M_MAX + 1)]
+          + [TAIL_VAR, "sum_pk_after_p6", "f_2", "W_tail", "J_tail"])
+# keep _ORDER free of duplicates (TAIL_VAR == sum_pk_after_p6 at M_MAX=6)
+_seen = set()
+_ORDER = [v for v in _ORDER if not (v in _seen or _seen.add(v))]
 
 _TAIL_LEMMA = {
     "tail_excess": "SimplyCon3ConnectedMap.tail_excess maps",
-    "tail_juc_nonneg": "SimplyCon3ConnectedMap.tail_juc_nonneg maps",
+    "tail_juc_lower": "SimplyCon3ConnectedMap.tail_juc_lower maps",
     "tail_juc_upper": "SimplyCon3ConnectedMap.tail_juc_upper maps",
     "tail_juc_half": "SimplyCon3ConnectedMap.tail_juc_half maps",
 }
 
 _REL = {">=": "≥", "<=": "≤", "==": "=", "=": "="}
 
-_TAILCOUNT_VARS = ["p_7", "p_8", "p_9", "p_10", "sum_pk_after_p10"]
+_TAILCOUNT_VARS = list(TAIL_COUNT_VARS)
 
 
 def _nk(coeffs: dict):
@@ -186,22 +194,27 @@ def _emit_step(step, lines, indent, text2hyp, case_hyps):
     if rule == "inventory":
         inv = step["inventory"]
         if inv == "Juc_EulerFormula":
-            # expand Σ_{k≥7}(k-6)p via split_W, then combine with Euler
             lines.append(f"{indent}have {hid} : {stmt} := by")
             lines.append(f"{indent}  have he := Juc_EulerFormula maps hM")
-            lines.append(f"{indent}  have hw := SimplyCon3ConnectedMap.split_W maps hM")
-            lines.append(f"{indent}  linear_combination he + hw")
+            if _HAS_LARGE:
+                # expand Σ_{k≥7}(k-6)p via split_W, then combine with Euler
+                lines.append(f"{indent}  have hw := SimplyCon3ConnectedMap.split_W maps hM")
+                lines.append(f"{indent}  linear_combination he + hw")
+            else:
+                # W_tail IS Σ_{k≥7}(k-6)p — exactly the Euler sum, no split needed
+                lines.append(f"{indent}  linear_combination he")
             return
         elif inv == "face_split":
+            fs = ("face_split" if _HAS_LARGE else "face_split_agg")
             lines.append(f"{indent}have {hid} : {stmt} := by")
-            lines.append(f"{indent}  have h := SimplyCon3ConnectedMap.face_split maps hM")
+            lines.append(f"{indent}  have h := SimplyCon3ConnectedMap.{fs} maps hM")
             lines.append(f"{indent}  have h2 := congrArg (Nat.cast : ℕ → ℤ) h")
             lines.append(f"{indent}  push_cast at h2")
             lines.append(f"{indent}  omega")
             return
         elif inv in _TAIL_LEMMA:
             tac = f"by have h := {_TAIL_LEMMA[inv]}; linarith [h]"
-        elif inv == "nonneg_sum_pk_after_p10":
+        elif inv == f"nonneg_{TAIL_VAR}":
             tac = "by exact Finset.sum_nonneg (fun k _ => by positivity)"
         elif inv and inv.startswith("nonneg_"):
             tac = "by positivity"
@@ -240,17 +253,28 @@ def _emit_step(step, lines, indent, text2hyp, case_hyps):
             lines.append(f"{indent}  have hf7 : 7 ≤ ∑ k ∈ Finset.Ico 3 (maps.m + 1), "
                          f"maps.p_i k := by zify; linarith [{trig}]")
             lines.append(f"{indent}  have hj := (JucovicTheorem maps hM hf7).1")
-            lines.append(f"{indent}  have hJs := SimplyCon3ConnectedMap.split_J maps hM")
-            lines.append(f"{indent}  linarith [hj, hJs]")
+            if _HAS_LARGE:
+                lines.append(f"{indent}  have hJs := SimplyCon3ConnectedMap.split_J maps hM")
+                lines.append(f"{indent}  linarith [hj, hJs]")
+            else:
+                # J_tail IS Σ_{k≥7}(⌊(k+1)/2⌋-6)p — the Jučovič sum, no split needed
+                lines.append(f"{indent}  linarith [hj]")
         elif inv == "Barnette_P6Bound":
-            tc = " + ".join(_INT[v] for v in _TAILCOUNT_VARS)
-            lines.append(f"{indent}  have hcnt := SimplyCon3ConnectedMap.split_count maps hM")
-            lines.append(f"{indent}  have hS3 : (3 : ℤ) ≤ {tc} := by linarith [{trig}]")
-            lines.append(f"{indent}  have hsum7 : (3 : ℤ) ≤ ∑ k ∈ Finset.Ico 7 (maps.m + 1), "
-                         f"(maps.p_i k : ℤ) := by linarith [hS3, hcnt]")
-            lines.append(f"{indent}  have hm6 := SimplyCon3ConnectedMap.barnette_m_ge_six maps hsum7")
-            lines.append(f"{indent}  have hb := Barnette_P6Bound maps hM hm6 hsum7")
-            lines.append(f"{indent}  linarith [hb, hcnt]")
+            if _HAS_LARGE:
+                tc = " + ".join(_INT[v] for v in _TAILCOUNT_VARS)
+                lines.append(f"{indent}  have hcnt := SimplyCon3ConnectedMap.split_count maps hM")
+                lines.append(f"{indent}  have hS3 : (3 : ℤ) ≤ {tc} := by linarith [{trig}]")
+                lines.append(f"{indent}  have hsum7 : (3 : ℤ) ≤ ∑ k ∈ Finset.Ico 7 (maps.m + 1), "
+                             f"(maps.p_i k : ℤ) := by linarith [hS3, hcnt]")
+                lines.append(f"{indent}  have hm6 := SimplyCon3ConnectedMap.barnette_m_ge_six maps hsum7")
+                lines.append(f"{indent}  have hb := Barnette_P6Bound maps hM hm6 hsum7")
+                lines.append(f"{indent}  linarith [hb, hcnt]")
+            else:
+                # the trigger fact is Σ_{k≥7} p_k ≥ 3 directly (= sum_pk_after_p6)
+                lines.append(f"{indent}  have hsum7 : (3 : ℤ) ≤ {_SUM_BIG} := by linarith [{trig}]")
+                lines.append(f"{indent}  have hm6 := SimplyCon3ConnectedMap.barnette_m_ge_six maps hsum7")
+                lines.append(f"{indent}  have hb := Barnette_P6Bound maps hM hm6 hsum7")
+                lines.append(f"{indent}  linarith [hb]")
         return
 
     if rule == "combination":
@@ -302,10 +326,12 @@ def build_lean(name: str, premises: list, conclusion: dict, proof_steps: list,
 
     need_big = False
     if display:
-        # §1.2 (v0.6.2): merge p_7..p_10 + sum_pk_after_p10 into ∑_{k>=7} p_k when
-        # they share one coefficient, bridged below via split_count.
+        # §1.2 (v0.6.2): when the individual large faces p_7..p_{M_MAX} and the tail
+        # share one coefficient, merge them to ∑_{k>=7} p_k, bridged via split_count.
+        # At M_MAX=6 there are no individual large faces (the tail IS Σ_{k≥7}), so no
+        # bridge is needed and the conclusion already uses sum_pk_after_p6.
         vals = set(int(conclusion["coeffs"].get(v, 0)) for v in _TAILCOUNT_VARS)
-        if len(vals) == 1 and next(iter(vals)) != 0:
+        if _HAS_LARGE and len(vals) == 1 and next(iter(vals)) != 0:
             b = next(iter(vals))
             gcoeffs = {k: int(c) for k, c in conclusion["coeffs"].items()
                        if k not in _TAILCOUNT_VARS}
@@ -325,10 +351,11 @@ def build_lean(name: str, premises: list, conclusion: dict, proof_steps: list,
     # face_split bridge so the final linarith can reconcile the display form
     # (p_6 vs the rest, possibly using f_2) with the proven fact
     _rhs = " + ".join(_INT[v] for v in
-                      ["p_3", "p_4", "p_5", "p_6", "p_7", "p_8", "p_9", "p_10",
-                       "sum_pk_after_p10"])
+                      (["p_3", "p_4", "p_5", "p_6"]
+                       + [f"p_{k}" for k in range(7, M_MAX + 1)] + [TAIL_VAR]))
+    _fs = ("face_split" if _HAS_LARGE else "face_split_agg")
     lines.append(f"  have hFaceZ : {_INT['f_2']} = {_rhs} := by")
-    lines.append("    have h := SimplyCon3ConnectedMap.face_split maps hM")
+    lines.append(f"    have h := SimplyCon3ConnectedMap.{_fs} maps hM")
     lines.append("    have h2 := congrArg (Nat.cast : ℕ → ℤ) h")
     lines.append("    push_cast at h2")
     lines.append("    omega")

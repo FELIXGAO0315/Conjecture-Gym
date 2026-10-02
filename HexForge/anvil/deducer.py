@@ -835,7 +835,7 @@ def vars_from_pvec(pvec: dict) -> dict:
             "p_6": p.get(6, 0)}
     for k in range(7, mm + 1):
         vals[f"p_{k}"] = p.get(k, 0)
-    vals["sum_pk_after_p10"] = sum(v for k, v in p.items() if k > mm)
+    vals[inventory.TAIL_VAR] = sum(v for k, v in p.items() if k > mm)
     vals["f_2"] = sum(v for k, v in p.items() if k >= 3)
     vals["W_tail"] = sum((k - 6) * v for k, v in p.items() if k > mm)
     vals["J_tail"] = sum(((k + 1) // 2 - 6) * v for k, v in p.items() if k > mm)

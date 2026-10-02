@@ -41,7 +41,8 @@ def _print_summary(stats, sampled, added, elapsed, f2_upper):
     print(f"  wall time               : {elapsed:.1f}s")
     print("  discards by reason:")
     for reason in ("empty_premises", "no_p6_canonical", "p6_only_via_f2",
-                   "p6_upper_bound", "p6_padding", "proof_reconstruct_failed",
+                   "p6_upper_bound", "p6_padding", "too_many_terms",
+                   "rounding_only", "proof_reconstruct_failed",
                    "premise_weakening", "linear_only", "not_attained",
                    "too_shallow", "duplicate", "premise_minimized_duplicate",
                    "same_skeleton_worse", "recheck_failed", "compile_failed"):
@@ -65,8 +66,8 @@ def _print_summary(stats, sampled, added, elapsed, f2_upper):
     print(f"      direction-budget truncations : "
           f"{stats.get('dir_budget_truncated', 0)}")
     # v0.6.2 §2: deductive-depth labels of the written conjectures
-    print(f"      depth_type: rounding_only {stats.get('rounding_only', 0)}, "
-          f"split_needed {stats.get('split_needed', 0)}")
+    print(f"      depth_type: rounding_only {stats.get('depth_rounding_only', 0)}, "
+          f"split_needed {stats.get('depth_split_needed', 0)}")
     if stats.get("compile_msgs"):
         print("  sample compile failures:")
         for nm, msg in stats["compile_msgs"][:3]:

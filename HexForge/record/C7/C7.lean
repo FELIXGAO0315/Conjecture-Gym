@@ -4,36 +4,53 @@ import HexLemmas
 
 open Finset
 
-theorem C7 (maps : SimplyCon3ConnectedMap 0) (hM : IsMap maps) (h1 : ∑ k ∈ Finset.Ico 3 (maps.m + 1), maps.p_i k ≥ 10) :
-    2 * (maps.p_i 6 : ℤ) ≥ (maps.p_i 9 : ℤ) - 2 * ∑ k ∈ Finset.Ico 3 (maps.m + 1), (maps.p_i k : ℤ) + 18 := by
-  have s1 : ∑ k ∈ Finset.Ico 11 (maps.m + 1), (((k : ℤ) + 1) / 2 - 6) * (maps.p_i k : ℤ) ≥ 0 := by have h := SimplyCon3ConnectedMap.tail_juc_nonneg maps; linarith [h]
-  have s2 : -5 * ∑ k ∈ Finset.Ico 11 (maps.m + 1), (maps.p_i k : ℤ) + ∑ k ∈ Finset.Ico 11 (maps.m + 1), ((k : ℤ) - 6) * (maps.p_i k : ℤ) - ∑ k ∈ Finset.Ico 11 (maps.m + 1), (((k : ℤ) + 1) / 2 - 6) * (maps.p_i k : ℤ) ≥ 0 := by have h := SimplyCon3ConnectedMap.tail_juc_upper maps; linarith [h]
-  have s3 : (maps.p_i 5 : ℤ) ≥ 0 := by positivity
-  have s4 : (maps.p_i 6 : ℤ) ≥ 0 := by positivity
-  have s5 : (maps.p_i 7 : ℤ) ≥ 0 := by positivity
-  have s6 : (maps.p_i 8 : ℤ) ≥ 0 := by positivity
-  have s7 : (maps.p_i 10 : ℤ) ≥ 0 := by positivity
-  have s8 : ∑ k ∈ Finset.Ico 11 (maps.m + 1), (maps.p_i k : ℤ) ≥ 0 := by exact Finset.sum_nonneg (fun k _ => by positivity)
-  have s9 : ∑ k ∈ Finset.Ico 3 (maps.m + 1), (maps.p_i k : ℤ) ≥ 10 := by exact_mod_cast h1
-  have s10 : 2 * (maps.p_i 4 : ℤ) + 3 * (maps.p_i 5 : ℤ) + 3 * (maps.p_i 6 : ℤ) + 2 * (maps.p_i 7 : ℤ) + 2 * (maps.p_i 8 : ℤ) + (maps.p_i 9 : ℤ) + (maps.p_i 10 : ℤ) - ∑ k ∈ Finset.Ico 11 (maps.m + 1), (((k : ℤ) + 1) / 2 - 6) * (maps.p_i k : ℤ) ≥ 12 := by
-    have hf7 : 7 ≤ ∑ k ∈ Finset.Ico 3 (maps.m + 1), maps.p_i k := by zify; linarith [s9]
-    have hj := (JucovicTheorem maps hM hf7).1
-    have hJs := SimplyCon3ConnectedMap.split_J maps hM
-    linarith [hj, hJs]
-  have s11 : 3 * (maps.p_i 3 : ℤ) + 2 * (maps.p_i 4 : ℤ) + (maps.p_i 5 : ℤ) - (maps.p_i 7 : ℤ) - 2 * (maps.p_i 8 : ℤ) - 3 * (maps.p_i 9 : ℤ) - 4 * (maps.p_i 10 : ℤ) - ∑ k ∈ Finset.Ico 11 (maps.m + 1), ((k : ℤ) - 6) * (maps.p_i k : ℤ) = 12 := by
-    have he := Juc_EulerFormula maps hM
-    have hw := SimplyCon3ConnectedMap.split_W maps hM
-    linear_combination he + hw
-  have s12 : -(maps.p_i 3 : ℤ) - (maps.p_i 4 : ℤ) - (maps.p_i 5 : ℤ) - (maps.p_i 6 : ℤ) - (maps.p_i 7 : ℤ) - (maps.p_i 8 : ℤ) - (maps.p_i 9 : ℤ) - (maps.p_i 10 : ℤ) - ∑ k ∈ Finset.Ico 11 (maps.m + 1), (maps.p_i k : ℤ) + ∑ k ∈ Finset.Ico 3 (maps.m + 1), (maps.p_i k : ℤ) = 0 := by
-    have h := SimplyCon3ConnectedMap.face_split maps hM
+theorem C7 (maps : SimplyCon3ConnectedMap 0) (hM : IsMap maps) (h1 : ∑ k ∈ Finset.Ico 3 (maps.m + 1), maps.p_i k ≥ 32) (h2 : ∑ k ∈ Finset.Ico 7 (maps.m + 1), maps.p_i k ≤ 5) :
+    2 * (maps.p_i 6 : ℤ) ≥ -2 * (maps.p_i 4 : ℤ) - (maps.p_i 5 : ℤ) + 11 := by
+  have s1 : 2 * (maps.p_i 4 : ℤ) + (maps.p_i 5 : ℤ) + 2 * (maps.p_i 6 : ℤ) ≥ 11 := by
+    by_cases hc1 : (3 : ℤ) ≤ ∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ)
+    · -- 1*sum_pk_after_p6 >= 3
+      have s2 : (maps.p_i 4 : ℤ) ≥ 0 := by positivity
+      have s3 : (maps.p_i 6 : ℤ) ≥ 0 := by positivity
+      have s4 : ∑ k ∈ Finset.Ico 3 (maps.m + 1), (maps.p_i k : ℤ) ≥ 32 := by exact_mod_cast h1
+      have s5 : 5 ≥ ∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ) := by exact_mod_cast h2
+      have s6 : ∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ) ≥ 3 := by linarith [hc1]
+      have s7 : -(maps.p_i 3 : ℤ) + (maps.p_i 5 : ℤ) + 2 * (maps.p_i 6 : ℤ) + 2 * ∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ) ≥ 4 := by
+        have hsum7 : (3 : ℤ) ≤ ∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ) := by linarith [s6]
+        have hm6 := SimplyCon3ConnectedMap.barnette_m_ge_six maps hsum7
+        have hb := Barnette_P6Bound maps hM hm6 hsum7
+        linarith [hb]
+      have s8 : -(maps.p_i 3 : ℤ) - (maps.p_i 4 : ℤ) - (maps.p_i 5 : ℤ) - (maps.p_i 6 : ℤ) - ∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ) + ∑ k ∈ Finset.Ico 3 (maps.m + 1), (maps.p_i k : ℤ) = 0 := by
+        have h := SimplyCon3ConnectedMap.face_split_agg maps hM
+        have h2 := congrArg (Nat.cast : ℕ → ℤ) h
+        push_cast at h2
+        omega
+      have s9 : 4 * (maps.p_i 4 : ℤ) + 2 * (maps.p_i 5 : ℤ) + 4 * (maps.p_i 6 : ℤ) ≥ 21 := by linarith [s2, s3, s4, s5, s7, s8]
+      have s10 : 2 * (maps.p_i 4 : ℤ) + (maps.p_i 5 : ℤ) + 2 * (maps.p_i 6 : ℤ) ≥ 11 := by have hr := s9; omega
+      linarith [s10]
+    · -- 1*sum_pk_after_p6 <= 2
+      have s11 : 6 * ∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ) - ∑ k ∈ Finset.Ico 7 (maps.m + 1), ((k : ℤ) - 6) * (maps.p_i k : ℤ) + 2 * ∑ k ∈ Finset.Ico 7 (maps.m + 1), (((k : ℤ) + 1) / 2 - 6) * (maps.p_i k : ℤ) ≥ 0 := by have h := SimplyCon3ConnectedMap.tail_juc_half maps; linarith [h]
+      have s12 : (maps.p_i 4 : ℤ) ≥ 0 := by positivity
+      have s13 : (maps.p_i 6 : ℤ) ≥ 0 := by positivity
+      have s14 : ∑ k ∈ Finset.Ico 3 (maps.m + 1), (maps.p_i k : ℤ) ≥ 32 := by exact_mod_cast h1
+      have s15 : -∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ) ≥ -2 := by have hcc := hc1; omega
+      have s16 : 2 * (maps.p_i 4 : ℤ) + 3 * (maps.p_i 5 : ℤ) + 3 * (maps.p_i 6 : ℤ) - ∑ k ∈ Finset.Ico 7 (maps.m + 1), (((k : ℤ) + 1) / 2 - 6) * (maps.p_i k : ℤ) ≥ 12 := by
+        have hf7 : 7 ≤ ∑ k ∈ Finset.Ico 3 (maps.m + 1), maps.p_i k := by zify; linarith [s14]
+        have hj := (JucovicTheorem maps hM hf7).1
+        linarith [hj]
+      have s17 : 3 * (maps.p_i 3 : ℤ) + 2 * (maps.p_i 4 : ℤ) + (maps.p_i 5 : ℤ) - ∑ k ∈ Finset.Ico 7 (maps.m + 1), ((k : ℤ) - 6) * (maps.p_i k : ℤ) = 12 := by
+        have he := Juc_EulerFormula maps hM
+        linear_combination he
+      have s18 : -(maps.p_i 3 : ℤ) - (maps.p_i 4 : ℤ) - (maps.p_i 5 : ℤ) - (maps.p_i 6 : ℤ) - ∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ) + ∑ k ∈ Finset.Ico 3 (maps.m + 1), (maps.p_i k : ℤ) = 0 := by
+        have h := SimplyCon3ConnectedMap.face_split_agg maps hM
+        have h2 := congrArg (Nat.cast : ℕ → ℤ) h
+        push_cast at h2
+        omega
+      have s19 : 8 * (maps.p_i 4 : ℤ) + 4 * (maps.p_i 5 : ℤ) + 8 * (maps.p_i 6 : ℤ) ≥ 45 := by linarith [s11, s12, s13, s14, s15, s16, s17, s18]
+      have s20 : 2 * (maps.p_i 4 : ℤ) + (maps.p_i 5 : ℤ) + 2 * (maps.p_i 6 : ℤ) ≥ 12 := by have hr := s19; omega
+      linarith [s20]
+  have hFaceZ : ∑ k ∈ Finset.Ico 3 (maps.m + 1), (maps.p_i k : ℤ) = (maps.p_i 3 : ℤ) + (maps.p_i 4 : ℤ) + (maps.p_i 5 : ℤ) + (maps.p_i 6 : ℤ) + ∑ k ∈ Finset.Ico 7 (maps.m + 1), (maps.p_i k : ℤ) := by
+    have h := SimplyCon3ConnectedMap.face_split_agg maps hM
     have h2 := congrArg (Nat.cast : ℕ → ℤ) h
     push_cast at h2
     omega
-  have s13 : 22 * (maps.p_i 3 : ℤ) + 22 * (maps.p_i 4 : ℤ) + 22 * (maps.p_i 5 : ℤ) + 44 * (maps.p_i 6 : ℤ) + 22 * (maps.p_i 7 : ℤ) + 22 * (maps.p_i 8 : ℤ) + 11 * (maps.p_i 9 : ℤ) + 22 * (maps.p_i 10 : ℤ) + 22 * ∑ k ∈ Finset.Ico 11 (maps.m + 1), (maps.p_i k : ℤ) ≥ 196 := by linarith [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12]
-  have s14 : 2 * (maps.p_i 3 : ℤ) + 2 * (maps.p_i 4 : ℤ) + 2 * (maps.p_i 5 : ℤ) + 4 * (maps.p_i 6 : ℤ) + 2 * (maps.p_i 7 : ℤ) + 2 * (maps.p_i 8 : ℤ) + (maps.p_i 9 : ℤ) + 2 * (maps.p_i 10 : ℤ) + 2 * ∑ k ∈ Finset.Ico 11 (maps.m + 1), (maps.p_i k : ℤ) ≥ 18 := by have hr := s13; omega
-  have hFaceZ : ∑ k ∈ Finset.Ico 3 (maps.m + 1), (maps.p_i k : ℤ) = (maps.p_i 3 : ℤ) + (maps.p_i 4 : ℤ) + (maps.p_i 5 : ℤ) + (maps.p_i 6 : ℤ) + (maps.p_i 7 : ℤ) + (maps.p_i 8 : ℤ) + (maps.p_i 9 : ℤ) + (maps.p_i 10 : ℤ) + ∑ k ∈ Finset.Ico 11 (maps.m + 1), (maps.p_i k : ℤ) := by
-    have h := SimplyCon3ConnectedMap.face_split maps hM
-    have h2 := congrArg (Nat.cast : ℕ → ℤ) h
-    push_cast at h2
-    omega
-  linarith [s14, hFaceZ]
+  linarith [s1, hFaceZ]

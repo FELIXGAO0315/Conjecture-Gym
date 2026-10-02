@@ -22,10 +22,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..anvil.inventory import M_MAX
+from ..anvil.inventory import M_MAX, TAIL_VAR
 
 FEATURES = (["p_3", "p_4", "p_5", "p_6"] + [f"p_{k}" for k in range(7, M_MAX + 1)]
-            + ["sum_pk_after_p10", "f_2"])
+            + [TAIL_VAR, "f_2"])
 
 
 def features_from_pvec(pvec: dict) -> tuple:

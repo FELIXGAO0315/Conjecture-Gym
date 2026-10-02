@@ -32,12 +32,20 @@ ROOT = Path(__file__).resolve().parent.parent           # HexForge/
 DATA = ROOT / "data" / "plantri_pool.json"
 RECORD = ROOT / "record"
 
-GENERATOR_VERSION = "0.6.2"
+GENERATOR_VERSION = "0.6.3"
 MAX_COEFF = 6
 
 # v0.6.2 §2: per-premise-set time budget for direction enumeration.  If exceeded,
 # a random subset of the remaining directions is used (reported in the summary).
 DIRECTION_BUDGET_SEC = 30.0
+
+# v0.6.3 §1: keep only conjectures whose proof genuinely needs a case split
+# (v_int > ceil(v_lin)); plain-rounding candidates are discarded as rounding_only.
+REQUIRE_SPLIT = True
+
+# v0.6.3 §3: at most this many terms besides p_6 in a conclusion (the merged
+# big_faces expression sum_pk_after_p6 counts as a single term).
+MAX_CONCLUSION_TERMS = 3
 
 # v0.2 §3: require the (strengthened) conclusion to be attained with equality by
 # at least one real polytope (IRIS T > 0).  Switchable to mark-only later.
@@ -56,9 +64,10 @@ POOL_F2_MAX = 28
 _FACE_VARS = [v for v in PROP_VARS if v not in ("f_2",)]
 _FACE = dict({"f_2": 1}, **{v: -1 for v in _FACE_VARS})
 
-# v0.6.2 §1: big_faces = p_7 + ... + p_10 + sum_pk_after_p10 (= sum over k >= 7).
-# A fixed linear expression, not a variable.
+# v0.6.2 §1: big_faces = Σ_{k≥7} p_k (= p_7+..+p_{M_MAX}+tail; at M_MAX=6 it is
+# exactly the single tail variable).  A fixed linear expression, not a variable.
 BIG_FACES = {v: 1 for v in INV.TAIL_COUNT_VARS}
+TAIL = INV.TAIL_VAR
 
 # The three Inventory *theorems* counted as "inventory" (everything else in the
 # axiom base is a HexLemmas lemma or a non-negativity fact).
@@ -68,13 +77,14 @@ _LP_TOL = 1e-7
 
 # pretty names -----------------------------------------------------------------
 PRETTY = {v: v for v in PROP_VARS}
-PRETTY["sum_pk_after_p10"] = "(sum_{k>=11} p_k)"
-PRETTY["sum_pk_after_p6"] = "sum_pk_after_p6"
+PRETTY["sum_pk_after_p6"] = "sum_pk_after_p6"   # merged big_faces display name
 
 # v0.6.2 §1.2: display order including the merged big_faces expression.
-DISPLAY_ORDER = (["p_3", "p_4", "p_5", "p_6"]
-                 + [f"p_{k}" for k in range(7, INV.M_MAX + 1)]
-                 + ["sum_pk_after_p10", "sum_pk_after_p6", "f_2"])
+_do = (["p_3", "p_4", "p_5", "p_6"] + [f"p_{k}" for k in range(7, INV.M_MAX + 1)]
+       + [TAIL])
+if "sum_pk_after_p6" not in _do:
+    _do.append("sum_pk_after_p6")
+DISPLAY_ORDER = _do + ["f_2"]
 
 
 def _merge_tail_display(coeffs: dict) -> dict:
@@ -135,8 +145,8 @@ def sample_premises(rng: random.Random) -> list:
     def add_tail():
         c = rng.randint(1, 5)
         rel = rng.choice([">=", "<="])
-        return {"coeffs": {"sum_pk_after_p10": 1}, "rel": rel, "rhs": c,
-                "text": f"sum_pk_after_p10 {rel} {c}"}
+        return {"coeffs": {TAIL: 1}, "rel": rel, "rhs": c,
+                "text": f"{TAIL} {rel} {c}"}
 
     def add_f2():
         c = rng.randint(7, 60)
@@ -510,10 +520,10 @@ from math import ceil as _ceil
 #   (Jučovič: f_2 >= 7 ; Barnette: big_faces >= 3), plus the second level.
 _SPLIT_THRESHOLDS = [("f_2", {"f_2": 1}, [7, 8]),
                      ("big_faces", dict(BIG_FACES), [3, 4])]
-# directions: a*p_6 (a in {1,2}) plus up to two terms chosen from these atoms /
-# expressions with coefficients in {-2,-1,1,2}.
-_DIR_TERMS = ["p_3", "p_4", "p_5", "p_7", "p_8", "p_9", "p_10",
-              "sum_pk_after_p10", "big_faces", "f_2"]
+# directions: a*p_6 (a in {1,2}) plus up to two terms chosen from these atoms with
+# coefficients in {-2,-1,1,2}.  v0.6.3 §2.5: the conclusion may only use
+# p_3, p_4, p_5 and sum_pk_after_p6 (the tail); f_2 is excluded.
+_DIR_TERMS = ["p_3", "p_4", "p_5", TAIL]
 _DIR_COEFFS = (-2, -1, 1, 2)
 
 
@@ -736,6 +746,11 @@ def enumerate_candidates(premises, stats, rng):
         if sint != "opt":
             continue
         if vint > vlin + _LP_TOL:
+            # §1 (v0.6.3): drop candidates that only need rounding (v_int =
+            # ceil(v_lin)); keep only those where the case split adds strictly more.
+            if REQUIRE_SPLIT and vint == _ceil(vlin - _LP_TOL):
+                stats["rounding_only"] += 1
+                continue
             out.append({"coeffs": dict(d), "rel": ">=", "rhs": int(vint)})
         else:
             stats["linear_only"] += 1
@@ -1373,11 +1388,62 @@ def _render_ineq_text(coeffs: dict, rel: str, rhs: int) -> str:
     return f"{lhs} {sym} {rhs}"
 
 
+# ── OLD_REPO-format formula string (v0.6.3 §2) ────────────────────────────────
+# Conclusions use p3/p4/p5/p6 (no underscore) and sum_pk_after_p6, p_6 normalised
+# to coefficient 1, %.10g decimal coefficients and a nested-parenthesis fold,
+# matching the original repository, e.g.
+#   if ((is_simple) and (p_4 = 0) and (p_5 <= 2) and (f_2>=_7)),
+#       then p6 >= (((-0.5 * sum_pk_after_p6) + 2))
+_OLD_NAME = {"p_3": "p3", "p_4": "p4", "p_5": "p5", "p_6": "p6",
+             "sum_pk_after_p6": "sum_pk_after_p6"}
+
+
+def _old_num(x) -> str:
+    return f"{float(x):.10g}"
+
+
+def _old_premise(pr: dict) -> str:
+    coeffs = {v: int(c) for v, c in pr["coeffs"].items() if c}
+    # f_2 uses the original glued format "(f_2>=_N)"
+    if list(coeffs) == ["f_2"] and coeffs["f_2"] == 1:
+        op = {">=": ">=", "<=": "<=", "=": "="}[pr["rel"]]
+        return f"(f_2{op}_{int(pr['rhs'])})"
+    # render from the coefficients (canonical variable names) rather than a stored
+    # text, so e.g. a big_faces premise shows as "sum_pk_after_p6 <= 5"
+    return f"({_render_ineq_text(pr['coeffs'], pr['rel'], int(pr['rhs']))})"
+
+
+def _old_conclusion(conclusion: dict) -> str:
+    coeffs = _merge_tail_display(conclusion["coeffs"])
+    a = Fraction(coeffs["p_6"])
+    rhs = Fraction(conclusion["rhs"])
+    # p6 >= Σ (-c_v/a)·x_v + rhs/a   (p_6 isolated, coeff 1, a > 0)
+    terms = []
+    for v in DISPLAY_ORDER:
+        if v in ("p_6", "f_2"):
+            continue
+        c = coeffs.get(v, 0)
+        if c == 0:
+            continue
+        coef = Fraction(-c) / a
+        name = _OLD_NAME.get(v, v)
+        terms.append(name if coef == 1 else f"({_old_num(coef)} * {name})")
+    const = rhs / a
+    if terms:
+        acc = terms[0]
+        for t in terms[1:]:
+            acc = f"({acc} + {t})"
+        if const != 0:
+            acc = f"({acc} + {_old_num(const)})"
+    else:
+        acc = _old_num(const)
+    rel = ">=" if conclusion["rel"] == ">=" else "<="
+    return f"p6 {rel} ({acc})"
+
+
 def formula_string(premises: list, conclusion: dict) -> str:
-    conds = ["(is_simple)"] + [f"({_render_ineq_text(pr['coeffs'], pr['rel'], pr['rhs'])})"
-                               for pr in premises]
-    concl = display_text(conclusion)
-    return f"if ({' and '.join(conds)}), then ({concl})"
+    conds = ["(is_simple)"] + [_old_premise(pr) for pr in premises]
+    return f"if ({' and '.join(conds)}), then {_old_conclusion(conclusion)}"
 
 
 def natural_language(premises: list, conclusion: dict) -> str:
@@ -1519,14 +1585,9 @@ def attempt(rng, pool, next_id, existing_hashes, stats, seed, skel_index):
         if canon_p6 < 0 and not ALLOW_UPPER_BOUNDS:
             stats["p6_upper_bound"] += 1
             continue
-        # p_6 must also survive in the minimal equivalent form
-        mcoeffs = minimal_form(ic_frac)
-        if mcoeffs.get("p_6", 0) == 0:
-            stats["p6_only_via_f2"] += 1
-            continue
-        if any(abs(c) > MAX_COEFF for c in mcoeffs.values()):
-            stats["no_candidate"] += 1
-            continue
+        # §2.5 (v0.6.3): the v0.2 "minimal equivalent form must contain p_6" check
+        # is removed — it only existed to cope with f_2 in the conclusion, which is
+        # now forbidden (§2).  The canonical p_6 check above is kept.
 
         # §2 (v0.4): p_6 must be essential — if, after removing a*p_6 from the
         # canonical LHS, the remainder L' >= c is still provable, then p_6 was
@@ -1545,17 +1606,18 @@ def attempt(rng, pool, next_id, existing_hashes, stats, seed, skel_index):
 
         tb = traceback(ctx_m, fact)
 
-        # §4-v0.2: p_6-isolated display form.  v0.6.2 §1.2: pick the most compact
-        # presentation — counting the merged big_faces expression as one term — so
-        # a conclusion with equal tail coefficients shows as a*p_6 >= c - sum_pk_after_p6
-        # rather than the longer f_2 form.
-        cand_disp = []
-        if mcoeffs.get("p_6", 0) > 0:
-            cand_disp.append(display_conclusion(mcoeffs, conclusion["rhs"]))
-        cand_disp.append(display_conclusion(
-            {v: Fraction(x) for v, x in cic.items()}, crhs))
-        disp = min(cand_disp,
-                   key=lambda dd: len(_merge_tail_display(dd["coeffs"])))
+        # §2 (v0.6.3): the display is the canonical (f_2-eliminated) form — f_2 is
+        # never used to compress a conclusion.  Equal-coefficient tail faces are
+        # merged to sum_pk_after_p6 at render time (§1.2).
+        disp = display_conclusion({v: Fraction(x) for v, x in cic.items()}, crhs)
+
+        # §3 (v0.6.3): at most MAX_CONCLUSION_TERMS terms besides p_6 (the merged
+        # big_faces expression counts as one term).
+        merged = _merge_tail_display(disp["coeffs"])
+        n_terms = len([v for v in merged if v != "p_6" and merged[v] != 0])
+        if n_terms > MAX_CONCLUSION_TERMS:
+            stats["too_many_terms"] += 1
+            continue
 
         # not a weakening of a (remaining) premise (canonical)
         if _weakens_premise(cic, crhs, pruned):
@@ -1649,9 +1711,11 @@ def attempt(rng, pool, next_id, existing_hashes, stats, seed, skel_index):
             stats.setdefault("compile_msgs", []).append((target, cmsg[:200]))
             continue
 
-        # §2 (v0.6.2): deductive-depth label (diagnostic only, never filters)
+        # §2 (v0.6.2): deductive-depth label (diagnostic only, never filters).
+        # Counted under a distinct key so it does not collide with the v0.6.3
+        # ``rounding_only`` enumeration discard reason.
         depth_type = classify_depth(pruned, cic)
-        stats[depth_type] += 1
+        stats["depth_" + depth_type] += 1
 
         data = {
             "id": target,
