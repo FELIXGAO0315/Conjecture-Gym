@@ -1,0 +1,1713 @@
+"""Conjecture generator: sample premises, deduce, select, formalise, score, write.
+
+Exposes functions only (no CLI); ``run.py`` drives them.  A single deduction
+closure yields many candidate p₆ facts, which are filtered, de-duplicated,
+minimised by traceback, exactly re-checked, regression-tested on every real
+p-vector, formalised in Lean, scored, and written to ``record/C{n}/``.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import random
+import shutil
+from datetime import datetime, timezone
+from fractions import Fraction
+from math import gcd
+from pathlib import Path
+
+import numpy as np
+from scipy.optimize import linprog, milp, LinearConstraint, Bounds
+
+from ..anvil import deducer as D
+from ..anvil.deducer import Context, traceback, recheck, fact_text, vars_from_pvec
+from ..anvil import inventory as INV
+from ..anvil.inventory import PROP_VARS, ALL_VARS
+from ..formalizer import formalizer as F
+from ..scoring import iris as IRIS
+from ..scoring import hardness as HARD
+
+ROOT = Path(__file__).resolve().parent.parent           # HexForge/
+DATA = ROOT / "data" / "plantri_pool.json"
+RECORD = ROOT / "record"
+
+GENERATOR_VERSION = "0.6.2"
+MAX_COEFF = 6
+
+# v0.6.2 §2: per-premise-set time budget for direction enumeration.  If exceeded,
+# a random subset of the remaining directions is used (reported in the summary).
+DIRECTION_BUDGET_SEC = 30.0
+
+# v0.2 §3: require the (strengthened) conclusion to be attained with equality by
+# at least one real polytope (IRIS T > 0).  Switchable to mark-only later.
+REQUIRE_ATTAINED = True
+
+# v0.4 §1: keep only lower bounds on p_6 (Inventory only bounds p_6 from below;
+# upper bounds would carry no deductive content beyond a premise f_2 <= c).
+ALLOW_UPPER_BOUNDS = False
+
+# v0.4 §3: plantri_pool.json only covers f_2 <= POOL_F2_MAX.  A premise f_2 >= c
+# with c > POOL_F2_MAX has no witness in the pool, so pool-based checks (non-empty
+# and attainment) are skipped and correctness rests on the deducer + Lean.
+POOL_F2_MAX = 28
+
+# face_split vector:  f_2 - (p_3 + ... + p_10 + sum_pk_after_p10) = 0
+_FACE_VARS = [v for v in PROP_VARS if v not in ("f_2",)]
+_FACE = dict({"f_2": 1}, **{v: -1 for v in _FACE_VARS})
+
+# v0.6.2 §1: big_faces = p_7 + ... + p_10 + sum_pk_after_p10 (= sum over k >= 7).
+# A fixed linear expression, not a variable.
+BIG_FACES = {v: 1 for v in INV.TAIL_COUNT_VARS}
+
+# The three Inventory *theorems* counted as "inventory" (everything else in the
+# axiom base is a HexLemmas lemma or a non-negativity fact).
+INVENTORY_THEOREMS = {"Juc_EulerFormula", "JucovicTheorem", "Barnette_P6Bound"}
+
+_LP_TOL = 1e-7
+
+# pretty names -----------------------------------------------------------------
+PRETTY = {v: v for v in PROP_VARS}
+PRETTY["sum_pk_after_p10"] = "(sum_{k>=11} p_k)"
+PRETTY["sum_pk_after_p6"] = "sum_pk_after_p6"
+
+# v0.6.2 §1.2: display order including the merged big_faces expression.
+DISPLAY_ORDER = (["p_3", "p_4", "p_5", "p_6"]
+                 + [f"p_{k}" for k in range(7, INV.M_MAX + 1)]
+                 + ["sum_pk_after_p10", "sum_pk_after_p6", "f_2"])
+
+
+def _merge_tail_display(coeffs: dict) -> dict:
+    """§1.2: for DISPLAY only — if p_7..p_10 and sum_pk_after_p10 all carry the
+    same nonzero coefficient, present them as the single expression
+    ``sum_pk_after_p6`` (= Σ_{k>=7} p_k).  The canonical form used for the
+    skeleton / scoring is unchanged."""
+    tc = list(INV.TAIL_COUNT_VARS)
+    vals = set(int(coeffs.get(v, 0)) for v in tc)
+    base = {k: int(c) for k, c in coeffs.items() if k not in tc}
+    if len(vals) == 1 and next(iter(vals)) != 0:
+        base["sum_pk_after_p6"] = next(iter(vals))
+    else:
+        for v in tc:
+            if int(coeffs.get(v, 0)) != 0:
+                base[v] = int(coeffs[v])
+    return base
+
+
+# ── pool loading ─────────────────────────────────────────────────────────────
+def load_pool():
+    """Return ``(pvecs, features)`` where ``pvecs`` is the list of face-count
+    dicts and ``features`` the list of IRIS feature 6-tuples."""
+    with open(DATA) as fh:
+        raw = json.load(fh)
+    pvecs = [entry["p_vec"] for entry in raw["p_vecs"]]
+    features = [IRIS.features_from_pvec(pv) for pv in pvecs]
+    return pvecs, features
+
+
+# ── premise sampling ─────────────────────────────────────────────────────────
+def sample_premises(rng: random.Random) -> list:
+    """Sample 1–3 premises from the allowed forms."""
+    n = rng.randint(1, 3)
+    templates = []
+
+    # v0.6.1: premises may mention p_3,p_4,p_5 and the large faces p_7..p_10 and
+    # the tail — never p_6 (the target).
+    SMALLV = ["p_3", "p_4", "p_5"] + [f"p_{k}" for k in range(7, INV.M_MAX + 1)]
+
+    def small_var():
+        return rng.choice(SMALLV)
+
+    def add_small_eq0():
+        v = small_var()
+        return {"coeffs": {v: 1}, "rel": "=", "rhs": 0, "text": f"{v} = 0"}
+
+    def add_small_le():
+        v = small_var()
+        c = rng.randint(1, 4)
+        return {"coeffs": {v: 1}, "rel": "<=", "rhs": c, "text": f"{v} <= {c}"}
+
+    def add_small_ge():
+        v = small_var()
+        c = rng.randint(1, 3)
+        return {"coeffs": {v: 1}, "rel": ">=", "rhs": c, "text": f"{v} >= {c}"}
+
+    def add_tail():
+        c = rng.randint(1, 5)
+        rel = rng.choice([">=", "<="])
+        return {"coeffs": {"sum_pk_after_p10": 1}, "rel": rel, "rhs": c,
+                "text": f"sum_pk_after_p10 {rel} {c}"}
+
+    def add_f2():
+        c = rng.randint(7, 60)
+        rel = rng.choice([">=", "<="])
+        return {"coeffs": {"f_2": 1}, "rel": rel, "rhs": c, "text": f"f_2 {rel} {c}"}
+
+    def add_big_faces():
+        # v0.6.2 §1: big_faces = p_7 + ... + p_10 + sum_pk_after_p10 as a single
+        # premise expression (c in 0..6); helps trigger Barnette.
+        c = rng.randint(0, 6)
+        rel = rng.choice([">=", "<="])
+        return {"coeffs": dict(BIG_FACES), "rel": rel, "rhs": c,
+                "text": f"big_faces {rel} {c}"}
+
+    def add_relation():
+        x, y = rng.sample(SMALLV, 2)
+        a, b = rng.randint(1, 3), rng.randint(1, 3)
+        return {"coeffs": {x: a, y: -b}, "rel": ">=", "rhs": 0,
+                "text": f"{a}*{x} >= {b}*{y}"}
+
+    makers = [add_small_eq0, add_small_le, add_small_ge, add_tail, add_f2,
+              add_big_faces, add_relation]
+    # bias towards including f_2 >= 7 (activates Jučovič) roughly half the time
+    prem = []
+    if rng.random() < 0.55:
+        c = rng.randint(7, 60)
+        prem.append({"coeffs": {"f_2": 1}, "rel": ">=", "rhs": c,
+                     "text": f"f_2 >= {c}"})
+    while len(prem) < n:
+        prem.append(rng.choice(makers)())
+    # deduplicate identical premises (by variable-support + rel)
+    seen = set()
+    out = []
+    for pr in prem:
+        key = (tuple(sorted(pr["coeffs"].items())), pr["rel"], pr["rhs"])
+        if key not in seen:
+            seen.add(key)
+            out.append(pr)
+    return out
+
+
+def _pvec_satisfies(vals: dict, premises: list) -> bool:
+    for pr in premises:
+        lhs = sum(Fraction(c) * vals.get(v, 0) for v, c in pr["coeffs"].items())
+        rhs = Fraction(pr["rhs"])
+        if pr["rel"] == "=" and lhs != rhs:
+            return False
+        if pr["rel"] == ">=" and lhs < rhs:
+            return False
+        if pr["rel"] == "<=" and lhs > rhs:
+            return False
+    return True
+
+
+def premises_nonempty(premises: list, pvec_vars: list) -> bool:
+    return any(_pvec_satisfies(v, premises) for v in pvec_vars)
+
+
+def pool_covered(premises: list) -> bool:
+    """False iff some premise ``f_2 >= c`` has c > POOL_F2_MAX (no pool witness
+    possible), in which case pool-based checks are skipped (§3)."""
+    for pr in premises:
+        supp = [v for v, c in pr["coeffs"].items() if c]
+        if supp == ["f_2"] and pr["rel"] == ">=" and \
+                Fraction(pr["rhs"]) / Fraction(pr["coeffs"]["f_2"]) > POOL_F2_MAX:
+            return False
+    return True
+
+
+# ── deduction cache (§4) ─────────────────────────────────────────────────────
+# Memoise saturated contexts by (premises, extra_directions).  The algorithm's
+# sequence of calls is unchanged; identical calls return the identical pool, so
+# results (conclusions, proofs, scores) are unaffected — only recomputation is
+# avoided.  Fids are renumbered deterministically at record-build time, so output
+# is independent of how many contexts were actually built.
+_CTX_CACHE: dict = {}
+_CTX_ORDER: list = []
+_CTX_CAP = 256
+# Toggle for the performance-equivalence check (HEXFORGE_NOCACHE=1 disables the
+# cache; output must be identical with and without it).
+USE_CACHE = os.environ.get("HEXFORGE_NOCACHE") != "1"
+
+
+def _ctx_cache_clear():
+    _CTX_CACHE.clear()
+    _CTX_ORDER.clear()
+
+
+def _dir_sig(extra_dirs):
+    return tuple(sorted(tuple(sorted((v, int(c)) for v, c in d.items()))
+                        for d in (extra_dirs or [])))
+
+
+def _prem_sig(premises):
+    return tuple(sorted((tuple(sorted(pr["coeffs"].items())), pr["rel"],
+                         int(pr["rhs"])) for pr in premises))
+
+
+def cached_context(premises, extra_directions=None):
+    if not USE_CACHE:
+        ctx = Context(premises=premises, depth=D.DEFAULT_SPLIT_DEPTH,
+                      extra_directions=extra_directions)
+        ctx.saturate()
+        return ctx
+    key = (_prem_sig(premises), _dir_sig(extra_directions))
+    ctx = _CTX_CACHE.get(key)
+    if ctx is not None:
+        return ctx
+    ctx = Context(premises=premises, depth=D.DEFAULT_SPLIT_DEPTH,
+                  extra_directions=extra_directions)
+    ctx.saturate()
+    _CTX_CACHE[key] = ctx
+    _CTX_ORDER.append(key)
+    if len(_CTX_ORDER) > _CTX_CAP:
+        old = _CTX_ORDER.pop(0)
+        _CTX_CACHE.pop(old, None)
+    return ctx
+
+
+# ── deterministic fid renumbering (§4) ───────────────────────────────────────
+def renumber_steps(tb: list) -> list:
+    """Renumber every step's fid (and dep references) to 1,2,3,… in traversal
+    order, so the recorded proof is independent of the global fact counter."""
+    mapping: dict = {}
+    counter = [0]
+
+    def first(steps):
+        for s in steps:
+            counter[0] += 1
+            mapping[s["fid"]] = counter[0]
+            if s["rule"] == "case_split":
+                for cse in s["cases"]:
+                    first(cse["steps"])
+
+    def rewrite(steps):
+        for s in steps:
+            s["fid"] = mapping[s["fid"]]
+            if "deps" in s:
+                s["deps"] = [mapping[d] for d in s["deps"]]
+            if s["rule"] == "case_split":
+                for cse in s["cases"]:
+                    rewrite(cse["steps"])
+
+    first(tb)
+    rewrite(tb)
+    return tb
+
+
+# ── candidate selection ──────────────────────────────────────────────────────
+def _primitive_int(coeffs: dict, const: Fraction):
+    prim = D._primitive(coeffs, const)
+    if prim is None:
+        return None
+    ic, nc = prim
+    return {v: int(c) for v, c in ic.items()}, nc
+
+
+def _count_derivation_steps(tb: list) -> int:
+    n = 0
+    for s in tb:
+        if s["rule"] in ("combination", "rounding", "conditional", "case_split"):
+            n += 1
+        if s["rule"] == "case_split":
+            for c in s["cases"]:
+                n += _count_derivation_steps(c["steps"])
+    return n
+
+
+def _used_inventory(tb: list, acc: set):
+    for s in tb:
+        if s.get("inventory"):
+            acc.add(s["inventory"])
+        if s["rule"] == "case_split":
+            for c in s["cases"]:
+                _used_inventory(c["steps"], acc)
+
+
+def _used_premise_texts(tb: list, acc: set):
+    for s in tb:
+        if s["rule"] == "premise":
+            acc.add(s["text"])
+        if s["rule"] == "case_split":
+            for c in s["cases"]:
+                _used_premise_texts(c["steps"], acc)
+
+
+# ── canonical form (§2): eliminate f_2 via face_split ────────────────────────
+# face_split:  f_2 = p_3 + p_4 + p_5 + p_6 + sum_pk_after_p6
+_FACE_SPLIT_SUB = [v for v in PROP_VARS if v != "f_2"]   # p_3..p_10, tail
+
+
+def canonicalize(coeffs: dict) -> dict:
+    """Replace f_2 by p_3+p_4+p_5+p_6+sum_pk_after_p6, giving a form over the
+    five remaining proposition variables (plus p_6)."""
+    out = {v: Fraction(c) for v, c in coeffs.items() if v != "f_2"}
+    a = Fraction(coeffs.get("f_2", 0))
+    if a != 0:
+        for v in _FACE_SPLIT_SUB:
+            out[v] = out.get(v, Fraction(0)) + a
+    return {v: c for v, c in out.items() if c != 0}
+
+
+# ── minimal equivalent form (§1) ─────────────────────────────────────────────
+def minimal_form(coeffs: dict) -> dict:
+    """Among all forms equivalent under face_split (adding integer multiples of
+    ``f_2 − p_3 − p_4 − p_5 − p_6 − sum_pk_after_p6``), return the one with the
+    fewest non-zero terms (ties: prefer p_6 present, then smallest coefficients).
+    The right-hand side is unaffected (face_split has rhs 0)."""
+    base = {v: Fraction(c) for v, c in coeffs.items() if Fraction(c) != 0}
+    cand_t = {Fraction(0)}
+    for v, fv in _FACE.items():
+        cand_t.add(-base.get(v, Fraction(0)) / fv)
+    best = None
+    for t in cand_t:
+        if t.denominator != 1:
+            continue
+        nc = {}
+        for v, fv in _FACE.items():
+            c = base.get(v, Fraction(0)) + t * fv
+            if c != 0:
+                nc[v] = c
+        score = (len(nc), 0 if nc.get("p_6", 0) != 0 else 1,
+                 max((abs(c) for c in nc.values()), default=Fraction(0)))
+        if best is None or score < best[0]:
+            best = (score, nc)
+    return best[1]
+
+
+def minimal_has_p6(coeffs: dict) -> bool:
+    return minimal_form(coeffs).get("p_6", 0) != 0
+
+
+# ── p_6-isolated display form (§4) ───────────────────────────────────────────
+def display_conclusion(min_coeffs: dict, rhs: int) -> dict:
+    """Orient the minimal form so p_6 is alone on the left with a positive,
+    coprime coefficient: ``a·p_6 >= rest`` or ``a·p_6 <= rest``."""
+    a = Fraction(min_coeffs.get("p_6", 0))
+    if a > 0:
+        coeffs = {v: int(c) for v, c in min_coeffs.items()}
+        return {"coeffs": coeffs, "rel": ">=", "rhs": int(rhs)}
+    coeffs = {v: int(-c) for v, c in min_coeffs.items()}
+    return {"coeffs": coeffs, "rel": "<=", "rhs": int(-rhs)}
+
+
+def display_text(disp: dict) -> str:
+    """Render ``a·p_6 (>=|<=) <rest>`` with p_6 isolated on the left."""
+    coeffs = _merge_tail_display(disp["coeffs"])   # §1.2 big_faces merge
+    a = coeffs["p_6"]
+    left = "p_6" if a == 1 else f"{a}*p_6"
+    # a*p_6 + Σ_{v≠p6} c_v x_v  rel  rhs   ->   a*p_6  rel  rhs − Σ_{v≠p6} c_v x_v
+    parts = []
+    for v in DISPLAY_ORDER:
+        if v == "p_6":
+            continue
+        c = coeffs.get(v, 0)
+        if c == 0:
+            continue
+        name = PRETTY[v]
+        rc = -c
+        parts.append(name if rc == 1 else (f"-{name}" if rc == -1 else f"{rc}*{name}"))
+    rhs = disp["rhs"]
+    if rhs != 0 or not parts:
+        parts.append(str(rhs))
+    rhs_expr = " + ".join(parts).replace("+ -", "- ")
+    return f"{left} {'>=' if disp['rel'] == '>=' else '<='} {rhs_expr}"
+
+
+def _is_trivial(coeffs: dict, rhs: int) -> bool:
+    # all coefficients non-negative and rhs <= 0  =>  always true
+    if coeffs and all(c >= 0 for c in coeffs.values()) and rhs <= 0:
+        return True
+    if coeffs and all(c <= 0 for c in coeffs.values()) and rhs >= 0:
+        return True
+    return False
+
+
+def _weakens_premise(coeffs: dict, rhs: int, premises: list) -> bool:
+    """True if the (canonical) conclusion has the same LHS direction as some
+    (canonical) premise and is no stronger than it."""
+    ckey = tuple(sorted((v, Fraction(c)) for v, c in coeffs.items()))
+    for pr in premises:
+        pc = canonicalize({v: Fraction(c) for v, c in pr["coeffs"].items()})
+        prim = D._primitive(pc, Fraction(-pr["rhs"]))
+        if prim is None:
+            continue
+        ic, nc = prim
+        if tuple(sorted((v, Fraction(c)) for v, c in ic.items())) == ckey and pr["rel"] == ">=":
+            if rhs <= -nc:
+                return True
+    return False
+
+
+# ── linear-derivability filter (§4) ──────────────────────────────────────────
+def _unconditional_forms():
+    """All unconditional inventory entries as (coeffs, const, rel) forms."""
+    forms = []
+    for e in INV.INVENTORY:
+        if e["kind"] in ("equality", "inequality"):
+            forms.append(D._conc_to_form(e["conclusion"]))
+    return forms
+
+
+def _premise_forms(premises):
+    return [D._conc_to_form(pr) for pr in premises]
+
+
+def _lp_min(obj_coeffs: dict, constraints):
+    """Minimise ``obj_coeffs · x`` subject to the constraint forms
+    ``coeffs·x + const rel 0`` over all atoms (free).  Returns the optimum
+    (float) or ``None`` if unbounded below / infeasible."""
+    idx = {v: i for i, v in enumerate(ALL_VARS)}
+    n = len(ALL_VARS)
+    A_ub, b_ub, A_eq, b_eq = [], [], [], []
+    for coeffs, const, rel in constraints:
+        row = [0.0] * n
+        for v, c in coeffs.items():
+            row[idx[v]] = float(c)
+        if rel == "==":
+            A_eq.append(row)
+            b_eq.append(-float(const))
+        else:                                  # ">=":  coeffs·x + const >= 0
+            A_ub.append([-x for x in row])
+            b_ub.append(float(const))
+    c = [0.0] * n
+    for v, coef in obj_coeffs.items():
+        c[idx[v]] = float(coef)
+    try:
+        res = linprog(c, A_ub=A_ub or None, b_ub=b_ub or None,
+                      A_eq=A_eq or None, b_eq=b_eq or None,
+                      bounds=[(None, None)] * n, method="highs")
+    except Exception:
+        return None
+    if not res.success or not np.isfinite(res.fun):
+        return None
+    return float(res.fun)
+
+
+def _hyp_derivable(premises, hyp):
+    """Is the conditional hypothesis ``hyp`` (``coeffs ≥ rhs``) linearly derivable
+    from the premises and unconditional inventory?"""
+    constraints = _premise_forms(premises) + _unconditional_forms()
+    coeffs = {v: Fraction(c) for v, c in hyp["coeffs"].items()}
+    m = _lp_min(coeffs, constraints)
+    if m is None:
+        return False
+    return m - float(hyp["rhs"]) >= -_LP_TOL
+
+
+def linearly_derivable(premises, conclusion) -> bool:
+    """§4: the conclusion is linearly derivable iff the LP relaxation (premises +
+    unconditional inventory + any conditional theorem whose hypothesis is itself
+    linearly derivable) already forces it.  Such conclusions need no integer
+    rounding or case split and are discarded."""
+    constraints = _premise_forms(premises) + _unconditional_forms()
+    for e in INV.CONDITIONAL_THEOREMS:
+        if _hyp_derivable(premises, e["hypothesis"]):
+            constraints.append(D._conc_to_form(e["conclusion"]))
+    coeffs = {v: Fraction(c) for v, c in conclusion["coeffs"].items()}
+    m = _lp_min(coeffs, constraints)
+    if m is None:
+        return False                           # unbounded -> not linearly forced
+    return m - float(conclusion["rhs"]) >= -_LP_TOL
+
+
+# ── candidate generation by direction enumeration (§2, v0.6.2) ────────────────
+import itertools as _it
+import time as _time
+from math import ceil as _ceil
+
+# split thresholds, aligned with the conditional theorems' hypotheses
+#   (Jučovič: f_2 >= 7 ; Barnette: big_faces >= 3), plus the second level.
+_SPLIT_THRESHOLDS = [("f_2", {"f_2": 1}, [7, 8]),
+                     ("big_faces", dict(BIG_FACES), [3, 4])]
+# directions: a*p_6 (a in {1,2}) plus up to two terms chosen from these atoms /
+# expressions with coefficients in {-2,-1,1,2}.
+_DIR_TERMS = ["p_3", "p_4", "p_5", "p_7", "p_8", "p_9", "p_10",
+              "sum_pk_after_p10", "big_faces", "f_2"]
+_DIR_COEFFS = (-2, -1, 1, 2)
+
+
+def _term_vec(name, coeff):
+    if name == "big_faces":
+        return {v: coeff for v, c in BIG_FACES.items()}
+    return {name: coeff}
+
+
+def _coprime(d):
+    """Divide an int-coeff dict by the gcd of its entries."""
+    vals = [abs(int(c)) for c in d.values() if int(c) != 0]
+    if not vals:
+        return {}
+    g = 0
+    for v in vals:
+        g = gcd(g, v)
+    g = g or 1
+    return {k: int(c) // g for k, c in d.items() if int(c) != 0}
+
+
+def enumerate_directions():
+    """§2: the direction set D.  Each direction has a positive p_6 coefficient."""
+    seen, dirs = set(), []
+
+    def add(base, terms):
+        d = dict(base)
+        for name, cf in terms:
+            for v, c in _term_vec(name, cf).items():
+                d[v] = d.get(v, 0) + c
+        d = _coprime(d)
+        if d.get("p_6", 0) <= 0:
+            return                                   # keep p_6 on the LHS, a > 0
+        key = tuple(sorted(d.items()))
+        if key in seen:
+            return
+        seen.add(key)
+        dirs.append(d)
+
+    for a in (1, 2):
+        base = {"p_6": a}
+        add(base, [])
+        for name in _DIR_TERMS:
+            for cf in _DIR_COEFFS:
+                add(base, [(name, cf)])
+        for n1, n2 in _it.combinations(_DIR_TERMS, 2):
+            for c1 in _DIR_COEFFS:
+                for c2 in _DIR_COEFFS:
+                    add(base, [(n1, c1), (n2, c2)])
+    return dirs
+
+
+_ALL_IDX = {v: i for i, v in enumerate(ALL_VARS)}
+_NVARS = len(ALL_VARS)
+
+
+def _prep_matrices(constraints):
+    """Build the LP matrices (A_ub,b_ub,A_eq,b_eq) for a constraint set *once*;
+    the objective vector is supplied per direction in :func:`_lp_pre`."""
+    A_ub, b_ub, A_eq, b_eq = [], [], [], []
+    for coeffs, const, rel in constraints:
+        row = [0.0] * _NVARS
+        for v, c in coeffs.items():
+            row[_ALL_IDX[v]] = float(c)
+        if rel == "==":
+            A_eq.append(row)
+            b_eq.append(-float(const))
+        else:
+            A_ub.append([-x for x in row])
+            b_ub.append(float(const))
+    return (np.array(A_ub) if A_ub else None, np.array(b_ub) if b_ub else None,
+            np.array(A_eq) if A_eq else None, np.array(b_eq) if b_eq else None)
+
+
+def _lp_pre(cvec, mats):
+    """Solve min ``cvec·x`` for pre-built matrices; returns ('opt',v) /
+    ('unbounded',None) / ('infeasible',None)."""
+    A_ub, b_ub, A_eq, b_eq = mats
+    try:
+        res = linprog(cvec, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+                      bounds=[(None, None)] * _NVARS, method="highs")
+    except Exception:
+        return ("infeasible", None)
+    if res.status == 0 and np.isfinite(res.fun):
+        return ("opt", float(res.fun))
+    if res.status == 3:
+        return ("unbounded", None)
+    return ("infeasible", None)
+
+
+def _lp_solve(obj_coeffs, constraints):
+    """Minimise ``obj·x`` over the forms (direction-dependent; builds matrices
+    on the fly — used by the non-hot paths)."""
+    cvec = [0.0] * _NVARS
+    for v, coef in obj_coeffs.items():
+        cvec[_ALL_IDX[v]] = float(coef)
+    return _lp_pre(cvec, _prep_matrices(constraints))
+
+
+def _entailed_form(constraints, coeffs, rhs):
+    """Is ``coeffs·x >= rhs`` forced by the LP over ``constraints``?"""
+    st, v = _lp_solve(coeffs, constraints)
+    return st == "opt" and v - float(rhs) >= -_LP_TOL
+
+
+def _triggerable_conditionals(constraints):
+    """Conditional-theorem conclusions whose hypothesis is entailed by the
+    constraints (so they may be used in that branch)."""
+    out = []
+    for e in INV.CONDITIONAL_THEOREMS:
+        h = e["hypothesis"]
+        coeffs = {v: Fraction(c) for v, c in h["coeffs"].items()}
+        if _entailed_form(constraints, coeffs, Fraction(h["rhs"])):
+            out.append(D._conc_to_form(e["conclusion"]))
+    return out
+
+
+def _build_split_tree(prem_forms, assum_forms, depth):
+    """§2.2: build the (direction-independent) case-split tree for a premise set.
+    Each node carries the pre-built LP matrices of its leaf constraint set
+    (premises + branch assumptions + unconditional inventory + triggerable
+    conditionals) and a list of ``(ge_child, le_child)`` splits on undecided
+    threshold conditions.  Built once per premise set; evaluated per direction."""
+    base = prem_forms + assum_forms + _unconditional_forms()
+    leaf_cons = base + _triggerable_conditionals(base)
+    node = {"mats": _prep_matrices(leaf_cons), "splits": []}
+    if depth > 0:
+        for _label, expr, ths in _SPLIT_THRESHOLDS:
+            ecoeffs = {v: Fraction(c) for v, c in expr.items()}
+            neg = {v: -c for v, c in ecoeffs.items()}
+            for c in ths:
+                if _entailed_form(base, ecoeffs, c):
+                    continue
+                if _entailed_form(base, neg, -(c - 1)):
+                    continue
+                ge = _build_split_tree(
+                    prem_forms, assum_forms + [(dict(expr), Fraction(-c), ">=")],
+                    depth - 1)
+                le = _build_split_tree(
+                    prem_forms,
+                    assum_forms + [({v: -x for v, x in expr.items()},
+                                    Fraction(c - 1), ">=")], depth - 1)
+                node["splits"].append((ge, le))
+    return node
+
+
+def _vint_eval(node, cvec):
+    """§2.3–2.4: evaluate the strongest integer bound on the direction ``cvec``
+    over a pre-built split tree.  Returns ('opt',v)/('unbounded',None)/
+    ('infeasible',None)."""
+    st, val = _lp_pre(cvec, node["mats"])
+    if st == "unbounded":
+        return ("unbounded", None)
+    best = _ceil(val - _LP_TOL) if st == "opt" else None
+    for ge, le in node["splits"]:
+        rge = _vint_eval(ge, cvec)
+        rle = _vint_eval(le, cvec)
+        if rge[0] == "unbounded" or rle[0] == "unbounded":
+            continue
+        feas = [r[1] for r in (rge, rle) if r[0] == "opt"]
+        if not feas:
+            continue
+        split_val = min(feas)
+        if best is None or split_val > best:
+            best = split_val
+    return ("opt", best) if best is not None else ("infeasible", None)
+
+
+def _dir_cvec(direction):
+    cvec = [0.0] * _NVARS
+    for v, c in direction.items():
+        cvec[_ALL_IDX[v]] = float(c)
+    return cvec
+
+
+def classify_depth(premises, direction_coeffs):
+    """§2 (v0.6.2): label the deductive depth of a conclusion ``direction·x >= c``.
+    ``rounding_only`` when ``v_int == ceil(v_lin)`` (plain rounding of the LP
+    relaxation suffices); ``split_needed`` when the case split adds strictly more
+    (``v_int > ceil(v_lin)``).  Diagnostic label only — never filters."""
+    pf = _premise_forms(premises)
+    lin_base = pf + _unconditional_forms()
+    lin_mats = _prep_matrices(lin_base + _triggerable_conditionals(lin_base))
+    cvec = _dir_cvec({v: int(c) for v, c in direction_coeffs.items()})
+    slin, vlin = _lp_pre(cvec, lin_mats)
+    tree = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH)
+    sint, vint = _vint_eval(tree, cvec)
+    if sint != "opt" or slin != "opt":
+        return "split_needed"
+    return "rounding_only" if vint == _ceil(vlin - _LP_TOL) else "split_needed"
+
+
+def enumerate_candidates(premises, stats, rng):
+    """§2: produce candidate conclusions ``{coeffs, rel:'>=', rhs}`` by enumerating
+    directions and, for each, comparing the LP relaxation bound ``v_lin`` with the
+    integer / case-split bound ``v_int``.  A direction is a candidate iff
+    ``v_int > v_lin`` (it genuinely needs rounding or a case split).  The split
+    tree and the relaxation matrices are built once per premise set."""
+    pf = _premise_forms(premises)
+    # v_lin matrices (relaxation: unconditional + triggerable conditionals), once
+    lin_base = pf + _unconditional_forms()
+    lin_mats = _prep_matrices(lin_base + _triggerable_conditionals(lin_base))
+    tree = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH)       # once
+
+    directions = enumerate_directions()
+    rng.shuffle(directions)
+    stats["directions_total"] += len(directions)
+    t0 = _time.time()
+    out, n_done = [], 0
+    for d in directions:
+        if _time.time() - t0 > DIRECTION_BUDGET_SEC:
+            stats["dir_budget_truncated"] += 1
+            break
+        n_done += 1
+        cvec = _dir_cvec(d)
+        slin, vlin = _lp_pre(cvec, lin_mats)
+        if slin != "opt":
+            continue                                # unbounded / infeasible: skip
+        sint, vint = _vint_eval(tree, cvec)
+        if sint != "opt":
+            continue
+        if vint > vlin + _LP_TOL:
+            out.append({"coeffs": dict(d), "rel": ">=", "rhs": int(vint)})
+        else:
+            stats["linear_only"] += 1
+    stats["directions_evaluated"] += n_done
+
+    # Dedup to canonical (f_2-eliminated) lower bounds and apply the cheap LP
+    # pre-filters (upper bound / p_6 padding) here, so the expensive deducer
+    # reconstruction only runs on genuinely distinct viable candidates.
+    best_by_canon = {}
+    for cand in out:
+        canon = canonicalize({v: Fraction(c) for v, c in cand["coeffs"].items()})
+        prim = D._primitive(canon, Fraction(-cand["rhs"]))
+        if prim is None:
+            continue
+        ic, nc = prim
+        if nc.denominator != 1:
+            continue
+        cic = {v: int(x) for v, x in ic.items()}
+        crhs = int(-nc)
+        if not ALLOW_UPPER_BOUNDS and cic.get("p_6", 0) <= 0:
+            stats["p6_upper_bound"] += 1
+            continue
+        if any(abs(c) > MAX_COEFF for c in cic.values()):
+            continue
+        key = tuple(sorted(cic.items()))
+        prev = best_by_canon.get(key)
+        if prev is None or crhs > prev["rhs"]:
+            best_by_canon[key] = {"coeffs": cic, "rel": ">=", "rhs": crhs}
+    viable = []
+    for cand in best_by_canon.values():
+        cic, crhs = cand["coeffs"], cand["rhs"]
+        lprime = {v: x for v, x in cic.items() if v != "p_6"}
+        if not lprime:
+            padded = crhs <= 0
+        else:
+            st, vr = _vint_eval(tree, _dir_cvec(lprime))
+            padded = (st == "opt" and vr >= crhs)
+        if padded:
+            stats["p6_padding"] += 1
+            continue
+        viable.append(cand)
+    stats["enum_time"] += _time.time() - t0
+    stats["enum_samples"] += 1
+    return viable
+
+
+# ── premise simplification (§1, v0.5) ─────────────────────────────────────────
+def _premise_nonneg_forms(premises):
+    """Premise forms plus non-negativity of the count variables (used for the
+    'combined with non-negativity' reasoning of §1)."""
+    cons = [D._conc_to_form(pr) for pr in premises]
+    for v in list(INV.NONNEG_VARS) + ["f_2"]:
+        cons.append(({v: Fraction(1)}, Fraction(0), ">="))
+    return cons
+
+
+def _lp_max(var, constraints):
+    """Maximum of ``var`` over ``constraints`` (float), or None if unbounded."""
+    m = _lp_min({var: Fraction(-1)}, constraints)
+    return None if m is None else -m
+
+
+def _entailed_by(pr, others):
+    """Is premise ``pr`` implied by ``others`` + non-negativity?"""
+    cons = _premise_nonneg_forms(others)
+    coeffs = {v: Fraction(c) for v, c in pr["coeffs"].items()}
+    rhs = float(pr["rhs"])
+    lo = _lp_min(coeffs, cons)          # min of coeffs.x
+    hi = _lp_max_expr(coeffs, cons)     # max of coeffs.x
+    if pr["rel"] == ">=":
+        return lo is not None and lo >= rhs - _LP_TOL
+    if pr["rel"] == "<=":
+        return hi is not None and hi <= rhs + _LP_TOL
+    # "="
+    return (lo is not None and lo >= rhs - _LP_TOL
+            and hi is not None and hi <= rhs + _LP_TOL)
+
+
+def _lp_max_expr(coeffs, constraints):
+    m = _lp_min({v: -c for v, c in coeffs.items()}, constraints)
+    return None if m is None else -m
+
+
+def simplify_premises(premises):
+    """§1: if the premises (with non-negativity) force a variable to 0, add it as
+    an explicit ``x = 0`` and drop premises that thereby become redundant.  The
+    result is equivalent to the input over the non-negative integers."""
+    prem = [dict(p) for p in premises]
+
+    def explicit_zero(v):
+        return any(set(k for k, c in p["coeffs"].items() if c) == {v}
+                   and p["rel"] == "=" and int(p["rhs"]) == 0 for p in prem)
+
+    changed = True
+    while changed:
+        changed = False
+        # (a) make an implied zero explicit
+        cons = _premise_nonneg_forms(prem)
+        for v in INV.NONNEG_VARS:
+            if explicit_zero(v):
+                continue
+            mx = _lp_max(v, cons)
+            if mx is not None and mx <= _LP_TOL:
+                prem.append({"coeffs": {v: 1}, "rel": "=", "rhs": 0,
+                             "text": f"{v} = 0"})
+                changed = True
+                break
+        if changed:
+            continue
+        # (b) drop a premise implied by the others
+        for i in range(len(prem)):
+            if _entailed_by(prem[i], prem[:i] + prem[i + 1:]):
+                del prem[i]
+                changed = True
+                break
+    return prem
+
+
+# ── integer MILP over the Inventory model (§3 gate v0.5, §2 arith-sharp v0.6.1) ─
+# Variables = ALL_VARS followed by one binary per conditional theorem (the
+# "hypothesis-false" branch of its big-M disjunction).  Built generically from
+# the inventory so it tracks the variable set automatically.
+_CM_IDX = {v: i for i, v in enumerate(ALL_VARS)}
+_NCOND = len(INV.CONDITIONAL_THEOREMS)
+_CM_N = len(ALL_VARS) + _NCOND
+_CM_BIGM = 10 ** 7
+# non-negativity for the count variables; W_tail/J_tail bounded generously
+_NONNEG = set(INV.NONNEG_VARS)
+
+
+def _cm_row(d):
+    r = [0.0] * _CM_N
+    for k, v in d.items():
+        r[_CM_IDX[k]] += float(v)
+    return r
+
+
+def _cm_base_constraints():
+    """Unconditional inventory + conditional big-M disjunctions."""
+    cons = []
+    for e in INV.INVENTORY:
+        if e["kind"] in ("equality", "inequality"):
+            co, k, rel = D._conc_to_form(e["conclusion"])   # co.x + k rel 0
+            row = _cm_row(co)
+            if rel == "==":
+                cons.append((row, -float(k), -float(k)))
+            else:                                            # >= 0
+                cons.append(([-x for x in row], None, float(k)))
+    for bi, e in enumerate(INV.CONDITIONAL_THEOREMS):
+        b = len(ALL_VARS) + bi
+        hc, hk, _ = D._conc_to_form(e["hypothesis"])         # hyp: hc.x + hk >= 0
+        # hypothesis-false branch (binary b = 1):  hc.x <= -hk - 1 ... modelled as
+        #   hyp_lhs <= (rhs-1) + M*(1-b)  where hyp is  hyp_lhs >= rhs
+        hyp_rhs = float(e["hypothesis"]["rhs"])
+        hyp_lhs = {v: Fraction(c) for v, c in e["hypothesis"]["coeffs"].items()}
+        row = _cm_row(hyp_lhs); row[b] = _CM_BIGM
+        cons.append((row, None, (hyp_rhs - 1) + _CM_BIGM))
+        # conclusion branch (b = 0): conclusion holds
+        cco, cck, _ = D._conc_to_form(e["conclusion"])       # cco.x + cck >= 0
+        row = _cm_row(cco); row[b] = _CM_BIGM
+        cons.append((row, -float(cck), None))
+    return cons
+
+
+def _cm_premise_rows(premises):
+    out = []
+    for pr in premises:
+        rr = _cm_row(pr["coeffs"]); rhs = float(pr["rhs"])
+        if pr["rel"] == "=":
+            out.append((rr, rhs, rhs))
+        elif pr["rel"] == ">=":
+            out.append((rr, rhs, None))
+        else:
+            out.append((rr, None, rhs))
+    return out
+
+
+def _cm_bounds():
+    bl = [0.0] * _CM_N
+    bu = [0.0] * _CM_N
+    for v, i in _CM_IDX.items():
+        if v in _NONNEG:
+            bl[i], bu[i] = 0.0, 10 ** 5
+        else:                                 # W_tail, J_tail
+            bl[i], bu[i] = -10 ** 6, 10 ** 6
+    for bi in range(_NCOND):
+        bl[len(ALL_VARS) + bi], bu[len(ALL_VARS) + bi] = 0.0, 1.0
+    return np.array(bl), np.array(bu)
+
+
+def _cm_solve(cons, objective=None):
+    A = np.array([c[0] for c in cons])
+    lb = np.array([-np.inf if c[1] is None else c[1] for c in cons])
+    ub = np.array([np.inf if c[2] is None else c[2] for c in cons])
+    bl, bu = _cm_bounds()
+    obj = np.zeros(_CM_N) if objective is None else np.array(objective)
+    try:
+        return milp(c=obj, constraints=[LinearConstraint(A, lb, ub)],
+                    integrality=np.ones(_CM_N), bounds=Bounds(bl, bu))
+    except Exception:
+        return None
+
+
+def counter_model(premises, conclusion):
+    """§3 gate: integer point satisfying premises + all Inventory conditions +
+    NEGATION of conclusion.  Returns the solution dict if found (a bug), else None."""
+    cons = _cm_base_constraints() + _cm_premise_rows(premises)
+    rr = _cm_row({v: Fraction(c) for v, c in conclusion["coeffs"].items()})
+    rhs = float(conclusion["rhs"])
+    if conclusion["rel"] == ">=":
+        cons.append((rr, None, rhs - 1))
+    else:
+        cons.append((rr, rhs + 1, None))
+    res = _cm_solve(cons)
+    if res is not None and res.success and res.x is not None:
+        return {v: int(round(res.x[i])) for v, i in _CM_IDX.items()}
+    return None
+
+
+def arith_min(premises, conclusion):
+    """§2 (v0.6.1): minimise the conclusion LHS over premises + Inventory (integer).
+    Returns the minimum (int) or None if unbounded/infeasible."""
+    cons = _cm_base_constraints() + _cm_premise_rows(premises)
+    obj = [0.0] * _CM_N
+    for v, c in conclusion["coeffs"].items():
+        obj[_CM_IDX[v]] = float(c)
+    res = _cm_solve(cons, obj)
+    if res is None or not res.success or res.x is None:
+        return None
+    return int(round(float(res.fun)))
+
+
+# ── bound strengthening (§2 of v0.2) + redundant-term removal (§3 of v0.3) ────
+_NONNEG_FACESPLIT = None
+
+
+def _nonneg_facesplit_forms():
+    global _NONNEG_FACESPLIT
+    if _NONNEG_FACESPLIT is None:
+        forms = []
+        for e in INV.INVENTORY:
+            if e["name"] == "face_split" or e["name"].startswith("nonneg_"):
+                forms.append(D._conc_to_form(e["conclusion"]))
+        _NONNEG_FACESPLIT = forms
+    return _NONNEG_FACESPLIT
+
+
+def _implies_via_base(frm: dict, to: dict) -> bool:
+    """Does ``frm`` (``coeffs ≥ rhs``) imply ``to`` using only non-negativity and
+    face_split?  (LP: is ``to`` forced by ``frm`` + those base facts.)"""
+    constraints = [D._conc_to_form(frm)] + _nonneg_facesplit_forms()
+    coeffs = {v: Fraction(c) for v, c in to["coeffs"].items()}
+    m = _lp_min(coeffs, constraints)
+    if m is None:
+        return False
+    return m - float(to["rhs"]) >= -_LP_TOL
+
+
+def _strongest_in(ctx, direction: dict):
+    """Strongest provable bound for ``direction`` read off an *already saturated*
+    pool (§4.2: reuse the fact pool instead of re-deriving).  Returns
+    ``(conclusion, fact)`` or None."""
+    Ldir = {v: int(c) for v, c in direction.items() if int(c) != 0}
+    if not Ldir:
+        return None
+    fact = _find_fact(ctx, {"coeffs": Ldir, "rel": ">=", "rhs": -10 ** 9})
+    if fact is None:
+        return None
+    prim = _primitive_int(fact.coeffs, fact.const)
+    if prim is None or prim[1].denominator != 1:
+        return None
+    ic, nc = prim
+    return {"coeffs": ic, "rel": ">=", "rhs": int(-nc)}, fact
+
+
+def _neg(d):
+    return {v: -int(c) for v, c in d.items() if int(c) != 0}
+
+
+def _strongest(pruned, direction: dict):
+    """Strongest provable bound for ``direction`` over ``pruned`` — the deducer
+    saturates with ``direction`` added (v0.6.2: candidates are arbitrary
+    directions, not in the base set)."""
+    Ldir = {v: int(c) for v, c in direction.items() if int(c) != 0}
+    if not Ldir:
+        return None
+    ctx = cached_context(pruned, [Ldir, _neg(Ldir)])
+    r = _strongest_in(ctx, direction)
+    if r is None:
+        return None
+    concl, fact = r
+    return concl, ctx, fact
+
+
+def strengthen_and_simplify(conclusion0: dict, pruned: list):
+    """§2: strengthen to the strongest provable constant; §3-v0.3: then greedily
+    drop any non-p_6 term whose removal still yields a provable (and, via nonneg +
+    face_split, stronger-or-equivalent) conclusion.  The deducer saturates once
+    with the conclusion direction and all single-term-drop directions added.
+    Returns ``(conclusion, ctx, fact)`` or None."""
+    d0 = {v: int(c) for v, c in conclusion0["coeffs"].items() if int(c) != 0}
+    dirs = [d0, _neg(d0)]
+    for x in [v for v in d0 if v != "p_6"]:
+        red = {v: c for v, c in d0.items() if v != x}
+        if "p_6" in red:
+            dirs += [red, _neg(red)]
+    ctx = cached_context(pruned, dirs)
+    r = _strongest_in(ctx, conclusion0["coeffs"])
+    if r is None:
+        return None
+    cur, fact = r
+    changed = True
+    while changed:
+        changed = False
+        for x in [v for v in cur["coeffs"] if v != "p_6"]:
+            reduced = {v: c for v, c in cur["coeffs"].items() if v != x}
+            if "p_6" not in reduced:
+                continue
+            rr = _strongest_in(ctx, reduced)
+            if rr is None:
+                continue
+            red_concl, rfact = rr
+            if _implies_via_base(red_concl, cur):
+                cur, fact = red_concl, rfact
+                changed = True
+                break
+    return cur, ctx, fact
+
+
+# ── premise de-duplication (§1) ──────────────────────────────────────────────
+def _premise_implies(a: dict, b: dict) -> bool:
+    """Does premise ``a`` imply premise ``b`` (so ``b`` is redundant)?  Handled
+    for premises on the same single canonical LHS direction."""
+    ca = canonicalize({v: Fraction(c) for v, c in a["coeffs"].items()})
+    cb = canonicalize({v: Fraction(c) for v, c in b["coeffs"].items()})
+    pa, pb = D._primitive(ca, Fraction(-a["rhs"])), D._primitive(cb, Fraction(-b["rhs"]))
+    if pa is None or pb is None:
+        return False
+    ia, na = pa
+    ib, nb = pb
+    # equalities imply same-LHS inequalities in either direction
+    if a["rel"] == "=":
+        if tuple(sorted(ia.items())) == tuple(sorted(ib.items())):
+            if b["rel"] == ">=" and -na >= -nb:
+                return True
+            if b["rel"] == "<=" and na >= nb:
+                return True
+            if b["rel"] == "=" and na == nb:
+                return True
+        neg = {v: -c for v, c in ia.items()}
+        if tuple(sorted(neg.items())) == tuple(sorted(ib.items())) and b["rel"] == ">=":
+            if na >= -nb:
+                return True
+    if a["rel"] == b["rel"] == ">=" and tuple(sorted(ia.items())) == tuple(sorted(ib.items())):
+        return -na >= -nb                      # a is the stronger lower bound
+    if a["rel"] == b["rel"] == "<=" and tuple(sorted(ia.items())) == tuple(sorted(ib.items())):
+        return na >= nb                        # a is the stronger upper bound
+    return False
+
+
+def dedup_premises(premises: list) -> list:
+    """Drop any premise implied by another in the same group (§1)."""
+    keep = list(premises)
+    changed = True
+    while changed:
+        changed = False
+        for i, b in enumerate(keep):
+            for j, a in enumerate(keep):
+                if i == j:
+                    continue
+                if _premise_implies(a, b) and not (
+                        _premise_implies(b, a) and j > i):
+                    del keep[i]
+                    changed = True
+                    break
+            if changed:
+                break
+    return keep
+
+
+# ── premise minimization (§3) ────────────────────────────────────────────────
+def _derives(ctx: Context, conclusion: dict) -> bool:
+    """Can ``ctx`` derive the conclusion (same or stronger), compared on the
+    canonical form so f_2 ↔ p-vars rewrites don't matter?"""
+    return _find_fact(ctx, conclusion) is not None
+
+
+def minimize_premises(premises: list, conclusion: dict) -> list:
+    """Greedy pruning (AlphaGeometry-2 style): drop a premise permanently if the
+    conclusion is still derivable without it."""
+    kept = list(premises)
+    i = 0
+    while i < len(kept):
+        trial = kept[:i] + kept[i + 1:]
+        ctx = cached_context(trial)
+        if _derives(ctx, conclusion):
+            kept = trial                       # premise unnecessary -> drop
+        else:
+            i += 1
+    return kept
+
+
+def harvest_conjectures(ctx: Context, premises: list) -> list:
+    """Return candidate ``(conclusion, fact)`` pairs from a saturated context.
+    All filters are evaluated on the canonical form (f_2 eliminated)."""
+    out = []
+    seen_lhs = {}
+    for fact in ctx.all_prop_facts():
+        prim = _primitive_int(fact.coeffs, fact.const)
+        if prim is None:
+            continue
+        icoeffs, nc = prim
+        if nc.denominator != 1:
+            continue                      # not integer-rounded -> skip
+        rhs = int(-nc)
+        canon = canonicalize({v: Fraction(c) for v, c in icoeffs.items()})
+        cprim = D._primitive(canon, Fraction(-rhs))
+        if cprim is None:
+            continue
+        cic, cnc = cprim
+        canon_int = {v: int(c) for v, c in cic.items()}
+        canon_rhs = int(-cnc)
+        # (a) p_6 must survive BOTH in the canonical form (f_2 eliminated) and
+        #     in the minimal equivalent form (§1, v0.3 — both checks required)
+        if canon_int.get("p_6", 0) == 0:
+            continue
+        if not minimal_has_p6({v: Fraction(c) for v, c in icoeffs.items()}):
+            continue
+        # (b) max coeff <= 6 (display form)
+        if any(abs(c) > MAX_COEFF for c in icoeffs.values()):
+            continue
+        # (c) non-trivial in canonical form
+        if _is_trivial(canon_int, canon_rhs):
+            continue
+        conclusion = {"coeffs": icoeffs, "rel": ">=", "rhs": rhs}
+        lhs = tuple(sorted(canon_int.items()))
+        if lhs in seen_lhs and seen_lhs[lhs] >= rhs:
+            continue
+        seen_lhs[lhs] = rhs
+        out.append((conclusion, fact))
+    return out
+
+
+# ── finding a proof fact after minimization ──────────────────────────────────
+def _canon_index(ctx: Context):
+    """Build (once, cached on the context) a map from canonical-LHS key to the
+    strongest pool fact with that LHS.  Makes :func:`_find_fact` O(1)."""
+    idx = getattr(ctx, "_canon_idx", None)
+    if idx is not None:
+        return idx
+    idx = {}
+    for fact in ctx.all_prop_facts():
+        prim = D._primitive(canonicalize(fact.coeffs), fact.const)
+        if prim is None:
+            continue
+        ic, nc = prim
+        if nc.denominator != 1:
+            continue
+        key = tuple(sorted((v, int(c)) for v, c in ic.items()))
+        prev = idx.get(key)
+        if prev is None or -nc > prev[1]:
+            idx[key] = (fact, -nc)
+    ctx._canon_idx = idx
+    return idx
+
+
+def _find_fact(ctx: Context, conclusion: dict):
+    """Return the strongest pool fact whose *canonical* LHS matches the
+    conclusion's canonical LHS with a bound at least as strong, or None."""
+    target = canonicalize({v: Fraction(c) for v, c in conclusion["coeffs"].items()})
+    pt = D._primitive(target, Fraction(-conclusion["rhs"]))
+    if pt is None:
+        return None
+    it, nt = pt
+    key_t = tuple(sorted((v, int(c)) for v, c in it.items()))
+    hit = _canon_index(ctx).get(key_t)
+    if hit is not None and hit[1] >= -nt:
+        return hit[0]
+    return None
+
+
+# ── hashing (dedup) — on canonical (f_2-eliminated) forms ─────────────────────
+def premise_key(premises: list):
+    items = []
+    for pr in premises:
+        pc = canonicalize({v: Fraction(c) for v, c in pr["coeffs"].items()})
+        prim = D._primitive(pc, Fraction(-pr["rhs"]))
+        if prim is None:
+            key = ((), str(pr["rhs"]), pr["rel"])
+        else:
+            ic, nc = prim
+            key = (tuple(sorted((v, int(c)) for v, c in ic.items())), str(nc), pr["rel"])
+        items.append(key)
+    return frozenset(items)
+
+
+def conjecture_hash(premises: list, conclusion: dict):
+    canon = canonicalize({v: Fraction(c) for v, c in conclusion["coeffs"].items()})
+    prim = D._primitive(canon, Fraction(-conclusion["rhs"]))
+    if prim is None:
+        ckey = ((), conclusion["rel"], conclusion["rhs"])
+    else:
+        ic, nc = prim
+        ckey = (tuple(sorted((v, int(c)) for v, c in ic.items())), conclusion["rel"],
+                str(nc))
+    return (premise_key(premises), ckey)
+
+
+def load_existing_hashes(record_dir: Path):
+    """Recompute hashes from existing record json (hash is never stored)."""
+    hashes = {}
+    max_id = 0
+    if not record_dir.exists():
+        return hashes, max_id
+    for d in record_dir.iterdir():
+        j = d / f"{d.name}.json"
+        if not j.exists():
+            continue
+        with open(j) as fh:
+            data = json.load(fh)
+        cj = data["conjecture"]
+        h = conjecture_hash(cj["premises"], cj["conclusion"])
+        hashes[h] = d.name
+        try:
+            max_id = max(max_id, int(d.name[1:]))
+        except ValueError:
+            pass
+    return hashes, max_id
+
+
+# ── skeleton de-duplication (§1/§2, v0.6) ─────────────────────────────────────
+# A skeleton abstracts a conjecture to its structure, replacing constants by a
+# placeholder, so conjectures that differ only in constants collapse together.
+def _skel_lhs(coeffs):
+    """Coprime-integer coefficient tuple (sign preserved) — the structural LHS."""
+    nz = {v: Fraction(c) for v, c in coeffs.items() if Fraction(c) != 0}
+    prim = D._primitive(nz, Fraction(0))
+    if prim is None:
+        return ()
+    ic, _ = prim
+    return tuple(sorted((v, int(c)) for v, c in ic.items()))
+
+
+def premise_skeleton(pr):
+    """Keep variables/coeffs/relation; replace the constant by a placeholder,
+    EXCEPT keep ``x = 0`` (an '='-premise, which is structural)."""
+    lhs = _skel_lhs(pr["coeffs"])
+    if pr["rel"] == "=":
+        return (lhs, "=", int(pr["rhs"]))        # structural (x = 0): keep 0
+    return (lhs, pr["rel"], "*")                 # placeholder for the constant
+
+
+def conclusion_skeleton(conclusion):
+    canon = canonicalize({v: Fraction(c) for v, c in conclusion["coeffs"].items()})
+    return (_skel_lhs(canon), conclusion["rel"])
+
+
+def conjecture_skeleton(premises, conclusion):
+    return (frozenset(premise_skeleton(pr) for pr in premises),
+            conclusion_skeleton(conclusion))
+
+
+def skeleton_better(new: dict, old: dict) -> bool:
+    """Is ``new`` strictly better than ``old`` (same skeleton)?  Order:
+    attained(yes>unknown), then touch (only when attained), then hardness."""
+    rank = lambda a: 1 if a == "yes" else 0
+    if rank(new["attained"]) != rank(old["attained"]):
+        return rank(new["attained"]) > rank(old["attained"])
+    if new["attained"] == "yes":
+        nt, ot = (new["touch"] or 0), (old["touch"] or 0)
+        if nt != ot:
+            return nt > ot
+    ns, os_ = bool(new.get("arith_sharp")), bool(old.get("arith_sharp"))
+    if ns != os_:
+        return ns and not os_          # arith_sharp true beats false
+    if new["hardness"] != old["hardness"]:
+        return new["hardness"] > old["hardness"]
+    return False
+
+
+def build_skeleton_index(record_dir: Path, features):
+    """Map skeleton -> info about the best recorded conjecture with that skeleton."""
+    idx = {}
+    if not record_dir.exists():
+        return idx
+    for d in sorted(record_dir.iterdir()):
+        j = d / f"{d.name}.json"
+        if not j.exists():
+            continue
+        data = json.load(open(j))
+        cj = data["conjecture"]
+        skel = conjecture_skeleton(cj["premises"], cj["conclusion"])
+        att = data.get("attained", "yes")
+        touch = data.get("touch")
+        if touch is None and att == "yes":
+            touch = IRIS.iris_score(cj["premises"], cj["conclusion"],
+                                    features)["touch_size"]
+        idx[skel] = {"name": d.name, "attained": att, "touch": touch,
+                     "arith_sharp": data.get("arith_sharp", False),
+                     "hardness": data["hardness"], "formula": cj["formula"],
+                     "supersedes": data.get("supersedes", [])}
+    return idx
+
+
+# ── soundness regression ─────────────────────────────────────────────────────
+def soundness_check(premises: list, conclusion: dict, pvecs: list, pvec_vars: list):
+    """Raise if any real p-vector satisfies the premises but violates the
+    conclusion (indicates a bug in inventory or deducer)."""
+    ccoeffs = {v: Fraction(c) for v, c in conclusion["coeffs"].items()}
+    crhs = Fraction(conclusion["rhs"])
+    for pv, vals in zip(pvecs, pvec_vars):
+        if not _pvec_satisfies(vals, premises):
+            continue
+        lhs = sum(c * vals.get(v, 0) for v, c in ccoeffs.items())
+        ok = lhs >= crhs if conclusion["rel"] == ">=" else lhs <= crhs
+        if not ok:
+            raise AssertionError(
+                f"SOUNDNESS VIOLATION: p-vector {pv} satisfies premises "
+                f"{premises} but violates conclusion {conclusion} "
+                f"(lhs={lhs}, rhs={crhs})")
+
+
+# ── natural language / formula rendering ─────────────────────────────────────
+def _render_ineq_text(coeffs: dict, rel: str, rhs: int) -> str:
+    coeffs = _merge_tail_display(coeffs)           # §1.2 big_faces merge
+    parts = []
+    for v in DISPLAY_ORDER:
+        c = coeffs.get(v, 0)
+        if c == 0:
+            continue
+        name = PRETTY[v]
+        parts.append(name if c == 1 else (f"-{name}" if c == -1 else f"{c}*{name}"))
+    lhs = " + ".join(parts).replace("+ -", "- ") if parts else "0"
+    sym = {">=": ">=", "<=": "<=", "=": "="}[rel]
+    return f"{lhs} {sym} {rhs}"
+
+
+def formula_string(premises: list, conclusion: dict) -> str:
+    conds = ["(is_simple)"] + [f"({_render_ineq_text(pr['coeffs'], pr['rel'], pr['rhs'])})"
+                               for pr in premises]
+    concl = display_text(conclusion)
+    return f"if ({' and '.join(conds)}), then ({concl})"
+
+
+def natural_language(premises: list, conclusion: dict) -> str:
+    prem_txt = ", ".join(_render_ineq_text(pr["coeffs"], pr["rel"], pr["rhs"])
+                         for pr in premises)
+    concl = display_text(conclusion)
+    intro = ("Let M be a simple 3-polytope (a simple 3-connected planar map), "
+             "with p_k the number of k-gonal faces, f_2 the total number of "
+             "faces, and sum_{k>=7} p_k the number of faces of size at least 7.")
+    if prem_txt:
+        return f"{intro} Suppose {prem_txt}. Then {concl}."
+    return f"{intro} Then {concl}."
+
+
+# ── markdown ────────────────────────────────────────────────────────────────
+def _steps_md(steps: list, depth: int) -> list:
+    lines = []
+    ind = "  " * depth
+    for s in steps:
+        rule = s["rule"]
+        if rule == "premise":
+            lines.append(f"{ind}- Premise: `{s['text']}`.")
+        elif rule == "assumption":
+            lines.append(f"{ind}- Assumption: `{s['text']}`.")
+        elif rule == "inventory":
+            lines.append(f"{ind}- Inventory `{s['inventory']}`: `{s['text']}`.")
+        elif rule == "conditional":
+            lines.append(f"{ind}- Inventory theorem `{s['inventory']}` "
+                         f"(via `linarith`): `{s['text']}`.")
+        elif rule == "combination":
+            lines.append(f"{ind}- Linear combination (`linarith`): `{s['text']}`.")
+        elif rule == "rounding":
+            lines.append(f"{ind}- Integer rounding (`omega`): `{s['text']}`.")
+        elif rule == "case_split":
+            lines.append(f"{ind}- Case split (`by_cases`) on "
+                         f"`{s['split_var']}` at threshold {s['split_threshold']}: "
+                         f"`{s['text']}`.")
+            for i, cse in enumerate(s["cases"], 1):
+                lines.append(f"{ind}  - **Case {i}** (`{cse['assume']}`):")
+                lines += _steps_md(cse["steps"], depth + 2)
+    return lines
+
+
+def build_md(data: dict) -> str:
+    cj = data["conjecture"]
+    lines = [f"# {data['id']}", "", "## Statement", "",
+             cj["natural_language"], "",
+             f"**Formula.** `{cj['formula']}`", "",
+             "## Proof", ""]
+    lines += _steps_md(data["proof"]["steps"], 0)
+    lines += ["", "## Scores", "",
+              f"- IRIS: T={data['iris']['T']:.4f}, R={data['iris']['R']:.4f}, "
+              f"L={data['iris']['L']:.4f}, score={data['iris']['score']:.4f}",
+              f"- hardness: {data['hardness']:.4f}",
+              f"- Lean: {data['lean']['status']}"]
+    return "\n".join(lines) + "\n"
+
+
+# ── one attempt ──────────────────────────────────────────────────────────────
+def attempt(rng, pool, next_id, existing_hashes, stats, seed, skel_index):
+    """Try to produce one conjecture.  Returns ``(record_data, lean_src, ...)``
+    on success, or ``None`` (with ``stats`` updated) on any discard.  Raises on
+    a soundness violation."""
+    pvecs, features, pvec_vars = pool
+    # §4 (v0.4): the deduction cache is reused within one attempt (many
+    # candidates re-run minimisation over the same premise subsets) but cleared
+    # between attempts to bound memory.
+    _ctx_cache_clear()
+    premises = sample_premises(rng)
+    # §2 (v0.3): premises never mention p_6 (the target variable)
+    premises = [pr for pr in premises if pr["coeffs"].get("p_6", 0) == 0]
+    # §1: drop premises implied by another in the same group
+    premises = dedup_premises(premises)
+    if not premises:
+        stats["empty_premises"] += 1
+        return None
+    # §3 (v0.4): premises with f_2 >= c (c > 28) have no pool witness; skip the
+    # pool-based non-empty / attainment checks and rely on deducer + Lean.
+    covered = pool_covered(premises)
+    if covered and not premises_nonempty(premises, pvec_vars):
+        stats["empty_premises"] += 1
+        return None
+
+    # §2 (v0.6.2): candidates from systematic direction enumeration (LP + case
+    # split), not from random pairing / a saturated pool.
+    candidates = enumerate_candidates(premises, stats, rng)
+    if not candidates:
+        stats["no_p6_canonical"] += 1
+        return None
+
+    rng.shuffle(candidates)
+    for conclusion0 in candidates:
+        # §1 (v0.4, fast pre-filter): reject p_6 upper bounds up front.  The
+        # canonical p_6 sign is fixed by the harvested direction and is preserved
+        # by strengthening; a candidate whose canonical form has no f_2 term keeps
+        # that sign through term-dropping too, so this never discards a would-be
+        # lower bound — it just avoids the expensive path for upper bounds.
+        c0_canon = canonicalize({v: Fraction(c) for v, c in conclusion0["coeffs"].items()})
+        if not ALLOW_UPPER_BOUNDS and c0_canon.get("p_6", 0) < 0 \
+                and conclusion0["coeffs"].get("f_2", 0) == 0:
+            stats["p6_upper_bound"] += 1
+            continue
+
+        # §4 (fast pre-filter): a conclusion linearly derivable from the full
+        # (deduped) premises is discarded.  Minimization only drops premises, so
+        # a conclusion not linearly derivable here is not linearly derivable from
+        # any minimized subset either — hence every conjecture we keep genuinely
+        # needs integer rounding or a case split on its minimized premises.
+        if linearly_derivable(premises, conclusion0):
+            stats["linear_only"] += 1
+            continue
+
+        # §3: greedy premise minimization
+        pruned = minimize_premises(premises, conclusion0)
+        # §1 (v0.5): make implied-zero variables explicit, drop redundant premises,
+        # then re-minimise and de-duplicate (result is equivalent on ℕ).
+        pruned = simplify_premises(pruned)
+        pruned = dedup_premises(pruned)
+        pruned = minimize_premises(pruned, conclusion0)
+        # §2 (strengthen) + §3-v0.3 (drop redundant terms)
+        res = strengthen_and_simplify(conclusion0, pruned)
+        if res is None:
+            # the deducer could not reconstruct a proof for a direction the LP
+            # enumeration flagged as non-linear (expected not to happen).
+            stats["proof_reconstruct_failed"] += 1
+            continue
+        conclusion, ctx_m, fact = res
+        icoeffs = conclusion["coeffs"]
+        ic_frac = {v: Fraction(c) for v, c in icoeffs.items()}
+
+        # p_6 must survive in the canonical form (f_2 eliminated)
+        canon_c = canonicalize(ic_frac)
+        canon_prim = D._primitive(canon_c, Fraction(-conclusion["rhs"]))
+        canon_p6 = canon_c.get("p_6", 0)
+        if canon_p6 == 0:
+            stats["no_p6_canonical"] += 1
+            continue
+        # §1 (v0.4): keep only lower bounds on p_6 (canonical p_6 coeff > 0)
+        if canon_p6 < 0 and not ALLOW_UPPER_BOUNDS:
+            stats["p6_upper_bound"] += 1
+            continue
+        # p_6 must also survive in the minimal equivalent form
+        mcoeffs = minimal_form(ic_frac)
+        if mcoeffs.get("p_6", 0) == 0:
+            stats["p6_only_via_f2"] += 1
+            continue
+        if any(abs(c) > MAX_COEFF for c in mcoeffs.values()):
+            stats["no_candidate"] += 1
+            continue
+
+        # §2 (v0.4): p_6 must be essential — if, after removing a*p_6 from the
+        # canonical LHS, the remainder L' >= c is still provable, then p_6 was
+        # only padded in via p_6 >= 0.  Discard as p6_padding.
+        cic = {v: int(x) for v, x in canon_prim[0].items()}
+        crhs = int(-canon_prim[1])
+        lprime = {v: x for v, x in cic.items() if v != "p_6"}
+        if not lprime:
+            padding = crhs <= 0
+        else:
+            rp = _strongest(pruned, lprime)
+            padding = rp is not None and rp[0]["rhs"] >= crhs
+        if padding:
+            stats["p6_padding"] += 1
+            continue
+
+        tb = traceback(ctx_m, fact)
+
+        # §4-v0.2: p_6-isolated display form.  v0.6.2 §1.2: pick the most compact
+        # presentation — counting the merged big_faces expression as one term — so
+        # a conclusion with equal tail coefficients shows as a*p_6 >= c - sum_pk_after_p6
+        # rather than the longer f_2 form.
+        cand_disp = []
+        if mcoeffs.get("p_6", 0) > 0:
+            cand_disp.append(display_conclusion(mcoeffs, conclusion["rhs"]))
+        cand_disp.append(display_conclusion(
+            {v: Fraction(x) for v, x in cic.items()}, crhs))
+        disp = min(cand_disp,
+                   key=lambda dd: len(_merge_tail_display(dd["coeffs"])))
+
+        # not a weakening of a (remaining) premise (canonical)
+        if _weakens_premise(cic, crhs, pruned):
+            stats["premise_weakening"] += 1
+            continue
+
+        # §4 (v0.1): must still need integer rounding / case split
+        if linearly_derivable(pruned, conclusion):
+            stats["linear_only"] += 1
+            continue
+
+        # derivation-step floor
+        if _count_derivation_steps(tb) < 2:
+            stats["too_shallow"] += 1
+            continue
+
+        # §3 (v0.4): attainment.  For pool-covered premises require IRIS T > 0;
+        # for out-of-pool premises (f_2 >= c, c > 28) skip the check, mark unknown.
+        if covered:
+            iris = IRIS.iris_score(pruned, disp, features)
+            if REQUIRE_ATTAINED and iris["touch_size"] == 0:
+                stats["not_attained"] += 1
+                continue
+            attained = "yes"
+        else:
+            iris = {"T": 0.0, "R": 0.0, "L": 0.0, "score": 0.0}
+            attained = "unknown"
+            stats["skipped_pool_checks"] += 1
+
+        touch_val = iris["touch_size"] if attained == "yes" else None
+        hard = HARD.hardness(tb, pruned, disp)
+
+        # §2 (v0.6.1): arithmetic sharpness — is c the integer minimum of the
+        # conclusion LHS over premises + Inventory?
+        amin = arith_min(pruned, disp)
+        arith_sharp = (amin is not None and amin == int(disp["rhs"]))
+
+        # exact-duplicate dedup (same premises AND same constants)
+        h = conjecture_hash(pruned, conclusion)
+        if h in existing_hashes:
+            stats["premise_minimized_duplicate" if not pruned else "duplicate"] += 1
+            continue
+
+        # §2 (v0.6): skeleton de-duplication (judged before the counter-model gate
+        # and Lean compile; metrics computed first so worse candidates are dropped
+        # cheaply).  Replacement itself happens only after all checks pass.
+        skel = conjecture_skeleton(pruned, disp)
+        new_metrics = {"attained": attained, "touch": touch_val,
+                       "arith_sharp": arith_sharp, "hardness": hard}
+        mode, target, supersedes = "new", f"C{next_id}", []
+        if skel in skel_index:
+            ex = skel_index[skel]
+            if not skeleton_better(new_metrics, ex):
+                stats["same_skeleton_worse"] += 1
+                continue
+            mode, target = "replace", ex["name"]
+            supersedes = [ex["formula"]] + list(ex.get("supersedes", []))
+
+        # exact re-check + soundness on the real pool
+        ok, msg = recheck(ctx_m, fact, pruned)
+        if not ok:
+            stats["recheck_failed"] += 1
+            continue
+        soundness_check(pruned, disp, pvecs, pvec_vars)
+
+        # §3 (v0.5): integer counter-model gate — the conclusion MUST be a logical
+        # consequence of the premises + Inventory.  If an integer counter-model
+        # exists the conjecture is not Inventory-derivable: a pipeline bug.
+        cm = counter_model(pruned, disp)
+        if cm is not None:
+            raise AssertionError(
+                "COUNTER-MODEL: conclusion not derivable from Inventory.\n"
+                f"  premises  : {[pr.get('text') for pr in pruned]}\n"
+                f"  conclusion: {display_text(disp)}\n"
+                f"  integer counter-model: {cm}\n"
+                f"  proof steps: {[ (s['rule'], s['text']) for s in tb ]}")
+
+        all_inv = set()
+        _used_inventory(tb, all_inv)
+        inv_theorems = sorted(all_inv & INVENTORY_THEOREMS)
+        lemmas_used = sorted(all_inv - INVENTORY_THEOREMS)
+
+        # deterministic fids (§4) so the record is independent of the cache
+        renumber_steps(tb)
+
+        # step-by-step formalisation + compile (goal in display form)
+        lean_src = F.build_lean(target, pruned, disp, tb, display=True)
+        cok, cmsg = F.compile_lean(target, lean_src)
+        if not cok:
+            stats["compile_failed"] += 1
+            stats.setdefault("compile_msgs", []).append((target, cmsg[:200]))
+            continue
+
+        # §2 (v0.6.2): deductive-depth label (diagnostic only, never filters)
+        depth_type = classify_depth(pruned, cic)
+        stats[depth_type] += 1
+
+        data = {
+            "id": target,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "generator": {"version": GENERATOR_VERSION, "seed": seed},
+            "conjecture": {
+                "formula": formula_string(pruned, disp),
+                "premises": [{"text": pr.get("text", ""),
+                              "coeffs": {k: int(v) for k, v in pr["coeffs"].items()},
+                              "rel": pr["rel"], "rhs": int(pr["rhs"])}
+                             for pr in pruned],
+                "conclusion": {
+                    "text": display_text(disp),
+                    "coeffs": {k: int(v) for k, v in disp["coeffs"].items()},
+                    "rel": disp["rel"], "rhs": int(disp["rhs"])},
+                "natural_language": natural_language(pruned, disp),
+            },
+            "proof": {"inventory_used": inv_theorems,
+                      "lemmas_used": lemmas_used,
+                      "steps": tb},
+            "iris": {k: iris[k] for k in ("T", "R", "L", "score")},
+            "attained": attained,
+            "touch": touch_val,
+            "arith_sharp": arith_sharp,
+            "arith_min": amin,
+            "depth_type": depth_type,
+            "supersedes": supersedes,
+            "hardness": hard,
+            "lean": {"theorem_name": target, "status": "compiled"},
+        }
+        existing_hashes[h] = target
+        return {"data": data, "lean_src": lean_src, "conclusion": disp,
+                "inventory": inv_theorems, "mode": mode, "target": target,
+                "skeleton": skel, "metrics": new_metrics}
+
+    return None
+
+
+# ── atomic record writing ────────────────────────────────────────────────────
+def write_record(data: dict, lean_src: str):
+    """Write to a temp dir first, then rename to C{n}/ atomically."""
+    name = data["id"]
+    RECORD.mkdir(exist_ok=True)
+    tmp = RECORD / f".{name}.tmp"
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    tmp.mkdir(parents=True)
+    (tmp / f"{name}.json").write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    (tmp / f"{name}.md").write_text(build_md(data))
+    (tmp / f"{name}.lean").write_text(lean_src)
+    final = RECORD / name
+    if final.exists():
+        shutil.rmtree(final)
+    os.replace(tmp, final)
+    # the compiled copy lives only in the record; remove the working file that
+    # the formalizer left inside the Lean project
+    lean_working = F.LEAN_DIR / f"{name}.lean"
+    if lean_working.exists():
+        lean_working.unlink()
