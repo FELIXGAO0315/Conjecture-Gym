@@ -484,7 +484,29 @@ def main(argv):
                    writes_by_depth, new_skel_segments, batch_count,
                    batch_time_total, bisection_total, mem.peak, n_workers,
                    phase1, phase2)
+    _recheck_sample(base_seed)
     return 0
+
+
+def _recheck_sample(base_seed, k=5):
+    """§III.5: randomly pick k records and compile their C{n}.lean standalone,
+    confirming that theorems verified inside a batch also compile on their own
+    (a batch-vs-standalone disagreement would be flagged here — §rule 2)."""
+    import random as _r
+    recs = [d for d in G.RECORD.iterdir()
+            if d.is_dir() and (d / f"{d.name}.lean").exists()]
+    if not recs:
+        return
+    pick = _r.Random(base_seed).sample(recs, min(k, len(recs)))
+    print(f"\n§III.5 standalone re-compile of {len(pick)} random records:")
+    bad = []
+    for d in sorted(pick, key=lambda d: int(d.name[1:]) if d.name[1:].isdigit() else 0):
+        ok, msg = F.compile_lean(d.name, (d / f"{d.name}.lean").read_text())
+        print(f"  {d.name}: {'OK' if ok else 'FAIL — ' + msg[:200]}")
+        if not ok:
+            bad.append(d.name)
+    if bad:
+        print(f"  !!! standalone compile DISAGREES with batch for: {bad}")
 
 
 def _print_summary(stats, sampled, added, replaced, elapsed, sample_time_total,
