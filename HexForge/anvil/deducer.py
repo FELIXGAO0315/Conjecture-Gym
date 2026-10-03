@@ -128,6 +128,7 @@ class Fact:
     split_var: Optional[str] = None               # case_split (label)
     split_threshold: Optional[int] = None
     split_coeffs: Optional[dict] = None           # case_split linear expression
+    split_kind: Optional[str] = None              # "conditional" | "bnb" (v0.6.6)
     branches: list = field(default_factory=list)  # case_split: [(label, Context, fid)]
     note: str = ""
 
@@ -274,6 +275,29 @@ SPLIT_SPECS = [
     ("tail_count", dict(_TAIL_COUNT), [3, 4]),   # Barnette trigger
     ("f_2", {"f_2": 1}, [7, 8]),                 # Jučovič trigger
 ]
+
+# v0.6.6 §1: branch-and-bound case splits.  When the LP optimum for a direction we
+# are trying to bound lands on a FRACTIONAL value of one of these variables, split
+# on ``var <= floor(x*)`` vs ``var >= ceil(x*)`` so the proof depth can grow beyond
+# what the fixed conditional-theorem splits (tail_count, f_2) allow.
+BNB_VARS = ["p_3", "p_4", "p_5", "p_6", "sum_pk_after_p6", "f_2"]
+_BNB_FRAC_TOL = 1e-6
+
+
+def _bnb_pick_var(xstar: dict):
+    """Deterministically pick the B&B variable: the one in ``BNB_VARS`` whose LP
+    value has fractional part closest to 0.5 (ties broken by the fixed BNB_VARS
+    order).  Returns ``(var, floor(x*))`` or ``None`` if all are (near-)integral."""
+    best = None
+    for v in BNB_VARS:
+        x = float(xstar.get(v, 0.0))
+        frac = x - floor(x)
+        if frac <= _BNB_FRAC_TOL or frac >= 1.0 - _BNB_FRAC_TOL:
+            continue                              # (near-)integral: nothing to split
+        dist = abs(frac - 0.5)
+        if best is None or dist < best[0] - 1e-12:
+            best = (dist, v, floor(x))
+    return (best[1], best[2]) if best is not None else None
 
 DEFAULT_MAX_ROUNDS = 8
 # v0.6.5 §4: case-split nesting raised 2 → 3 (the 3rd level reuses the same
@@ -567,9 +591,62 @@ class Context:
                         changed = True
         return changed
 
+    # ── branch-and-bound split selection (v0.6.6 §1) ─────────────────────────
+    def _lp_vertex(self, direction: dict):
+        """Solve ``min direction·x`` over the current facts; return ``(value,
+        {var: x_i})`` for the optimal vertex, or ``None`` if infeasible/unbounded."""
+        ineqs, eqs = self._active_ineqs_eqs()
+        idx = {v: i for i, v in enumerate(ALL_VARS)}
+        n = len(ALL_VARS)
+        A_ub, b_ub = [], []
+        for f in ineqs:
+            row = [0.0] * n
+            for v, c in f.coeffs.items():
+                row[idx[v]] = -float(c)
+            A_ub.append(row); b_ub.append(float(f.const))
+        A_eq, b_eq = [], []
+        for f in eqs:
+            row = [0.0] * n
+            for v, c in f.coeffs.items():
+                row[idx[v]] = float(c)
+            A_eq.append(row); b_eq.append(-float(f.const))
+        c = [0.0] * n
+        for v, coef in direction.items():
+            c[idx[v]] = float(coef)
+        work_tick()
+        try:
+            res = linprog(c, A_ub=A_ub or None, b_ub=b_ub or None,
+                          A_eq=A_eq or None, b_eq=b_eq or None,
+                          bounds=[(None, None)] * n, method="highs")
+        except Exception:
+            return None
+        if not res.success or not np.isfinite(res.fun):
+            return None
+        return float(res.fun), {v: float(res.x[idx[v]]) for v in ALL_VARS}
+
+    def _bnb_splits(self):
+        """Deterministic B&B split candidates ``(var, threshold)`` from the extra
+        (candidate) directions whose LP optimum is fractional in a B&B variable."""
+        out, seen = [], set()
+        for d in self.directions[len(BASE_DIRECTIONS):]:
+            v = self._lp_vertex(d)
+            if v is None:
+                continue
+            pick = _bnb_pick_var(v[1])
+            if pick is None:
+                continue
+            var, fl = pick
+            key = (var, fl + 1)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(key)
+        return out
+
     # ── case splitting ──────────────────────────────────────────────────────
     def saturate(self) -> None:
-        """Full closure including case splits down to ``self.depth``."""
+        """Full closure including case splits (conditional-theorem and branch-and-
+        bound) down to ``self.depth``."""
         self._saturate()
         if self.depth <= 0:
             return
@@ -578,8 +655,13 @@ class Context:
             progress = False
             for label, coeffs, thresholds in SPLIT_SPECS:
                 for c in thresholds:
-                    if self._merge_case_split(label, coeffs, c):
+                    if self._merge_case_split(label, coeffs, c, kind="conditional"):
                         progress = True
+            # v0.6.6 §1: branch-and-bound splits on fractional LP variables
+            for var, k in self._bnb_splits():
+                if self._merge_case_split(f"bnb:{var}", {var: Fraction(1)}, k,
+                                          kind="bnb"):
+                    progress = True
             if progress:
                 self._saturate()
 
@@ -589,7 +671,8 @@ class Context:
         le = self._entails({v: -x for v, x in coeffs.items()}, Fraction(c - 1)) is not None
         return ge or le
 
-    def _merge_case_split(self, label: str, coeffs: dict, c: int) -> bool:
+    def _merge_case_split(self, label: str, coeffs: dict, c: int,
+                          kind: str = "conditional") -> bool:
         if self._decided(coeffs, c):
             return False
         key_c = tuple(sorted(coeffs.items()))
@@ -629,7 +712,7 @@ class Context:
             merged = Fact(next(self._counter), {v: Fraction(x) for v, x in ic.items()},
                           -merged_bound, ">=",
                           rule="case_split", split_var=label, split_threshold=c,
-                          split_coeffs=dict(coeffs),
+                          split_coeffs=dict(coeffs), split_kind=kind,
                           branches=[(f"{etext} >= {c}", ctx_ge, fg.fid),
                                     (f"{etext} <= {c - 1}", ctx_le, fl.fid)])
             if self._add(merged):
@@ -725,6 +808,7 @@ def traceback(ctx: Context, fact: Fact) -> list:
             step["split_var"] = f.split_var
             step["split_threshold"] = f.split_threshold
             step["split_coeffs"] = {v: str(c) for v, c in (f.split_coeffs or {}).items()}
+            step["split_kind"] = f.split_kind or "conditional"
             step["cases"] = []
             for (label, child, cfid) in f.branches:
                 cfact = next(x for x in child.facts if x.fid == cfid)

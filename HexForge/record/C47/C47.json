@@ -1,49 +1,50 @@
 {
   "id": "C47",
-  "created_at": "2026-10-03T05:07:12.284454+00:00",
+  "created_at": "2026-10-03T08:16:31.913354+00:00",
   "generator": {
-    "version": "0.6.5",
-    "seed": 2024007195
+    "version": "0.6.6",
+    "seed": 2024006752
   },
   "conjecture": {
-    "formula": "if ((is_simple) and (f_2>=_43) and (f_2<=_47) and (sum_pk_after_p6 <= 5)), then p6 >= ((((0.5 * p3) + (0.5 * sum_pk_after_p6)) + -15))",
+    "formula": "if ((is_simple) and (-3*p_4 + 3*p_5 >= 0) and (sum_pk_after_p6 <= 6) and (f_2>=_40)), then p6 >= ((((-1 * p5) + (2 * sum_pk_after_p6)) + -3))",
     "premises": [
       {
-        "text": "f_2 >= 43",
+        "text": "3*p_5 >= 3*p_4",
         "coeffs": {
-          "f_2": 1
+          "p_5": 3,
+          "p_4": -3
         },
         "rel": ">=",
-        "rhs": 43
+        "rhs": 0
       },
       {
-        "text": "f_2 <= 47",
-        "coeffs": {
-          "f_2": 1
-        },
-        "rel": "<=",
-        "rhs": 47
-      },
-      {
-        "text": "sum_pk_after_p6 <= 5",
+        "text": "big_faces <= 6",
         "coeffs": {
           "sum_pk_after_p6": 1
         },
         "rel": "<=",
-        "rhs": 5
+        "rhs": 6
+      },
+      {
+        "text": "f_2 >= 40",
+        "coeffs": {
+          "f_2": 1
+        },
+        "rel": ">=",
+        "rhs": 40
       }
     ],
     "conclusion": {
-      "text": "2*p_6 >= p_3 + sum_pk_after_p6 - 30",
+      "text": "p_6 >= -p_5 + 2*sum_pk_after_p6 - 3",
       "coeffs": {
-        "p_6": 2,
-        "p_3": -1,
-        "sum_pk_after_p6": -1
+        "p_6": 1,
+        "p_5": 1,
+        "sum_pk_after_p6": -2
       },
       "rel": ">=",
-      "rhs": -30
+      "rhs": -3
     },
-    "natural_language": "Let M be a simple 3-polytope (a simple 3-connected planar map), with p_k the number of k-gonal faces, f_2 the total number of faces, and sum_{k>=7} p_k the number of faces of size at least 7. Suppose f_2 >= 43, f_2 <= 47, sum_pk_after_p6 <= 5. Then 2*p_6 >= p_3 + sum_pk_after_p6 - 30."
+    "natural_language": "Let M be a simple 3-polytope (a simple 3-connected planar map), with p_k the number of k-gonal faces, f_2 the total number of faces, and sum_{k>=7} p_k the number of faces of size at least 7. Suppose -3*p_4 + 3*p_5 >= 0, sum_pk_after_p6 <= 6, f_2 >= 40. Then p_6 >= -p_5 + 2*sum_pk_after_p6 - 3."
   },
   "proof": {
     "inventory_used": [
@@ -53,7 +54,6 @@
     ],
     "lemmas_used": [
       "face_split",
-      "nonneg_p_4",
       "nonneg_p_6",
       "tail_juc_half"
     ],
@@ -61,13 +61,13 @@
       {
         "fid": 1,
         "rule": "case_split",
-        "text": "-1*p_3 + 2*p_6 + -1*sum_pk_after_p6 + 30 >= 0",
+        "text": "1*p_5 + 1*p_6 + -2*sum_pk_after_p6 + 3 >= 0",
         "coeffs": {
-          "p_6": "2",
-          "p_3": "-1",
-          "sum_pk_after_p6": "-1"
+          "p_6": "1",
+          "p_5": "1",
+          "sum_pk_after_p6": "-2"
         },
-        "const": "30",
+        "const": "3",
         "rel": ">=",
         "tactic": "by_cases",
         "split_var": "tail_count",
@@ -75,56 +75,47 @@
         "split_coeffs": {
           "sum_pk_after_p6": "1"
         },
+        "split_kind": "conditional",
         "cases": [
           {
             "assume": "1*sum_pk_after_p6 >= 3",
             "steps": [
               {
                 "fid": 2,
-                "rule": "inventory",
-                "text": "1*p_4 >= 0",
+                "rule": "premise",
+                "text": "-3*p_4 + 3*p_5 >= 0",
                 "coeffs": {
-                  "p_4": "1"
+                  "p_5": "3",
+                  "p_4": "-3"
                 },
                 "const": "0",
                 "rel": ">=",
-                "inventory": "nonneg_p_4"
+                "note": "3*p_5 >= 3*p_4"
               },
               {
                 "fid": 3,
-                "rule": "inventory",
-                "text": "1*p_6 >= 0",
+                "rule": "premise",
+                "text": "-1*sum_pk_after_p6 + 6 >= 0",
                 "coeffs": {
-                  "p_6": "1"
+                  "sum_pk_after_p6": "-1"
                 },
-                "const": "0",
+                "const": "6",
                 "rel": ">=",
-                "inventory": "nonneg_p_6"
+                "note": "big_faces <= 6"
               },
               {
                 "fid": 4,
                 "rule": "premise",
-                "text": "-1*f_2 + 47 >= 0",
+                "text": "1*f_2 + -40 >= 0",
                 "coeffs": {
-                  "f_2": "-1"
+                  "f_2": "1"
                 },
-                "const": "47",
+                "const": "-40",
                 "rel": ">=",
-                "note": "f_2 <= 47"
+                "note": "f_2 >= 40"
               },
               {
                 "fid": 5,
-                "rule": "premise",
-                "text": "-1*sum_pk_after_p6 + 5 >= 0",
-                "coeffs": {
-                  "sum_pk_after_p6": "-1"
-                },
-                "const": "5",
-                "rel": ">=",
-                "note": "sum_pk_after_p6 <= 5"
-              },
-              {
-                "fid": 6,
                 "rule": "assumption",
                 "text": "1*sum_pk_after_p6 + -3 >= 0",
                 "coeffs": {
@@ -135,7 +126,7 @@
                 "note": "1*sum_pk_after_p6 >= 3"
               },
               {
-                "fid": 7,
+                "fid": 6,
                 "rule": "conditional",
                 "text": "-1*p_3 + 1*p_5 + 2*p_6 + 2*sum_pk_after_p6 + -4 >= 0",
                 "coeffs": {
@@ -149,11 +140,11 @@
                 "inventory": "Barnette_P6Bound",
                 "tactic": "linarith",
                 "deps": [
-                  6
+                  5
                 ]
               },
               {
-                "fid": 8,
+                "fid": 7,
                 "rule": "inventory",
                 "text": "-1*p_3 + -1*p_4 + -1*p_5 + -1*p_6 + -1*sum_pk_after_p6 + 1*f_2 == 0",
                 "coeffs": {
@@ -169,32 +160,46 @@
                 "inventory": "face_split"
               },
               {
-                "fid": 9,
+                "fid": 8,
                 "rule": "combination",
-                "text": "-1*p_3 + 2*p_6 + -1*sum_pk_after_p6 + 29 >= 0",
+                "text": "1*p_5 + 1*p_6 + -2*sum_pk_after_p6 + 10/3 >= 0",
                 "coeffs": {
-                  "p_6": "2",
-                  "p_3": "-1",
-                  "sum_pk_after_p6": "-1"
+                  "p_6": "1",
+                  "p_5": "1",
+                  "sum_pk_after_p6": "-2"
                 },
-                "const": "29",
+                "const": "10/3",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
                   2,
                   3,
                   4,
-                  5,
-                  7,
-                  8
+                  6,
+                  7
                 ],
                 "mults": [
-                  "1/2",
-                  "3/2",
-                  "1/2",
-                  "3/2",
-                  "1/2",
-                  "1/2"
+                  "1/9",
+                  "3",
+                  "1/3",
+                  "1/3",
+                  "-1/3"
+                ]
+              },
+              {
+                "fid": 9,
+                "rule": "rounding",
+                "text": "1*p_5 + 1*p_6 + -2*sum_pk_after_p6 + 3 >= 0",
+                "coeffs": {
+                  "p_6": "1",
+                  "p_5": "1",
+                  "sum_pk_after_p6": "-2"
+                },
+                "const": "3",
+                "rel": ">=",
+                "tactic": "omega",
+                "deps": [
+                  8
                 ]
               }
             ]
@@ -218,17 +223,6 @@
               {
                 "fid": 11,
                 "rule": "inventory",
-                "text": "1*p_4 >= 0",
-                "coeffs": {
-                  "p_4": "1"
-                },
-                "const": "0",
-                "rel": ">=",
-                "inventory": "nonneg_p_4"
-              },
-              {
-                "fid": 12,
-                "rule": "inventory",
                 "text": "1*p_6 >= 0",
                 "coeffs": {
                   "p_6": "1"
@@ -238,18 +232,19 @@
                 "inventory": "nonneg_p_6"
               },
               {
-                "fid": 13,
+                "fid": 12,
                 "rule": "premise",
-                "text": "-1*f_2 + 47 >= 0",
+                "text": "-3*p_4 + 3*p_5 >= 0",
                 "coeffs": {
-                  "f_2": "-1"
+                  "p_5": "3",
+                  "p_4": "-3"
                 },
-                "const": "47",
+                "const": "0",
                 "rel": ">=",
-                "note": "f_2 <= 47"
+                "note": "3*p_5 >= 3*p_4"
               },
               {
-                "fid": 14,
+                "fid": 13,
                 "rule": "assumption",
                 "text": "-1*sum_pk_after_p6 + 2 >= 0",
                 "coeffs": {
@@ -260,18 +255,18 @@
                 "note": "1*sum_pk_after_p6 <= 2"
               },
               {
-                "fid": 15,
+                "fid": 14,
                 "rule": "premise",
-                "text": "1*f_2 + -43 >= 0",
+                "text": "1*f_2 + -40 >= 0",
                 "coeffs": {
                   "f_2": "1"
                 },
-                "const": "-43",
+                "const": "-40",
                 "rel": ">=",
-                "note": "f_2 >= 43"
+                "note": "f_2 >= 40"
               },
               {
-                "fid": 16,
+                "fid": 15,
                 "rule": "conditional",
                 "text": "2*p_4 + 3*p_5 + 3*p_6 + -1*J_tail + -12 >= 0",
                 "coeffs": {
@@ -285,11 +280,11 @@
                 "inventory": "JucovicTheorem",
                 "tactic": "linarith",
                 "deps": [
-                  15
+                  14
                 ]
               },
               {
-                "fid": 17,
+                "fid": 16,
                 "rule": "inventory",
                 "text": "3*p_3 + 2*p_4 + 1*p_5 + -1*W_tail + -12 == 0",
                 "coeffs": {
@@ -303,7 +298,7 @@
                 "inventory": "Juc_EulerFormula"
               },
               {
-                "fid": 18,
+                "fid": 17,
                 "rule": "inventory",
                 "text": "-1*p_3 + -1*p_4 + -1*p_5 + -1*p_6 + -1*sum_pk_after_p6 + 1*f_2 == 0",
                 "coeffs": {
@@ -319,15 +314,15 @@
                 "inventory": "face_split"
               },
               {
-                "fid": 19,
+                "fid": 18,
                 "rule": "combination",
-                "text": "-1*p_3 + 2*p_6 + -1*sum_pk_after_p6 + 241/8 >= 0",
+                "text": "1*p_5 + 1*p_6 + -2*sum_pk_after_p6 + -62/13 >= 0",
                 "coeffs": {
-                  "p_6": "2",
-                  "p_3": "-1",
-                  "sum_pk_after_p6": "-1"
+                  "p_6": "1",
+                  "p_5": "1",
+                  "sum_pk_after_p6": "-2"
                 },
-                "const": "241/8",
+                "const": "-62/13",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
@@ -336,35 +331,35 @@
                   12,
                   13,
                   14,
+                  15,
                   16,
-                  17,
-                  18
+                  17
                 ],
                 "mults": [
-                  "1/8",
-                  "3/8",
-                  "15/8",
-                  "5/8",
-                  "9/8",
-                  "1/4",
-                  "-1/8",
-                  "5/8"
+                  "1/13",
+                  "4/13",
+                  "5/39",
+                  "35/13",
+                  "3/13",
+                  "2/13",
+                  "-1/13",
+                  "-3/13"
                 ]
               },
               {
-                "fid": 20,
+                "fid": 19,
                 "rule": "rounding",
-                "text": "-1*p_3 + 2*p_6 + -1*sum_pk_after_p6 + 30 >= 0",
+                "text": "1*p_5 + 1*p_6 + -2*sum_pk_after_p6 + -5 >= 0",
                 "coeffs": {
-                  "p_6": "2",
-                  "p_3": "-1",
-                  "sum_pk_after_p6": "-1"
+                  "p_6": "1",
+                  "p_5": "1",
+                  "sum_pk_after_p6": "-2"
                 },
-                "const": "30",
+                "const": "-5",
                 "rel": ">=",
                 "tactic": "omega",
                 "deps": [
-                  19
+                  18
                 ]
               }
             ]
@@ -382,17 +377,20 @@
   "attained": "unknown",
   "touch": null,
   "arith_sharp": true,
-  "arith_min": -30,
+  "arith_min": -3,
   "depth_type": "split_needed",
   "proof_stats": {
     "case_splits": 1,
+    "case_splits_conditional": 1,
+    "case_splits_bnb": 0,
     "max_nest_depth": 1,
-    "roundings": 1,
+    "roundings": 2,
     "inventory_theorems": 3
   },
   "tier": 3,
+  "predicted_tier": 3,
   "supersedes": [],
-  "hardness": 2.0555555555555554,
+  "hardness": 1.95,
   "lean": {
     "theorem_name": "C47",
     "status": "compiled"

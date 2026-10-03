@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent           # HexForge/
 DATA = ROOT / "data" / "plantri_pool.json"
 RECORD = ROOT / "record"
 
-GENERATOR_VERSION = "0.6.5"
+GENERATOR_VERSION = "0.6.6"
 MAX_COEFF = 6
 
 # v0.6.5 §2: the old wall-clock DIRECTION_BUDGET_SEC (truncate enumeration after N
@@ -58,13 +58,12 @@ RO_TARGET_RATIO = 0.25
 # a single premise set may trigger (counted across the deducer + generator via
 # deducer.work_tick) before the whole group is discarded (``too_slow``).  This
 # replaces the old wall-clock DIRECTION_BUDGET_SEC, which broke reproducibility.
-# Calibration (5-min depth-3 probe, seed 2024, 357 groups): per-group solve count
-# p50=971, p90=9326, p95=25777, p99=92710, max=502237; the slowest groups (≥84k,
-# 160-573 s each) are ALL unproductive (discarded after churning), while productive
-# groups cluster at ≤26k (one outlier at 61k).  30000 ≈ p95 (≈43 s, matching the
-# ~p95≈40 s time cut) trims the slow tail and the monster groups with minimal yield
-# loss (1 productive group of 30 in the probe).
-GROUP_WORK_BUDGET = 30000
+# Recalibrated for v0.6.6 (branch-and-bound makes groups heavier): 5-min depth-3+B&B
+# probe, seed 2024, 232 groups — per-group solve count p50=1395, p90=16039, p95=56803;
+# PRODUCTIVE groups top out at 112428 solves, while UNPRODUCTIVE groups run to the
+# probe cap (200k).  120000 keeps every productive group observed and cuts only the
+# unproductive long tail (8 groups >120k, all unproductive), per §3.
+GROUP_WORK_BUDGET = 120000
 
 # v0.6.3 §3: at most this many terms besides p_6 in a conclusion (the merged
 # big_faces expression sum_pk_after_p6 counts as a single term).
@@ -695,26 +694,111 @@ def _build_split_tree(prem_forms, assum_forms, depth):
     return node
 
 
-def _vint_eval(node, cvec):
-    """§2.3–2.4: evaluate the strongest integer bound on the direction ``cvec``
-    over a pre-built split tree.  Returns ('opt',v)/('unbounded',None)/
-    ('infeasible',None)."""
-    st, val = _lp_pre(cvec, node["mats"])
+def _lp_pre_x(cvec, mats):
+    """Like :func:`_lp_pre`, but also return the optimal vertex ``x`` (dict over
+    ALL_VARS) when the status is ``opt`` (needed to pick branch-and-bound variables).
+    Returns ``(status, value, x)``."""
+    A_ub, b_ub, A_eq, b_eq = mats
+    D.work_tick()
+    try:
+        res = linprog(cvec, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+                      bounds=[(None, None)] * _NVARS, method="highs")
+    except Exception:
+        return ("infeasible", None, None)
+    if res.status == 0 and np.isfinite(res.fun):
+        return ("opt", float(res.fun), {v: float(res.x[_ALL_IDX[v]]) for v in ALL_VARS})
+    if res.status == 3:
+        return ("unbounded", None, None)
+    return ("infeasible", None, None)
+
+
+def _add_int_bound(mats, var, rel, k):
+    """Return a copy of ``mats`` with one extra integer bound row ``var rel k``
+    (rel in ``"<="`` / ``">="``), for a branch-and-bound sub-problem."""
+    A_ub, b_ub, A_eq, b_eq = mats
+    row = np.zeros(_NVARS)
+    if rel == "<=":
+        row[_ALL_IDX[var]] = 1.0; b = float(k)          # var <= k
+    else:
+        row[_ALL_IDX[var]] = -1.0; b = -float(k)        # -var <= -k  (var >= k)
+    nA = np.vstack([A_ub, row]) if A_ub is not None else row.reshape(1, -1)
+    nb = np.concatenate([b_ub, [b]]) if b_ub is not None else np.array([b])
+    return (nA, nb, A_eq, b_eq)
+
+
+_NO_SPLIT_PS = {"cond": 0, "bnb": 0, "maxdepth": 0}
+
+
+def _branch_ps(r):
+    return r[2] if (r[0] == "opt" and r[2]) else _NO_SPLIT_PS
+
+
+def _split_combine(kind, rge, rle):
+    """Predicted proof-structure stats for a split: this split (of ``kind``) plus the
+    splits inside both branches; nesting depth = 1 + max branch depth."""
+    pg, pl = _branch_ps(rge), _branch_ps(rle)
+    return {"cond": (1 if kind == "cond" else 0) + pg["cond"] + pl["cond"],
+            "bnb": (1 if kind == "bnb" else 0) + pg["bnb"] + pl["bnb"],
+            "maxdepth": 1 + max(pg["maxdepth"], pl["maxdepth"])}
+
+
+def _merge_branch_vals(rge, rle):
+    """min of the two branch bounds (an infeasible branch is a vacuous case); None
+    if both branches are infeasible/unbounded."""
+    if rge[0] == "unbounded" or rle[0] == "unbounded":
+        return None
+    feas = [r[1] for r in (rge, rle) if r[0] == "opt"]
+    return min(feas) if feas else None
+
+
+def _vint_eval(node, cvec, depth):
+    """§2.3–2.4 + v0.6.6 §1: strongest integer lower bound on direction ``cvec`` via
+    conditional-theorem splits (pre-built in ``node['splits']``) AND branch-and-bound
+    splits on fractional LP variables, sharing a single nesting budget ``depth``.
+    Returns ``(status, value, pstats)`` where ``pstats`` = {cond, bnb, maxdepth}
+    describes the split structure that achieves the returned bound (for predicted
+    tiering)."""
+    st, val, xstar = _lp_pre_x(cvec, node["mats"])
     if st == "unbounded":
-        return ("unbounded", None)
-    best = _ceil(val - _LP_TOL) if st == "opt" else None
-    for ge, le in node["splits"]:
-        rge = _vint_eval(ge, cvec)
-        rle = _vint_eval(le, cvec)
-        if rge[0] == "unbounded" or rle[0] == "unbounded":
-            continue
-        feas = [r[1] for r in (rge, rle) if r[0] == "opt"]
-        if not feas:
-            continue
-        split_val = min(feas)
-        if best is None or split_val > best:
-            best = split_val
-    return ("opt", best) if best is not None else ("infeasible", None)
+        return ("unbounded", None, None)
+    if st != "opt":
+        return ("infeasible", None, None)
+    best = _ceil(val - _LP_TOL)
+    best_ps = dict(_NO_SPLIT_PS)
+    if depth > 0:
+        # conditional-theorem splits (direction-independent, pre-built)
+        for ge, le in node["splits"]:
+            rge = _vint_eval(ge, cvec, depth - 1)
+            rle = _vint_eval(le, cvec, depth - 1)
+            mv = _merge_branch_vals(rge, rle)
+            if mv is not None and mv > best:
+                best, best_ps = mv, _split_combine("cond", rge, rle)
+        # branch-and-bound split on a fractional LP variable (direction-dependent)
+        pick = D._bnb_pick_var(xstar)
+        if pick is not None:
+            var, fl = pick
+            ge_node = {"mats": _add_int_bound(node["mats"], var, ">=", fl + 1), "splits": []}
+            le_node = {"mats": _add_int_bound(node["mats"], var, "<=", fl), "splits": []}
+            rge = _vint_eval(ge_node, cvec, depth - 1)
+            rle = _vint_eval(le_node, cvec, depth - 1)
+            mv = _merge_branch_vals(rge, rle)
+            if mv is not None and mv > best:
+                best, best_ps = mv, _split_combine("bnb", rge, rle)
+    return ("opt", best, best_ps)
+
+
+def _predicted_tier(ps):
+    """v0.6.6 §2: predict the tier from the split structure found while computing
+    v_int (rounding count is unknown at enumeration, so no-split predicts tier 1)."""
+    nc = ps["cond"] + ps["bnb"]
+    depth = ps["maxdepth"]
+    if depth >= 3:
+        return 5
+    if nc == 0:
+        return 1
+    if depth == 1 and nc == 1:
+        return 3
+    return 4
 
 
 def _dir_cvec(direction):
@@ -735,7 +819,7 @@ def classify_depth(premises, direction_coeffs):
     cvec = _dir_cvec({v: int(c) for v, c in direction_coeffs.items()})
     slin, vlin = _lp_pre(cvec, lin_mats)
     tree = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH)
-    sint, vint = _vint_eval(tree, cvec)
+    sint, vint, _ = _vint_eval(tree, cvec, D.DEFAULT_SPLIT_DEPTH)
     if sint != "opt" or slin != "opt":
         return "split_needed"
     return "rounding_only" if vint == _ceil(vlin - _LP_TOL) else "split_needed"
@@ -772,7 +856,7 @@ def enumerate_candidates(premises, stats, rng, accept="split_needed"):
         slin, vlin = _lp_pre(cvec, lin_mats)
         if slin != "opt":
             continue                                # unbounded / infeasible: skip
-        sint, vint = _vint_eval(tree, cvec)
+        sint, vint, vps = _vint_eval(tree, cvec, D.DEFAULT_SPLIT_DEPTH)
         if sint != "opt":
             continue
         if vint > vlin + _LP_TOL:
@@ -784,7 +868,8 @@ def enumerate_candidates(premises, stats, rng, accept="split_needed"):
                 stats["rounding_only_skipped" if dtype == "rounding_only"
                       else "split_needed_skipped"] += 1
                 continue
-            out.append({"coeffs": dict(d), "rel": ">=", "rhs": int(vint)})
+            out.append({"coeffs": dict(d), "rel": ">=", "rhs": int(vint),
+                        "pred_ps": vps})               # v0.6.6 §2: predicted split struct
         else:
             stats["linear_only"] += 1
     stats["directions_evaluated"] += n_done
@@ -811,7 +896,8 @@ def enumerate_candidates(premises, stats, rng, accept="split_needed"):
         key = tuple(sorted(cic.items()))
         prev = best_by_canon.get(key)
         if prev is None or crhs > prev["rhs"]:
-            best_by_canon[key] = {"coeffs": cic, "rel": ">=", "rhs": crhs}
+            best_by_canon[key] = {"coeffs": cic, "rel": ">=", "rhs": crhs,
+                                  "pred_ps": cand.get("pred_ps", _NO_SPLIT_PS)}
     viable = []
     for cand in best_by_canon.values():
         cic, crhs = cand["coeffs"], cand["rhs"]
@@ -819,7 +905,7 @@ def enumerate_candidates(premises, stats, rng, accept="split_needed"):
         if not lprime:
             padded = crhs <= 0
         else:
-            st, vr = _vint_eval(tree, _dir_cvec(lprime))
+            st, vr, _ = _vint_eval(tree, _dir_cvec(lprime), D.DEFAULT_SPLIT_DEPTH)
             padded = (st == "opt" and vr >= crhs)
         if padded:
             stats["p6_padding"] += 1
@@ -1763,6 +1849,8 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
         # §3 (v0.6.5): difficulty tier from the FINAL proof structure (not depth_type).
         proof_stats = HARD.proof_structure_stats(tb)
         tier = HARD.tier_of(proof_stats)
+        # §2 (v0.6.6): tier predicted at enumeration from the v_int split structure.
+        predicted_tier = _predicted_tier(conclusion0.get("pred_ps", _NO_SPLIT_PS))
 
         return {
             "seed": seed,
@@ -1781,6 +1869,7 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
             "depth_type": depth_type,
             "proof_stats": proof_stats,
             "tier": tier,
+            "predicted_tier": predicted_tier,
             "hash": h,
             "skeleton": skel,
             "metrics": new_metrics,
@@ -1820,6 +1909,7 @@ def assemble_data(proposal: dict, target: str, supersedes: list) -> dict:
         "depth_type": proposal["depth_type"],
         "proof_stats": proposal["proof_stats"],
         "tier": proposal["tier"],
+        "predicted_tier": proposal["predicted_tier"],
         "supersedes": supersedes,
         "hardness": proposal["hardness"],
         "lean": {"theorem_name": target, "status": "compiled"},

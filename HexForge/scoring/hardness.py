@@ -64,7 +64,7 @@ def proof_structure_stats(steps) -> dict:
     case splits, maximum case-split nesting depth, number of integer-rounding steps,
     and number of Inventory-theorem invocations.  Used for difficulty tiering."""
     def walk(steps, depth):
-        nc = mcd = nr = nt = 0
+        nc = ncond = nbnb = mcd = nr = nt = 0
         for s in steps:
             rule = s.get("rule")
             if s.get("inventory") in INVENTORY_THEOREMS:
@@ -73,16 +73,21 @@ def proof_structure_stats(steps) -> dict:
                 nr += 1
             if rule == "case_split":
                 nc += 1
+                if s.get("split_kind") == "bnb":      # v0.6.6: branch-and-bound split
+                    nbnb += 1
+                else:
+                    ncond += 1
                 sub = depth + 1
                 maxd = sub
                 for case in s.get("cases", []):
-                    cc, cmd, cr, ct = walk(case.get("steps", []), sub)
-                    nc += cc; nr += cr; nt += ct
+                    cc, ccd, cbd, cmd, cr, ct = walk(case.get("steps", []), sub)
+                    nc += cc; ncond += ccd; nbnb += cbd; nr += cr; nt += ct
                     maxd = max(maxd, cmd)
                 mcd = max(mcd, maxd)
-        return nc, mcd, nr, nt
-    nc, mcd, nr, nt = walk(steps, 0)
-    return {"case_splits": nc, "max_nest_depth": mcd,
+        return nc, ncond, nbnb, mcd, nr, nt
+    nc, ncond, nbnb, mcd, nr, nt = walk(steps, 0)
+    return {"case_splits": nc, "case_splits_conditional": ncond,
+            "case_splits_bnb": nbnb, "max_nest_depth": mcd,
             "roundings": nr, "inventory_theorems": nt}
 
 
