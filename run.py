@@ -8,7 +8,7 @@ Usage (run from the Conjecture-Gym root):
     python -m run hexforge N --minutes M  # stop at whichever comes first
 
 ``N`` is the MAIN-phase target (``split_needed`` records); the SUPPLEMENT phase then
-adds ``floor(N * RO_TARGET_RATIO)`` = ``floor(N/4)`` ``rounding_only`` records.
+adds AT MOST ``floor(N * RO_MAX_RATIO)`` = ``floor(N/4)`` ``rounding_only`` records.
 
 Options:
     --seed S     base seed (default: random)
@@ -24,10 +24,10 @@ number of workers.
 v0.6.4 §IV: generation runs in two phases.  The MAIN phase produces only
 ``split_needed`` records (``N`` of them, or until the Ctrl+C / 85%-of-budget);
 rounding_only directions are dropped right after enumeration, never reconstructed.
-The SUPPLEMENT phase then produces ``floor(S * RO_TARGET_RATIO)`` ``rounding_only``
-records, where ``S`` is the main-phase count (so rounding_only settle at 20% of
-the total).  The supplement phase's premise seeds continue the main phase's index,
-so the whole record is reproducible regardless of worker count.
+The SUPPLEMENT phase then produces AT MOST ``floor(S * RO_MAX_RATIO)`` ``rounding_only``
+records (an upper cap), where ``S`` is the main-phase count (so rounding_only are at
+most 20% of the total).  The supplement phase's premise seeds continue the main
+phase's index, so the whole record is reproducible regardless of worker count.
 """
 
 from __future__ import annotations
@@ -466,16 +466,18 @@ def main(argv):
         phase1 = run_phase("split_needed", target, main_deadline)
         S = phase1[0]
         if not soundness["err"]:
-            # ── supplement phase: rounding_only, floor(S * RO_TARGET_RATIO) ────
-            ro_target = int(S * G.RO_TARGET_RATIO)
-            if ro_target > 0:
+            # ── supplement phase: rounding_only, CAP floor(S * RO_MAX_RATIO) ────
+            # §3 (v0.6.7): this is an upper cap, not a fixed target — the phase stops
+            # at the cap OR the time budget, whichever first (whatever it gets is kept).
+            ro_cap = int(S * G.RO_MAX_RATIO)
+            if ro_cap > 0:
                 stop["flag"] = False      # re-arm after a Ctrl+C-ended main phase
-                print(f"\nsupplement phase: {ro_target} rounding_only "
-                      f"(= floor({S} * {G.RO_TARGET_RATIO}))")
-                phase2 = run_phase("rounding_only", ro_target, full_deadline)
+                print(f"\nsupplement phase: up to {ro_cap} rounding_only "
+                      f"(cap = floor({S} * {G.RO_MAX_RATIO}))")
+                phase2 = run_phase("rounding_only", ro_cap, full_deadline)
             else:
-                print(f"\nsupplement phase skipped: S={S} → floor("
-                      f"{S} * {G.RO_TARGET_RATIO}) = 0 rounding_only")
+                print(f"\nsupplement phase skipped: S={S} → cap floor("
+                      f"{S} * {G.RO_MAX_RATIO}) = 0 rounding_only")
     finally:
         mem.stop()
         wp.terminate()

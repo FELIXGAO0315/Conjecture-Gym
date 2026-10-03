@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## HexForge (v0.6.6)
+## HexForge (v0.6.7)
 
 HexForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about simple 3-polytopes, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures on p₆ — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -44,14 +44,14 @@ Run from the `Conjecture-Gym` root:
 
 ```bash
 python -m run hexforge                 # run until Ctrl+C
-python -m run hexforge 50               # 50 split_needed, then floor(50/4)=12 rounding_only
+python -m run hexforge 50               # 50 split_needed, then up to floor(50/4)=12 rounding_only
 python -m run hexforge --minutes 30     # run for 30 minutes
 python -m run hexforge 50 --minutes 30  # stop at whichever comes first
 ```
 
 Generation runs in two phases: a main phase that produces `N` harder
-`split_needed` conjectures, then a supplement phase that adds `floor(N/4)` easier
-`rounding_only` conjectures (so the easy tier is 20% of the record). With
+`split_needed` conjectures, then a supplement phase that adds at most `floor(N/4)`
+easier `rounding_only` conjectures (so the easy tier is at most 20% of the record). With
 `--minutes M` the main phase gets 85% of the budget and the supplement phase the
 remaining 15%.
 
@@ -70,6 +70,7 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v0.6.7** — Cost-bounded re-proving finds the shortest proof for each conjecture; hardness computed from it (raw value, larger is harder); tiers removed; rounding-only conjectures capped at 20% instead of a fixed target.
 - **v0.6.6** — Branch-and-bound case splits on fractional LP variables (shared nesting limit 3), predicted tiers, recalibrated work budget.
 - **v0.6.5** — Out-of-order collection with in-order commit (removes head-of-line blocking); deterministic per-group work budget; difficulty tiers from actual proof structure; case-split nesting up to 3.
 - **v0.6.4** — Parallel generation with deterministic ordering, batched Lean compilation, automatic HexLemmas rebuild, time-budgeted runs; rounding-only conjectures added in a final phase as the easy tier (20%).

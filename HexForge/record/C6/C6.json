@@ -1,8 +1,8 @@
 {
   "id": "C6",
-  "created_at": "2026-10-03T08:16:31.918324+00:00",
+  "created_at": "2026-10-03T17:17:41.280768+00:00",
   "generator": {
-    "version": "0.6.6",
+    "version": "0.6.7",
     "seed": 2024006767
   },
   "conjecture": {
@@ -390,8 +390,9 @@
     "roundings": 2,
     "inventory_theorems": 3
   },
-  "tier": 3,
-  "predicted_tier": 3,
+  "proof_cost_initial": 20.0,
+  "proof_cost": 20.0,
+  "shorten_rounds": 0,
   "supersedes": [
     "if ((is_simple) and (sum_pk_after_p6 <= 5) and (f_2>=_60)), then p6 >= ((((-0.5 * p4) + (-0.5 * p5)) + 11))"
   ],

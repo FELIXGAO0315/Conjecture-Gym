@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent           # HexForge/
 DATA = ROOT / "data" / "plantri_pool.json"
 RECORD = ROOT / "record"
 
-GENERATOR_VERSION = "0.6.6"
+GENERATOR_VERSION = "0.6.7"
 MAX_COEFF = 6
 
 # v0.6.5 §2: the old wall-clock DIRECTION_BUDGET_SEC (truncate enumeration after N
@@ -48,11 +48,17 @@ MAX_COEFF = 6
 # after enumeration (no proof reconstruction), exactly as v0.6.3 dropped
 # rounding_only via REQUIRE_SPLIT.
 #
-# v0.6.4 §IV.2: the per-record rounding_only quota (old RO_MAX_FRACTION) is gone.
-# Instead the supplement phase targets ``floor(S * RO_TARGET_RATIO)`` rounding_only
-# records, where S is the number of split_needed records written in the main phase
-# (so rounding_only end up at 20% of the total when RO_TARGET_RATIO = 0.25).
-RO_TARGET_RATIO = 0.25
+# v0.6.7 §3: the supplement phase writes AT MOST ``floor(S * RO_MAX_RATIO)``
+# rounding_only records (an upper cap, not a fixed target), where S is the number of
+# split_needed records from the main phase (so rounding_only are at most 20% of the
+# total).  Whatever the supplement phase manages within its time/conditions is kept;
+# it is not required to fill the cap.
+RO_MAX_RATIO = 0.25
+
+# v0.6.7 §1: cost-bounded re-proving — after the engine finds a proof, re-prove the
+# same conclusion under cheaper method restrictions and keep the lowest-cost proof,
+# at most this many compression rounds.
+MAX_SHORTEN_ROUNDS = 3
 
 # v0.6.5 §2: deterministic per-group work budget — the max number of LP/MILP solves
 # a single premise set may trigger (counted across the deducer + generator via
@@ -787,20 +793,6 @@ def _vint_eval(node, cvec, depth):
     return ("opt", best, best_ps)
 
 
-def _predicted_tier(ps):
-    """v0.6.6 §2: predict the tier from the split structure found while computing
-    v_int (rounding count is unknown at enumeration, so no-split predicts tier 1)."""
-    nc = ps["cond"] + ps["bnb"]
-    depth = ps["maxdepth"]
-    if depth >= 3:
-        return 5
-    if nc == 0:
-        return 1
-    if depth == 1 and nc == 1:
-        return 3
-    return 4
-
-
 def _dir_cvec(direction):
     cvec = [0.0] * _NVARS
     for v, c in direction.items():
@@ -1198,6 +1190,66 @@ def strengthen_and_simplify(conclusion0: dict, pruned: list):
                 changed = True
                 break
     return cur, ctx, fact
+
+
+# ── cost-bounded re-proving: shortest proof (§1, v0.6.7) ──────────────────────
+# Search grid of method restrictions (depth × which split kinds are allowed),
+# ordered cheapest-feature first.  (3, True, True) == the unrestricted initial
+# proof and is omitted.  Varying BOTH depth and split-kind satisfies "not only the
+# nesting-depth dimension".  The grid is fixed, so the search is deterministic.
+_SHORTEN_CONFIGS = [
+    (0, False, False),                                   # no case split at all
+    (1, True, False), (1, False, True), (1, True, True),  # depth 1
+    (2, True, False), (2, False, True), (2, True, True),  # depth 2
+    (3, True, False), (3, False, True),                   # depth 3 (single kind)
+]
+
+
+def _reprove(pruned, conclusion, depth, use_cond, use_bnb):
+    """Re-derive ``conclusion`` under the given method restrictions.  Returns
+    ``(ctx, fact, tb, cost)`` if the SAME (or stronger) bound is provable, else None."""
+    d0 = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
+    if not d0:
+        return None
+    ctx = Context(premises=pruned, depth=depth, extra_directions=[d0, _neg(d0)],
+                  use_conditional_split=use_cond, use_bnb=use_bnb)
+    ctx.saturate()
+    fact = _find_fact(ctx, conclusion)
+    if fact is None:
+        return None
+    tb = traceback(ctx, fact)
+    return ctx, fact, tb, HARD.proof_difficulty(tb)
+
+
+def shorten_proof(pruned, conclusion, tb, ctx, fact, init_cost):
+    """§1 (v0.6.7): AlphaGeometry-style proof pruning.  Re-prove ``conclusion`` under
+    a grid of method restrictions and keep the lowest-cost proof, iterating up to
+    MAX_SHORTEN_ROUNDS times (each round adopts any strictly-cheaper proof).  Returns
+    ``(tb, ctx, fact, cost, rounds)``.  Work is counted in the per-group budget; if
+    the budget is hit mid-search the best proof found so far is kept (the already
+    sound+verified conjecture is never discarded by the shortening step)."""
+    best = (tb, ctx, fact, init_cost)
+    # §1.4: a proof with no case split is already structurally minimal — skip it.
+    if HARD.proof_structure_stats(tb)["case_splits"] == 0:
+        return best[0], best[1], best[2], best[3], 0
+    rounds = 0
+    try:
+        for _ in range(MAX_SHORTEN_ROUNDS):
+            improved = False
+            for depth, use_cond, use_bnb in _SHORTEN_CONFIGS:
+                r = _reprove(pruned, conclusion, depth, use_cond, use_bnb)
+                if r is None:
+                    continue
+                if r[3] < best[3]:                       # strictly cheaper proof
+                    best = (r[2], r[0], r[1], r[3])
+                    improved = True
+            if improved:
+                rounds += 1
+            else:
+                break
+    except D.WorkBudgetExceeded:
+        pass                                             # keep the best proof so far
+    return best[0], best[1], best[2], best[3], rounds
 
 
 # ── premise de-duplication (§1) ──────────────────────────────────────────────
@@ -1828,6 +1880,16 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
                 f"  integer counter-model: {cm}\n"
                 f"  proof steps: {[ (s['rule'], s['text']) for s in tb ]}")
 
+        # §1 (v0.6.7): cost-bounded re-proving — replace the engine's (possibly
+        # round-about) proof with the lowest-cost proof of the SAME conclusion, then
+        # recompute everything proof-derived (hardness, metrics, stats) from it.
+        proof_cost_initial = HARD.proof_difficulty(tb)
+        tb, ctx_m, fact, proof_cost, shorten_rounds = shorten_proof(
+            pruned, conclusion, tb, ctx_m, fact, proof_cost_initial)
+        hard = HARD.hardness(tb, pruned, disp)
+        new_metrics = {"attained": attained, "touch": touch_val,
+                       "arith_sharp": arith_sharp, "hardness": hard}
+
         all_inv = set()
         _used_inventory(tb, all_inv)
         inv_theorems = sorted(all_inv & INVENTORY_THEOREMS)
@@ -1836,8 +1898,7 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
         # deterministic fids (§4) so the record is independent of the cache
         renumber_steps(tb)
 
-        # §2 (v0.6.2): deductive-depth label — now ONLY a diagnostic record of the
-        # enumeration-time LP prediction; v0.6.5 §3 tiers from the actual proof.
+        # §2 (v0.6.2): deductive-depth label — enumeration-time LP prediction only.
         depth_type = classify_depth(pruned, cic)
         # §IV (v0.6.4): the direction-level filter in enumerate_candidates classifies
         # the raw direction; after strengthening/canonicalisation the final label can
@@ -1846,11 +1907,8 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
             stats["depth_mismatch"] += 1
             continue
 
-        # §3 (v0.6.5): difficulty tier from the FINAL proof structure (not depth_type).
+        # proof-structure stats from the FINAL (shortest) proof (v0.6.7: no tiers)
         proof_stats = HARD.proof_structure_stats(tb)
-        tier = HARD.tier_of(proof_stats)
-        # §2 (v0.6.6): tier predicted at enumeration from the v_int split structure.
-        predicted_tier = _predicted_tier(conclusion0.get("pred_ps", _NO_SPLIT_PS))
 
         return {
             "seed": seed,
@@ -1868,8 +1926,9 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
             "hardness": hard,
             "depth_type": depth_type,
             "proof_stats": proof_stats,
-            "tier": tier,
-            "predicted_tier": predicted_tier,
+            "proof_cost_initial": proof_cost_initial,
+            "proof_cost": proof_cost,
+            "shorten_rounds": shorten_rounds,
             "hash": h,
             "skeleton": skel,
             "metrics": new_metrics,
@@ -1908,8 +1967,9 @@ def assemble_data(proposal: dict, target: str, supersedes: list) -> dict:
         "arith_min": proposal["arith_min"],
         "depth_type": proposal["depth_type"],
         "proof_stats": proposal["proof_stats"],
-        "tier": proposal["tier"],
-        "predicted_tier": proposal["predicted_tier"],
+        "proof_cost_initial": proposal["proof_cost_initial"],
+        "proof_cost": proposal["proof_cost"],
+        "shorten_rounds": proposal["shorten_rounds"],
         "supersedes": supersedes,
         "hardness": proposal["hardness"],
         "lean": {"theorem_name": target, "status": "compiled"},

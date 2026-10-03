@@ -1,8 +1,8 @@
 {
   "id": "C38",
-  "created_at": "2026-10-03T08:10:26.656256+00:00",
+  "created_at": "2026-10-03T17:11:14.715422+00:00",
   "generator": {
-    "version": "0.6.6",
+    "version": "0.6.7",
     "seed": 2024006509
   },
   "conjecture": {
@@ -382,8 +382,9 @@
     "roundings": 2,
     "inventory_theorems": 2
   },
-  "tier": 3,
-  "predicted_tier": 5,
+  "proof_cost_initial": 18.0,
+  "proof_cost": 18.0,
+  "shorten_rounds": 0,
   "supersedes": [],
   "hardness": 1.8,
   "lean": {

@@ -317,7 +317,8 @@ class Context:
     _counter = itertools.count(1)
 
     def __init__(self, premises=None, assumptions=None, depth=DEFAULT_SPLIT_DEPTH,
-                 max_rounds=DEFAULT_MAX_ROUNDS, extra_directions=None, label=""):
+                 max_rounds=DEFAULT_MAX_ROUNDS, extra_directions=None, label="",
+                 use_conditional_split=True, use_bnb=True):
         self.facts: list = []
         self._by_lhs: dict = {}     # lhs_key -> Fact (strongest)
         self._markers: set = set()  # triggered-conditional / attempted-split keys
@@ -325,6 +326,10 @@ class Context:
         self.max_rounds = max_rounds
         self.directions = list(BASE_DIRECTIONS) + list(extra_directions or [])
         self.label = label
+        # v0.6.7 §1: restrict the split kinds (used by cost-bounded re-proving to
+        # search for a cheaper proof under different method restrictions).
+        self.use_conditional_split = use_conditional_split
+        self.use_bnb = use_bnb
         self.children: dict = {}    # (var, c, "ge"/"le") -> Context
 
         # 1. Unconditional inventory facts.
@@ -653,15 +658,17 @@ class Context:
         progress = True
         while progress:
             progress = False
-            for label, coeffs, thresholds in SPLIT_SPECS:
-                for c in thresholds:
-                    if self._merge_case_split(label, coeffs, c, kind="conditional"):
-                        progress = True
+            if self.use_conditional_split:
+                for label, coeffs, thresholds in SPLIT_SPECS:
+                    for c in thresholds:
+                        if self._merge_case_split(label, coeffs, c, kind="conditional"):
+                            progress = True
             # v0.6.6 §1: branch-and-bound splits on fractional LP variables
-            for var, k in self._bnb_splits():
-                if self._merge_case_split(f"bnb:{var}", {var: Fraction(1)}, k,
-                                          kind="bnb"):
-                    progress = True
+            if self.use_bnb:
+                for var, k in self._bnb_splits():
+                    if self._merge_case_split(f"bnb:{var}", {var: Fraction(1)}, k,
+                                              kind="bnb"):
+                        progress = True
             if progress:
                 self._saturate()
 
@@ -686,7 +693,9 @@ class Context:
         def branch(cond, text):
             ctx = Context(depth=self.depth - 1, max_rounds=self.max_rounds,
                           extra_directions=self.directions[len(BASE_DIRECTIONS):],
-                          label=f"{self.label}/{text}")
+                          label=f"{self.label}/{text}",
+                          use_conditional_split=self.use_conditional_split,
+                          use_bnb=self.use_bnb)
             for f in base_prem:
                 ctx._add(Fact(next(ctx._counter), dict(f.coeffs), f.const, f.rel,
                               rule=f.rule, note=f.note))

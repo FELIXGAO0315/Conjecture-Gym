@@ -1,8 +1,8 @@
 {
   "id": "C10",
-  "created_at": "2026-10-03T08:05:25.516853+00:00",
+  "created_at": "2026-10-03T17:06:10.972981+00:00",
   "generator": {
-    "version": "0.6.6",
+    "version": "0.6.7",
     "seed": 2024006294
   },
   "conjecture": {
@@ -390,8 +390,9 @@
     "roundings": 2,
     "inventory_theorems": 3
   },
-  "tier": 3,
-  "predicted_tier": 3,
+  "proof_cost_initial": 20.0,
+  "proof_cost": 20.0,
+  "shorten_rounds": 0,
   "supersedes": [
     "if ((is_simple) and (f_2>=_32) and (sum_pk_after_p6 <= 4)), then p6 >= ((((-1 * p4) + (-0.5 * p5)) + 6))"
   ],

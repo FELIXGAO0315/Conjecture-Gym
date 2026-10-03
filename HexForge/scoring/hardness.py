@@ -91,25 +91,6 @@ def proof_structure_stats(steps) -> dict:
             "roundings": nr, "inventory_theorems": nt}
 
 
-def tier_of(stats: dict) -> int:
-    """v0.6.5 §3: difficulty tier (1-5) from the final proof structure.
-      1: no case split, 1 rounding
-      2: no case split, >=2 roundings
-      3: case split, max nesting depth 1, exactly 1 case split
-      4: max nesting depth 2, or >=2 case splits (nesting depth <= 2)
-      5: max nesting depth >= 3"""
-    nc = stats["case_splits"]
-    depth = stats["max_nest_depth"]
-    nr = stats["roundings"]
-    if depth >= 3:
-        return 5
-    if nc == 0:
-        return 2 if nr >= 2 else 1
-    if depth == 1 and nc == 1:
-        return 3
-    return 4                                    # depth == 2, or (>=2 splits, depth<=2)
-
-
 def statement_length(premises, conclusion) -> int:
     n = len(premises)
     for pr in premises:
