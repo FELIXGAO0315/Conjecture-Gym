@@ -29,6 +29,30 @@ from scipy.optimize import linprog
 from . import inventory
 from .inventory import ALL_VARS, PROP_VARS
 
+# ── deterministic per-group work budget (v0.6.5 §2) ─────────────────────────
+# A group's cost is measured by the number of LP/MILP solves it triggers (a
+# deterministic count, unlike wall-clock), accumulated across the deducer and the
+# generator.  ``WORK["budget"]`` is set per premise set by the generator; when the
+# count exceeds it, ``work_tick`` raises ``WorkBudgetExceeded`` and the whole group
+# is discarded (``too_slow``).  ``budget=None`` disables the cap (counts only).
+WORK = {"n": 0, "budget": None}
+
+
+class WorkBudgetExceeded(Exception):
+    """Raised by ``work_tick`` when a premise set exceeds ``WORK['budget']``."""
+
+
+def work_reset(budget):
+    WORK["n"] = 0
+    WORK["budget"] = budget
+
+
+def work_tick(k: int = 1):
+    """Count ``k`` solver calls; raise if over the per-group budget (if set)."""
+    WORK["n"] += k
+    if WORK["budget"] is not None and WORK["n"] > WORK["budget"]:
+        raise WorkBudgetExceeded(WORK["n"])
+
 # ── Inference actions and their Lean tactics ────────────────────────────────
 ACTION_LINEAR_COMBINATION = "linear_combination"  # Lean tactic: linarith
 ACTION_INTEGER_ROUNDING = "integer_rounding"      # Lean tactic: omega
@@ -252,7 +276,10 @@ SPLIT_SPECS = [
 ]
 
 DEFAULT_MAX_ROUNDS = 8
-DEFAULT_SPLIT_DEPTH = 2
+# v0.6.5 §4: case-split nesting raised 2 → 3 (the 3rd level reuses the same
+# thresholds: f_2 ∈ {7,8}, big-face total ∈ {3,4}).  The per-group work budget
+# (§2) keeps the deeper, exponentially larger split trees in check.
+DEFAULT_SPLIT_DEPTH = 3
 # v0.6.2: candidates come from systematic direction enumeration (generator), not
 # from pairwise Fourier–Motzkin, so pairwise is off by default.  The facts the
 # proofs use are supplied by the LP directed bounds.
@@ -391,6 +418,7 @@ class Context:
             c = [0.0] * n
             for v, coef in direction.items():
                 c[idx[v]] = float(coef)
+            work_tick()                           # v0.6.5 §2: count this LP solve
             try:
                 res = linprog(c, A_ub=A_ub or None, b_ub=b_ub or None,
                               A_eq=A_eq or None, b_eq=b_eq or None,

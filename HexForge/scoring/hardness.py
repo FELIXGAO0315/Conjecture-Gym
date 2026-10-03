@@ -59,6 +59,52 @@ def proof_difficulty(steps) -> float:
     )
 
 
+def proof_structure_stats(steps) -> dict:
+    """v0.6.5 §3: structural stats of the FINAL proof (proof.steps) — number of
+    case splits, maximum case-split nesting depth, number of integer-rounding steps,
+    and number of Inventory-theorem invocations.  Used for difficulty tiering."""
+    def walk(steps, depth):
+        nc = mcd = nr = nt = 0
+        for s in steps:
+            rule = s.get("rule")
+            if s.get("inventory") in INVENTORY_THEOREMS:
+                nt += 1
+            if rule == "rounding":
+                nr += 1
+            if rule == "case_split":
+                nc += 1
+                sub = depth + 1
+                maxd = sub
+                for case in s.get("cases", []):
+                    cc, cmd, cr, ct = walk(case.get("steps", []), sub)
+                    nc += cc; nr += cr; nt += ct
+                    maxd = max(maxd, cmd)
+                mcd = max(mcd, maxd)
+        return nc, mcd, nr, nt
+    nc, mcd, nr, nt = walk(steps, 0)
+    return {"case_splits": nc, "max_nest_depth": mcd,
+            "roundings": nr, "inventory_theorems": nt}
+
+
+def tier_of(stats: dict) -> int:
+    """v0.6.5 §3: difficulty tier (1-5) from the final proof structure.
+      1: no case split, 1 rounding
+      2: no case split, >=2 roundings
+      3: case split, max nesting depth 1, exactly 1 case split
+      4: max nesting depth 2, or >=2 case splits (nesting depth <= 2)
+      5: max nesting depth >= 3"""
+    nc = stats["case_splits"]
+    depth = stats["max_nest_depth"]
+    nr = stats["roundings"]
+    if depth >= 3:
+        return 5
+    if nc == 0:
+        return 2 if nr >= 2 else 1
+    if depth == 1 and nc == 1:
+        return 3
+    return 4                                    # depth == 2, or (>=2 splits, depth<=2)
+
+
 def statement_length(premises, conclusion) -> int:
     n = len(premises)
     for pr in premises:

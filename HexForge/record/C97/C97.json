@@ -1,0 +1,280 @@
+{
+  "id": "C97",
+  "created_at": "2026-10-03T05:18:32.077749+00:00",
+  "generator": {
+    "version": "0.6.5",
+    "seed": 2024008395
+  },
+  "conjecture": {
+    "formula": "if ((is_simple) and (sum_pk_after_p6 <= 2) and (sum_pk_after_p6 >= 2)), then p6 >= ((((-0.5 * p4) + (-1 * p5)) + 2))",
+    "premises": [
+      {
+        "text": "big_faces <= 2",
+        "coeffs": {
+          "sum_pk_after_p6": 1
+        },
+        "rel": "<=",
+        "rhs": 2
+      },
+      {
+        "text": "sum_pk_after_p6 >= 2",
+        "coeffs": {
+          "sum_pk_after_p6": 1
+        },
+        "rel": ">=",
+        "rhs": 2
+      }
+    ],
+    "conclusion": {
+      "text": "2*p_6 >= -p_4 - 2*p_5 + 4",
+      "coeffs": {
+        "p_6": 2,
+        "p_4": 1,
+        "p_5": 2
+      },
+      "rel": ">=",
+      "rhs": 4
+    },
+    "natural_language": "Let M be a simple 3-polytope (a simple 3-connected planar map), with p_k the number of k-gonal faces, f_2 the total number of faces, and sum_{k>=7} p_k the number of faces of size at least 7. Suppose sum_pk_after_p6 <= 2, sum_pk_after_p6 >= 2. Then 2*p_6 >= -p_4 - 2*p_5 + 4."
+  },
+  "proof": {
+    "inventory_used": [
+      "Juc_EulerFormula",
+      "JucovicTheorem"
+    ],
+    "lemmas_used": [
+      "face_split",
+      "nonneg_p_4",
+      "nonneg_p_5",
+      "nonneg_p_6",
+      "tail_juc_lower",
+      "tail_juc_upper"
+    ],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "2*sum_pk_after_p6 + 1*J_tail >= 0",
+        "coeffs": {
+          "J_tail": "1",
+          "sum_pk_after_p6": "2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "tail_juc_lower"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "1*p_5 >= 0",
+        "coeffs": {
+          "p_5": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_p_5"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "1*p_6 >= 0",
+        "coeffs": {
+          "p_6": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_p_6"
+      },
+      {
+        "fid": 4,
+        "rule": "premise",
+        "text": "-1*sum_pk_after_p6 + 2 >= 0",
+        "coeffs": {
+          "sum_pk_after_p6": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "note": "big_faces <= 2"
+      },
+      {
+        "fid": 5,
+        "rule": "inventory",
+        "text": "-3*sum_pk_after_p6 + 1*W_tail + -1*J_tail >= 0",
+        "coeffs": {
+          "W_tail": "1",
+          "J_tail": "-1",
+          "sum_pk_after_p6": "-3"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "tail_juc_upper"
+      },
+      {
+        "fid": 6,
+        "rule": "inventory",
+        "text": "1*p_4 >= 0",
+        "coeffs": {
+          "p_4": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_p_4"
+      },
+      {
+        "fid": 7,
+        "rule": "premise",
+        "text": "1*sum_pk_after_p6 + -2 >= 0",
+        "coeffs": {
+          "sum_pk_after_p6": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "note": "sum_pk_after_p6 >= 2"
+      },
+      {
+        "fid": 8,
+        "rule": "inventory",
+        "text": "3*p_3 + 2*p_4 + 1*p_5 + -1*W_tail + -12 == 0",
+        "coeffs": {
+          "p_3": "3",
+          "p_4": "2",
+          "p_5": "1",
+          "W_tail": "-1"
+        },
+        "const": "-12",
+        "rel": "==",
+        "inventory": "Juc_EulerFormula"
+      },
+      {
+        "fid": 9,
+        "rule": "inventory",
+        "text": "-1*p_3 + -1*p_4 + -1*p_5 + -1*p_6 + -1*sum_pk_after_p6 + 1*f_2 == 0",
+        "coeffs": {
+          "f_2": "1",
+          "p_3": "-1",
+          "p_4": "-1",
+          "p_5": "-1",
+          "p_6": "-1",
+          "sum_pk_after_p6": "-1"
+        },
+        "const": "0",
+        "rel": "==",
+        "inventory": "face_split"
+      },
+      {
+        "fid": 10,
+        "rule": "combination",
+        "text": "1*f_2 + -20/3 >= 0",
+        "coeffs": {
+          "f_2": "1"
+        },
+        "const": "-20/3",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          5,
+          6,
+          2,
+          3,
+          7,
+          8,
+          9
+        ],
+        "mults": [
+          "1/3",
+          "1/3",
+          "1/3",
+          "2/3",
+          "1",
+          "4/3",
+          "1/3",
+          "1"
+        ]
+      },
+      {
+        "fid": 11,
+        "rule": "rounding",
+        "text": "1*f_2 + -7 >= 0",
+        "coeffs": {
+          "f_2": "1"
+        },
+        "const": "-7",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          10
+        ]
+      },
+      {
+        "fid": 12,
+        "rule": "conditional",
+        "text": "2*p_4 + 3*p_5 + 3*p_6 + -1*J_tail + -12 >= 0",
+        "coeffs": {
+          "p_6": "3",
+          "p_4": "2",
+          "p_5": "3",
+          "J_tail": "-1"
+        },
+        "const": "-12",
+        "rel": ">=",
+        "inventory": "JucovicTheorem",
+        "tactic": "linarith",
+        "deps": [
+          11
+        ]
+      },
+      {
+        "fid": 13,
+        "rule": "combination",
+        "text": "1*p_4 + 2*p_5 + 2*p_6 + -4 >= 0",
+        "coeffs": {
+          "p_6": "2",
+          "p_4": "1",
+          "p_5": "2"
+        },
+        "const": "-4",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          4,
+          12
+        ],
+        "mults": [
+          "1/2",
+          "1/2",
+          "1/2",
+          "1",
+          "1/2"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.00022466861379465288,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0002246686137946
+  },
+  "attained": "yes",
+  "touch": 1,
+  "arith_sharp": true,
+  "arith_min": 4,
+  "depth_type": "split_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 2
+  },
+  "tier": 1,
+  "supersedes": [],
+  "hardness": 1.5714285714285714,
+  "lean": {
+    "theorem_name": "C97",
+    "status": "compiled"
+  }
+}

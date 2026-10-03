@@ -263,7 +263,12 @@ def main(argv):
     mem = MemMonitor(wp)
     mem.start()
 
-    WINDOW = n_workers * 2 + 2
+    # §I (v0.6.5): dispatch window measured by OUTSTANDING COMPUTE (dispatched but
+    # not yet finished); completed results waiting for in-order commit live in a
+    # separate buffer and do not occupy the window — so a slow premise set no longer
+    # starves the other workers (no head-of-line blocking).  Window 4× workers.
+    WINDOW = n_workers * 4
+    COMMIT_BUFFER_CAP = 500        # pause dispatch if this many results await commit
 
     def run_phase(accept, target, deadline):
         """Dispatch / compile / commit loop for ONE phase.  Produces up to ``target``
@@ -297,8 +302,9 @@ def main(argv):
         added = replaced = 0
         boundary = {"idx": disp["collect"] - 1}
         done = {"flag": False}            # target slot filled during commit
-        pending = []                      # [(idx, prop)] awaiting compile+commit
-        inflight = {}
+        pending = []                      # [(idx, prop)] sequenced, awaiting compile+commit
+        ready = {}                        # idx -> result tuple: collected, not yet sequenced
+        inflight = {}                     # idx -> AsyncResult: dispatched, still computing
 
         def commit(idx, prop):
             """Decide and write ONE candidate whose Lean compile already succeeded.
@@ -396,16 +402,21 @@ def main(argv):
 
         while True:
             halt = stop_dispatch()
-            while (not halt) and len(inflight) < WINDOW:
+            # (1) dispatch to fill the COMPUTE window, unless the commit buffer is
+            # full (results already collected/sequenced but not yet committed).
+            while (not halt) and len(inflight) < WINDOW \
+                    and (len(ready) + len(pending)) < COMMIT_BUFFER_CAP:
                 inflight[disp["next"]] = wp.apply_async(G.worker, (disp["next"], accept))
                 disp["next"] += 1
-            if halt and not inflight:
-                break
             progressed = False
-            fut = inflight.get(disp["collect"])
-            if fut is not None and fut.ready():
-                tag, idx, payload, lstats, elapsed = fut.get()
-                del inflight[disp["collect"]]
+            # (2) collect ANY finished results out of order (frees window slots so a
+            # slow premise set can't starve the other workers — §I no HOL blocking).
+            for i in [i for i, f in inflight.items() if f.ready()]:
+                ready[i] = inflight.pop(i).get()
+                progressed = True
+            # (3) sequence strictly by premise index from the ready buffer.
+            while disp["collect"] in ready:
+                tag, idx, payload, lstats, elapsed = ready.pop(disp["collect"])
                 disp["collect"] += 1
                 sampled += 1
                 sample_time_total += elapsed
@@ -419,9 +430,15 @@ def main(argv):
                     if queue_start["t"] is None:
                         queue_start["t"] = time.time()
                 progressed = True
-            if should_flush(halt and not inflight):
+            if soundness["err"]:
+                break
+            # (4) compile + commit in index order.
+            if should_flush(halt and not inflight and not ready):
                 flush()
             if done["flag"]:
+                break
+            # (5) done when halted and nothing is running or buffered.
+            if halt and not inflight and not ready and not pending:
                 break
             if not progressed:
                 time.sleep(0.02)
@@ -432,6 +449,7 @@ def main(argv):
         disp["collect"] = boundary["idx"] + 1
         disp["next"] = boundary["idx"] + 1
         inflight.clear()
+        ready.clear()
         return added, replaced, boundary["idx"], time.time() - phase_t0
 
     t0 = time.time()
@@ -576,7 +594,7 @@ def _print_summary(stats, sampled, added, replaced, elapsed, sample_time_total,
                    "too_shallow", "duplicate", "premise_minimized_duplicate",
                    "same_skeleton_worse", "recheck_failed", "depth_mismatch",
                    "rounding_only_skipped", "split_needed_skipped",
-                   "compile_failed"):
+                   "too_slow", "compile_failed"):
         print(f"  {reason:28s}: {stats.get(reason, 0)}")
 
     # §6.6 memory + Lean batches

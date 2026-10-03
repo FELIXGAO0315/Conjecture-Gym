@@ -33,12 +33,13 @@ ROOT = Path(__file__).resolve().parent.parent           # HexForge/
 DATA = ROOT / "data" / "plantri_pool.json"
 RECORD = ROOT / "record"
 
-GENERATOR_VERSION = "0.6.4"
+GENERATOR_VERSION = "0.6.5"
 MAX_COEFF = 6
 
-# v0.6.2 §2: per-premise-set time budget for direction enumeration.  If exceeded,
-# a random subset of the remaining directions is used (reported in the summary).
-DIRECTION_BUDGET_SEC = 30.0
+# v0.6.5 §2: the old wall-clock DIRECTION_BUDGET_SEC (truncate enumeration after N
+# seconds, keeping a random subset) is removed — it made the candidate set depend on
+# machine speed.  All directions are now enumerated; runaway groups are cut by the
+# deterministic GROUP_WORK_BUDGET below.
 
 # v0.6.4 §IV: rounding_only conjectures are the easy tier.  Generation now runs in
 # two phases (see run.py): a MAIN phase that produces only ``split_needed`` and a
@@ -52,6 +53,18 @@ DIRECTION_BUDGET_SEC = 30.0
 # records, where S is the number of split_needed records written in the main phase
 # (so rounding_only end up at 20% of the total when RO_TARGET_RATIO = 0.25).
 RO_TARGET_RATIO = 0.25
+
+# v0.6.5 §2: deterministic per-group work budget — the max number of LP/MILP solves
+# a single premise set may trigger (counted across the deducer + generator via
+# deducer.work_tick) before the whole group is discarded (``too_slow``).  This
+# replaces the old wall-clock DIRECTION_BUDGET_SEC, which broke reproducibility.
+# Calibration (5-min depth-3 probe, seed 2024, 357 groups): per-group solve count
+# p50=971, p90=9326, p95=25777, p99=92710, max=502237; the slowest groups (≥84k,
+# 160-573 s each) are ALL unproductive (discarded after churning), while productive
+# groups cluster at ≤26k (one outlier at 61k).  30000 ≈ p95 (≈43 s, matching the
+# ~p95≈40 s time cut) trims the slow tail and the monster groups with minimal yield
+# loss (1 productive group of 30 in the probe).
+GROUP_WORK_BUDGET = 30000
 
 # v0.6.3 §3: at most this many terms besides p_6 in a conclusion (the merged
 # big_faces expression sum_pk_after_p6 counts as a single term).
@@ -483,6 +496,7 @@ def _lp_min(obj_coeffs: dict, constraints):
     c = [0.0] * n
     for v, coef in obj_coeffs.items():
         c[idx[v]] = float(coef)
+    D.work_tick()                              # v0.6.5 §2: count this LP solve
     try:
         res = linprog(c, A_ub=A_ub or None, b_ub=b_ub or None,
                       A_eq=A_eq or None, b_eq=b_eq or None,
@@ -612,6 +626,7 @@ def _lp_pre(cvec, mats):
     """Solve min ``cvec·x`` for pre-built matrices; returns ('opt',v) /
     ('unbounded',None) / ('infeasible',None)."""
     A_ub, b_ub, A_eq, b_eq = mats
+    D.work_tick()                              # v0.6.5 §2: count this LP solve
     try:
         res = linprog(cvec, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
                       bounds=[(None, None)] * _NVARS, method="highs")
@@ -748,10 +763,10 @@ def enumerate_candidates(premises, stats, rng, accept="split_needed"):
     stats["directions_total"] += len(directions)
     t0 = _time.time()
     out, n_done = [], 0
+    # v0.6.5 §2: all directions are evaluated (deterministic); a runaway group is
+    # bounded by the per-group work budget (deducer.work_tick inside _lp_pre), not
+    # by wall-clock — so the set of candidates is reproducible across machines.
     for d in directions:
-        if _time.time() - t0 > DIRECTION_BUDGET_SEC:
-            stats["dir_budget_truncated"] += 1
-            break
         n_done += 1
         cvec = _dir_cvec(d)
         slin, vlin = _lp_pre(cvec, lin_mats)
@@ -965,6 +980,7 @@ def _cm_solve(cons, objective=None):
     ub = np.array([np.inf if c[2] is None else c[2] for c in cons])
     bl, bu = _cm_bounds()
     obj = np.zeros(_CM_N) if objective is None else np.array(objective)
+    D.work_tick()                              # v0.6.5 §2: count this MILP solve
     try:
         return milp(c=obj, constraints=[LinearConstraint(A, lb, ub)],
                     integrality=np.ones(_CM_N), bounds=Bounds(bl, bu))
@@ -1522,6 +1538,18 @@ def build_md(data: dict) -> str:
 
 # ── one attempt (worker side, v0.6.4 §II) ────────────────────────────────────
 def process_premise_set(rng, pool, existing_hashes, stats, seed, accept="split_needed"):
+    """v0.6.5 §2 wrapper: arm the deterministic per-group work budget, then run the
+    attempt.  A group that exceeds GROUP_WORK_BUDGET LP/MILP solves is discarded as
+    ``too_slow`` (a reproducible cut, since the solve count is deterministic)."""
+    D.work_reset(GROUP_WORK_BUDGET)
+    try:
+        return _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept)
+    except D.WorkBudgetExceeded:
+        stats["too_slow"] += 1
+        return None
+
+
+def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="split_needed"):
     """Worker-side work for ONE premise set: sampling, direction enumeration, proof
     reconstruction, every check, the integer counter-model gate, and scoring.
 
@@ -1722,7 +1750,8 @@ def process_premise_set(rng, pool, existing_hashes, stats, seed, accept="split_n
         # deterministic fids (§4) so the record is independent of the cache
         renumber_steps(tb)
 
-        # §2 (v0.6.2): deductive-depth label (diagnostic + v0.6.4 §IV tiering).
+        # §2 (v0.6.2): deductive-depth label — now ONLY a diagnostic record of the
+        # enumeration-time LP prediction; v0.6.5 §3 tiers from the actual proof.
         depth_type = classify_depth(pruned, cic)
         # §IV (v0.6.4): the direction-level filter in enumerate_candidates classifies
         # the raw direction; after strengthening/canonicalisation the final label can
@@ -1730,6 +1759,10 @@ def process_premise_set(rng, pool, existing_hashes, stats, seed, accept="split_n
         if depth_type != accept:
             stats["depth_mismatch"] += 1
             continue
+
+        # §3 (v0.6.5): difficulty tier from the FINAL proof structure (not depth_type).
+        proof_stats = HARD.proof_structure_stats(tb)
+        tier = HARD.tier_of(proof_stats)
 
         return {
             "seed": seed,
@@ -1746,6 +1779,8 @@ def process_premise_set(rng, pool, existing_hashes, stats, seed, accept="split_n
             "arith_min": amin,
             "hardness": hard,
             "depth_type": depth_type,
+            "proof_stats": proof_stats,
+            "tier": tier,
             "hash": h,
             "skeleton": skel,
             "metrics": new_metrics,
@@ -1783,6 +1818,8 @@ def assemble_data(proposal: dict, target: str, supersedes: list) -> dict:
         "arith_sharp": proposal["arith_sharp"],
         "arith_min": proposal["arith_min"],
         "depth_type": proposal["depth_type"],
+        "proof_stats": proposal["proof_stats"],
+        "tier": proposal["tier"],
         "supersedes": supersedes,
         "hardness": proposal["hardness"],
         "lean": {"theorem_name": target, "status": "compiled"},

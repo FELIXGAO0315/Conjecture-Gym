@@ -1,8 +1,8 @@
 {
   "id": "C1",
-  "created_at": "2026-10-02T16:47:07.750917+00:00",
+  "created_at": "2026-10-03T04:57:22.628824+00:00",
   "generator": {
-    "version": "0.6.4",
+    "version": "0.6.5",
     "seed": 2024006076
   },
   "conjecture": {
@@ -389,6 +389,13 @@
   "arith_sharp": true,
   "arith_min": 11,
   "depth_type": "split_needed",
+  "proof_stats": {
+    "case_splits": 1,
+    "max_nest_depth": 1,
+    "roundings": 2,
+    "inventory_theorems": 3
+  },
+  "tier": 3,
   "supersedes": [],
   "hardness": 2.2222222222222223,
   "lean": {
