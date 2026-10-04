@@ -363,5 +363,8 @@
   "lean": {
     "theorem_name": "C62",
     "status": "compiled"
-  }
+  },
+  "lemmas_used": [],
+  "generation": 0,
+  "proof_cost_expanded": 17.5
 }

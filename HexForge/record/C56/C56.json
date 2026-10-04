@@ -393,5 +393,8 @@
   "lean": {
     "theorem_name": "C56",
     "status": "compiled"
-  }
+  },
+  "lemmas_used": [],
+  "generation": 0,
+  "proof_cost_expanded": 21.5
 }

@@ -200,5 +200,8 @@
   "lean": {
     "theorem_name": "C88",
     "status": "compiled"
-  }
+  },
+  "lemmas_used": [],
+  "generation": 0,
+  "proof_cost_expanded": 5.5
 }

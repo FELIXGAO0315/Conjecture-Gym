@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent           # HexForge/
 DATA = ROOT / "data" / "plantri_pool.json"
 RECORD = ROOT / "record"
 
-GENERATOR_VERSION = "0.6.7"
+GENERATOR_VERSION = "0.7"
 MAX_COEFF = 6
 
 # v0.6.5 §2: the old wall-clock DIRECTION_BUDGET_SEC (truncate enumeration after N
@@ -58,7 +58,12 @@ RO_MAX_RATIO = 0.25
 # v0.6.7 §1: cost-bounded re-proving — after the engine finds a proof, re-prove the
 # same conclusion under cheaper method restrictions and keep the lowest-cost proof,
 # at most this many compression rounds.
-MAX_SHORTEN_ROUNDS = 3
+MAX_SHORTEN_ROUNDS = 1
+
+# v0.7 §1: lemma library size cap.  From the record, the conjectures with <= 2
+# premises and attained == "yes" become reusable conditional theorems; if more than
+# this many qualify, the deterministic ordering in ``select_lemma_library`` trims it.
+LEMMA_LIB_MAX = 50
 
 # v0.6.5 §2: deterministic per-group work budget — the max number of LP/MILP solves
 # a single premise set may trigger (counted across the deducer + generator via
@@ -273,18 +278,18 @@ def _prem_sig(premises):
                          int(pr["rhs"])) for pr in premises))
 
 
-def cached_context(premises, extra_directions=None):
+def cached_context(premises, extra_directions=None, use_lemmas=True):
     if not USE_CACHE:
         ctx = Context(premises=premises, depth=D.DEFAULT_SPLIT_DEPTH,
-                      extra_directions=extra_directions)
+                      extra_directions=extra_directions, use_lemmas=use_lemmas)
         ctx.saturate()
         return ctx
-    key = (_prem_sig(premises), _dir_sig(extra_directions))
+    key = (_prem_sig(premises), _dir_sig(extra_directions), use_lemmas)
     ctx = _CTX_CACHE.get(key)
     if ctx is not None:
         return ctx
     ctx = Context(premises=premises, depth=D.DEFAULT_SPLIT_DEPTH,
-                  extra_directions=extra_directions)
+                  extra_directions=extra_directions, use_lemmas=use_lemmas)
     ctx.saturate()
     _CTX_CACHE[key] = ctx
     _CTX_ORDER.append(key)
@@ -671,15 +676,44 @@ def _triggerable_conditionals(constraints):
     return out
 
 
+def _premise_entailed_lp(constraints, pr):
+    """Is lemma premise ``pr`` ({coeffs, rel, rhs}) LP-forced by ``constraints``?"""
+    cf = {v: Fraction(c) for v, c in pr["coeffs"].items()}
+    rhs = Fraction(pr["rhs"])
+    rel = pr["rel"]
+    if rel == ">=":
+        return _entailed_form(constraints, cf, rhs)
+    if rel == "<=":
+        return _entailed_form(constraints, {v: -c for v, c in cf.items()}, -rhs)
+    if rel in ("=", "=="):
+        return (_entailed_form(constraints, cf, rhs)
+                and _entailed_form(constraints, {v: -c for v, c in cf.items()}, -rhs))
+    return False
+
+
+def _triggerable_lemmas(constraints):
+    """v0.7 §1: library-lemma conclusions whose premises are all entailed by the
+    constraints — usable as extra linear facts in that LP context (same role as a
+    conditional theorem, now also in candidate detection)."""
+    out = []
+    for cnum in sorted(D.LEMMAS):
+        lem = D.LEMMAS[cnum]
+        if all(_premise_entailed_lp(constraints, pr) for pr in lem["premises"]):
+            out.append((dict(lem["coeffs"]), lem["const"], lem["rel"]))
+    return out
+
+
 def _build_split_tree(prem_forms, assum_forms, depth):
     """§2.2: build the (direction-independent) case-split tree for a premise set.
-    Each node carries the pre-built LP matrices of its leaf constraint set
-    (premises + branch assumptions + unconditional inventory + triggerable
-    conditionals) and a list of ``(ge_child, le_child)`` splits on undecided
-    threshold conditions.  Built once per premise set; evaluated per direction."""
+    Each node carries the pre-built LP matrices of its leaf constraint set WITHOUT
+    lemmas (``mats``) and WITH triggerable library lemmas added (``mats_lemma``, v0.7
+    §1), plus ``(ge_child, le_child)`` splits on undecided thresholds.  Built once per
+    premise set; ``_vint_eval`` picks which matrices to use per direction."""
     base = prem_forms + assum_forms + _unconditional_forms()
-    leaf_cons = base + _triggerable_conditionals(base)
-    node = {"mats": _prep_matrices(leaf_cons), "splits": []}
+    leaf_base = base + _triggerable_conditionals(base)
+    leaf_lemma = leaf_base + _triggerable_lemmas(base)
+    node = {"mats": _prep_matrices(leaf_base),
+            "mats_lemma": _prep_matrices(leaf_lemma), "splits": []}
     if depth > 0:
         for _label, expr, ths in _SPLIT_THRESHOLDS:
             ecoeffs = {v: Fraction(c) for v, c in expr.items()}
@@ -757,14 +791,14 @@ def _merge_branch_vals(rge, rle):
     return min(feas) if feas else None
 
 
-def _vint_eval(node, cvec, depth):
-    """§2.3–2.4 + v0.6.6 §1: strongest integer lower bound on direction ``cvec`` via
-    conditional-theorem splits (pre-built in ``node['splits']``) AND branch-and-bound
-    splits on fractional LP variables, sharing a single nesting budget ``depth``.
-    Returns ``(status, value, pstats)`` where ``pstats`` = {cond, bnb, maxdepth}
-    describes the split structure that achieves the returned bound (for predicted
-    tiering)."""
-    st, val, xstar = _lp_pre_x(cvec, node["mats"])
+def _vint_eval(node, cvec, depth, use_lemmas=False):
+    """§2.3–2.4 + v0.6.6 §1 + v0.7 §1: strongest integer lower bound on direction
+    ``cvec`` via conditional-theorem splits (pre-built) AND branch-and-bound splits,
+    sharing nesting budget ``depth``.  ``use_lemmas`` picks the lemma-augmented leaf
+    matrices (so the bound may use library lemmas as linear facts).  Returns
+    ``(status, value, pstats)``."""
+    mats = node["mats_lemma"] if (use_lemmas and "mats_lemma" in node) else node["mats"]
+    st, val, xstar = _lp_pre_x(cvec, mats)
     if st == "unbounded":
         return ("unbounded", None, None)
     if st != "opt":
@@ -774,8 +808,8 @@ def _vint_eval(node, cvec, depth):
     if depth > 0:
         # conditional-theorem splits (direction-independent, pre-built)
         for ge, le in node["splits"]:
-            rge = _vint_eval(ge, cvec, depth - 1)
-            rle = _vint_eval(le, cvec, depth - 1)
+            rge = _vint_eval(ge, cvec, depth - 1, use_lemmas)
+            rle = _vint_eval(le, cvec, depth - 1, use_lemmas)
             mv = _merge_branch_vals(rge, rle)
             if mv is not None and mv > best:
                 best, best_ps = mv, _split_combine("cond", rge, rle)
@@ -783,10 +817,10 @@ def _vint_eval(node, cvec, depth):
         pick = D._bnb_pick_var(xstar)
         if pick is not None:
             var, fl = pick
-            ge_node = {"mats": _add_int_bound(node["mats"], var, ">=", fl + 1), "splits": []}
-            le_node = {"mats": _add_int_bound(node["mats"], var, "<=", fl), "splits": []}
-            rge = _vint_eval(ge_node, cvec, depth - 1)
-            rle = _vint_eval(le_node, cvec, depth - 1)
+            ge_node = {"mats": _add_int_bound(mats, var, ">=", fl + 1), "splits": []}
+            le_node = {"mats": _add_int_bound(mats, var, "<=", fl), "splits": []}
+            rge = _vint_eval(ge_node, cvec, depth - 1, use_lemmas)
+            rle = _vint_eval(le_node, cvec, depth - 1, use_lemmas)
             mv = _merge_branch_vals(rge, rle)
             if mv is not None and mv > best:
                 best, best_ps = mv, _split_combine("bnb", rge, rle)
@@ -829,39 +863,39 @@ def enumerate_candidates(premises, stats, rng, accept="split_needed"):
     ``rounding_only_skipped`` / ``split_needed_skipped``) before any expensive proof
     reconstruction, exactly as v0.6.3 dropped rounding_only via REQUIRE_SPLIT."""
     pf = _premise_forms(premises)
-    # v_lin matrices (relaxation: unconditional + triggerable conditionals), once
+    # v_lin matrices (relaxation: unconditional + triggerable conditionals + lemmas,
+    # v0.7 §1.3 — so "linear_only" means derivable on top of the lemmas), once
     lin_base = pf + _unconditional_forms()
-    lin_mats = _prep_matrices(lin_base + _triggerable_conditionals(lin_base))
-    tree = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH)       # once
+    lin_mats = _prep_matrices(lin_base + _triggerable_conditionals(lin_base)
+                              + _triggerable_lemmas(lin_base))
+    tree = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH)       # once (both leaf mats)
 
     directions = enumerate_directions()
     rng.shuffle(directions)
     stats["directions_total"] += len(directions)
     t0 = _time.time()
     out, n_done = [], 0
-    # v0.6.5 §2: all directions are evaluated (deterministic); a runaway group is
-    # bounded by the per-group work budget (deducer.work_tick inside _lp_pre), not
-    # by wall-clock — so the set of candidates is reproducible across machines.
     for d in directions:
         n_done += 1
         cvec = _dir_cvec(d)
         slin, vlin = _lp_pre(cvec, lin_mats)
         if slin != "opt":
             continue                                # unbounded / infeasible: skip
-        sint, vint, vps = _vint_eval(tree, cvec, D.DEFAULT_SPLIT_DEPTH)
+        # v0.7 §1.2: the bound uses lemmas (v_int_lemma); v_int_base (no lemmas) is
+        # kept to gate the dependency check cheaply (§2).
+        sint, vint, vps = _vint_eval(tree, cvec, D.DEFAULT_SPLIT_DEPTH, use_lemmas=True)
         if sint != "opt":
             continue
         if vint > vlin + _LP_TOL:
-            # §IV (v0.6.4): classify the direction now (rounding_only when the case
-            # split adds nothing beyond ceil(v_lin)) and keep only the accepted
-            # depth — the other type is dropped before proof reconstruction.
             dtype = "rounding_only" if vint == _ceil(vlin - _LP_TOL) else "split_needed"
             if dtype != accept:
                 stats["rounding_only_skipped" if dtype == "rounding_only"
                       else "split_needed_skipped"] += 1
                 continue
+            sb, vint_base, _ = _vint_eval(tree, cvec, D.DEFAULT_SPLIT_DEPTH, use_lemmas=False)
             out.append({"coeffs": dict(d), "rel": ">=", "rhs": int(vint),
-                        "pred_ps": vps})               # v0.6.6 §2: predicted split struct
+                        "pred_ps": vps, "v_int_lemma": int(vint),
+                        "v_int_base": (int(vint_base) if sb == "opt" else None)})
         else:
             stats["linear_only"] += 1
     stats["directions_evaluated"] += n_done
@@ -889,7 +923,9 @@ def enumerate_candidates(premises, stats, rng, accept="split_needed"):
         prev = best_by_canon.get(key)
         if prev is None or crhs > prev["rhs"]:
             best_by_canon[key] = {"coeffs": cic, "rel": ">=", "rhs": crhs,
-                                  "pred_ps": cand.get("pred_ps", _NO_SPLIT_PS)}
+                                  "pred_ps": cand.get("pred_ps", _NO_SPLIT_PS),
+                                  "v_int_lemma": cand.get("v_int_lemma"),
+                                  "v_int_base": cand.get("v_int_base")}
     viable = []
     for cand in best_by_canon.values():
         cic, crhs = cand["coeffs"], cand["rhs"]
@@ -897,7 +933,8 @@ def enumerate_candidates(premises, stats, rng, accept="split_needed"):
         if not lprime:
             padded = crhs <= 0
         else:
-            st, vr, _ = _vint_eval(tree, _dir_cvec(lprime), D.DEFAULT_SPLIT_DEPTH)
+            st, vr, _ = _vint_eval(tree, _dir_cvec(lprime), D.DEFAULT_SPLIT_DEPTH,
+                                   use_lemmas=True)
             padded = (st == "opt" and vr >= crhs)
         if padded:
             stats["p6_padding"] += 1
@@ -1157,11 +1194,12 @@ def _strongest(pruned, direction: dict):
     return concl, ctx, fact
 
 
-def strengthen_and_simplify(conclusion0: dict, pruned: list):
+def strengthen_and_simplify(conclusion0: dict, pruned: list, use_lemmas=True):
     """§2: strengthen to the strongest provable constant; §3-v0.3: then greedily
     drop any non-p_6 term whose removal still yields a provable (and, via nonneg +
     face_split, stronger-or-equivalent) conclusion.  The deducer saturates once
     with the conclusion direction and all single-term-drop directions added.
+    ``use_lemmas`` (v0.7) lets the proof use library lemmas.
     Returns ``(conclusion, ctx, fact)`` or None."""
     d0 = {v: int(c) for v, c in conclusion0["coeffs"].items() if int(c) != 0}
     dirs = [d0, _neg(d0)]
@@ -1169,7 +1207,7 @@ def strengthen_and_simplify(conclusion0: dict, pruned: list):
         red = {v: c for v, c in d0.items() if v != x}
         if "p_6" in red:
             dirs += [red, _neg(red)]
-    ctx = cached_context(pruned, dirs)
+    ctx = cached_context(pruned, dirs, use_lemmas=use_lemmas)
     r = _strongest_in(ctx, conclusion0["coeffs"])
     if r is None:
         return None
@@ -1205,14 +1243,14 @@ _SHORTEN_CONFIGS = [
 ]
 
 
-def _reprove(pruned, conclusion, depth, use_cond, use_bnb):
+def _reprove(pruned, conclusion, depth, use_cond, use_bnb, use_lemmas=True):
     """Re-derive ``conclusion`` under the given method restrictions.  Returns
     ``(ctx, fact, tb, cost)`` if the SAME (or stronger) bound is provable, else None."""
     d0 = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
     if not d0:
         return None
     ctx = Context(premises=pruned, depth=depth, extra_directions=[d0, _neg(d0)],
-                  use_conditional_split=use_cond, use_bnb=use_bnb)
+                  use_conditional_split=use_cond, use_bnb=use_bnb, use_lemmas=use_lemmas)
     ctx.saturate()
     fact = _find_fact(ctx, conclusion)
     if fact is None:
@@ -1221,13 +1259,31 @@ def _reprove(pruned, conclusion, depth, use_cond, use_bnb):
     return ctx, fact, tb, HARD.proof_difficulty(tb)
 
 
-def shorten_proof(pruned, conclusion, tb, ctx, fact, init_cost):
+def shortest_lemma_free(pruned, conclusion):
+    """§3.2 (v0.7): the cheapest proof that uses NO lemmas, over the shorten grid plus
+    the full-feature config.  Returns ``(tb, ctx, fact, cost)`` or None if the
+    conclusion is not provable without lemmas."""
+    best = None
+    for depth, uc, ub in _SHORTEN_CONFIGS + [(D.DEFAULT_SPLIT_DEPTH, True, True)]:
+        try:
+            r = _reprove(pruned, conclusion, depth, uc, ub, use_lemmas=False)
+        except D.WorkBudgetExceeded:
+            break
+        if r is None:
+            continue
+        if best is None or r[3] < best[3]:
+            best = r
+    return best
+
+
+def shorten_proof(pruned, conclusion, tb, ctx, fact, init_cost, use_lemmas=True):
     """§1 (v0.6.7): AlphaGeometry-style proof pruning.  Re-prove ``conclusion`` under
     a grid of method restrictions and keep the lowest-cost proof, iterating up to
     MAX_SHORTEN_ROUNDS times (each round adopts any strictly-cheaper proof).  Returns
     ``(tb, ctx, fact, cost, rounds)``.  Work is counted in the per-group budget; if
     the budget is hit mid-search the best proof found so far is kept (the already
-    sound+verified conjecture is never discarded by the shortening step)."""
+    sound+verified conjecture is never discarded by the shortening step).  v0.7:
+    ``use_lemmas`` keeps library lemmas available during the search."""
     best = (tb, ctx, fact, init_cost)
     # §1.4: a proof with no case split is already structurally minimal — skip it.
     if HARD.proof_structure_stats(tb)["case_splits"] == 0:
@@ -1237,7 +1293,8 @@ def shorten_proof(pruned, conclusion, tb, ctx, fact, init_cost):
         for _ in range(MAX_SHORTEN_ROUNDS):
             improved = False
             for depth, use_cond, use_bnb in _SHORTEN_CONFIGS:
-                r = _reprove(pruned, conclusion, depth, use_cond, use_bnb)
+                r = _reprove(pruned, conclusion, depth, use_cond, use_bnb,
+                             use_lemmas=use_lemmas)
                 if r is None:
                     continue
                 if r[3] < best[3]:                       # strictly cheaper proof
@@ -1429,6 +1486,45 @@ def conjecture_hash(premises: list, conclusion: dict):
         ckey = (tuple(sorted((v, int(c)) for v, c in ic.items())), conclusion["rel"],
                 str(nc))
     return (premise_key(premises), ckey)
+
+
+def select_lemma_library(record_dir: Path):
+    """v0.7 §1: choose the lemma library from the existing record.  Eligible = at most
+    2 premises and ``attained == "yes"``.  If more than LEMMA_LIB_MAX qualify, keep the
+    first LEMMA_LIB_MAX by: fewer premises → more touch → higher hardness → smaller C.
+
+    Returns ``(lemmas, lemma_meta, lemma_data)``:
+      lemmas     cnum -> {premises, coeffs(Fraction), const(Fraction), rel} for the deducer
+      lemma_meta cnum -> {generation, proof_cost_expanded}
+      lemma_data cnum -> full record json (for inlining into Lean)."""
+    cand = []
+    if record_dir.exists():
+        for d in sorted(record_dir.iterdir()):
+            j = d / f"{d.name}.json"
+            if not j.exists():
+                continue
+            data = json.load(open(j))
+            cj = data["conjecture"]
+            if len(cj["premises"]) > 2 or data.get("attained") != "yes":
+                continue
+            cand.append((int(d.name[1:]), data))
+    # deterministic ordering, then cap
+    cand.sort(key=lambda t: (len(t[1]["conjecture"]["premises"]),
+                             -(t[1].get("touch") or 0),
+                             -t[1].get("hardness", 0.0), t[0]))
+    cand = cand[:LEMMA_LIB_MAX]
+    lemmas, lemma_meta, lemma_data = {}, {}, {}
+    for cnum, data in cand:
+        cj = data["conjecture"]
+        concl = cj["conclusion"]
+        lemmas[cnum] = {"premises": cj["premises"],
+                        "coeffs": {k: Fraction(v) for k, v in concl["coeffs"].items()},
+                        "const": Fraction(-int(concl["rhs"])), "rel": ">="}
+        lemma_meta[cnum] = {"generation": data.get("generation", 0),
+                            "proof_cost_expanded": data.get("proof_cost_expanded",
+                                                            data.get("proof_cost", 0.0))}
+        lemma_data[cnum] = data
+    return lemmas, lemma_meta, lemma_data
 
 
 def load_existing_hashes(record_dir: Path):
@@ -1757,8 +1853,13 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
         pruned = simplify_premises(pruned)
         pruned = dedup_premises(pruned)
         pruned = minimize_premises(pruned, conclusion0)
+        # §1/§2 (v0.7): a lemma only "helps" this direction if its lemma-aided bound
+        # beats the lemma-free one; then (and only then) is the proof allowed to use
+        # lemmas, and the §2 dependency check is run.  Otherwise prove lemma-free.
+        vl, vb = conclusion0.get("v_int_lemma"), conclusion0.get("v_int_base")
+        lemma_helps = (vb is None) or (vl is not None and vl > vb)
         # §2 (strengthen) + §3-v0.3 (drop redundant terms)
-        res = strengthen_and_simplify(conclusion0, pruned)
+        res = strengthen_and_simplify(conclusion0, pruned, use_lemmas=lemma_helps)
         if res is None:
             # the deducer could not reconstruct a proof for a direction the LP
             # enumeration flagged as non-linear (expected not to happen).
@@ -1880,20 +1981,45 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
                 f"  integer counter-model: {cm}\n"
                 f"  proof steps: {[ (s['rule'], s['text']) for s in tb ]}")
 
-        # §1 (v0.6.7): cost-bounded re-proving — replace the engine's (possibly
-        # round-about) proof with the lowest-cost proof of the SAME conclusion, then
-        # recompute everything proof-derived (hardness, metrics, stats) from it.
+        # §1 (v0.6.7): cost-bounded re-proving — lowest-cost proof of the SAME
+        # conclusion (lemmas available only if they help this direction, §2 v0.7).
         proof_cost_initial = HARD.proof_difficulty(tb)
         tb, ctx_m, fact, proof_cost, shorten_rounds = shorten_proof(
-            pruned, conclusion, tb, ctx_m, fact, proof_cost_initial)
-        hard = HARD.hardness(tb, pruned, disp)
+            pruned, conclusion, tb, ctx_m, fact, proof_cost_initial,
+            use_lemmas=lemma_helps)
+
+        # §2 (v0.7): which library lemmas does the (shortest) proof use, and are they
+        # essential?  Only run the (expensive) full lemma-free re-proof when the
+        # lemma-aided bound beat the base bound (lemma_helps); otherwise it is lemma 0.
+        lemma_cnums = sorted(F._lemma_cnums_in(tb))
+        if lemma_helps and lemma_cnums:
+            stats["lemma_bound_helped"] += 1
+            free = shortest_lemma_free(pruned, conclusion)   # §2.2 full no-lemma reprove
+            if free is not None:
+                ctx_m, fact, tb, proof_cost = free
+                lemma_cnums = []
+                stats["lemma_dropped_dependency"] += 1        # reproved without lemmas
+
+        # §3.1/§4.1: generation and expanded cost from the lemmas actually depended on.
+        if lemma_cnums:
+            generation = 1 + max(_W_LEMMA_META[c]["generation"] for c in lemma_cnums)
+            proof_cost_expanded = proof_cost + sum(
+                _W_LEMMA_META[c]["proof_cost_expanded"] for c in lemma_cnums)
+        else:
+            generation = 0
+            proof_cost_expanded = proof_cost
+
+        # §4.2: hardness = expanded proof cost / statement length (raw value).
+        sl = HARD.statement_length(pruned, disp)
+        hard = (proof_cost_expanded / sl) if sl else 0.0
         new_metrics = {"attained": attained, "touch": touch_val,
                        "arith_sharp": arith_sharp, "hardness": hard}
+        lemma_refs = [f"C{c}" for c in lemma_cnums]
 
         all_inv = set()
         _used_inventory(tb, all_inv)
         inv_theorems = sorted(all_inv & INVENTORY_THEOREMS)
-        lemmas_used = sorted(all_inv - INVENTORY_THEOREMS)
+        lemmas_used = sorted(all_inv - INVENTORY_THEOREMS)   # HexLemmas lemmas (proof.*)
 
         # deterministic fids (§4) so the record is independent of the cache
         renumber_steps(tb)
@@ -1928,7 +2054,10 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
             "proof_stats": proof_stats,
             "proof_cost_initial": proof_cost_initial,
             "proof_cost": proof_cost,
+            "proof_cost_expanded": proof_cost_expanded,
             "shorten_rounds": shorten_rounds,
+            "generation": generation,
+            "lemma_refs": lemma_refs,
             "hash": h,
             "skeleton": skel,
             "metrics": new_metrics,
@@ -1969,7 +2098,10 @@ def assemble_data(proposal: dict, target: str, supersedes: list) -> dict:
         "proof_stats": proposal["proof_stats"],
         "proof_cost_initial": proposal["proof_cost_initial"],
         "proof_cost": proposal["proof_cost"],
+        "proof_cost_expanded": proposal["proof_cost_expanded"],
         "shorten_rounds": proposal["shorten_rounds"],
+        "generation": proposal["generation"],
+        "lemmas_used": proposal["lemma_refs"],       # v0.7 §3: library-lemma C-numbers
         "supersedes": supersedes,
         "hardness": proposal["hardness"],
         "lean": {"theorem_name": target, "status": "compiled"},
@@ -1984,11 +2116,17 @@ _W_HASHES = None
 _W_BASE_SEED = None
 
 
-def set_worker_globals(pool, existing_hashes_snapshot, base_seed):
-    global _W_POOL, _W_HASHES, _W_BASE_SEED
+_W_LEMMA_META = {}        # cnum -> {"generation", "proof_cost_expanded"} (v0.7)
+
+
+def set_worker_globals(pool, existing_hashes_snapshot, base_seed,
+                       lemmas=None, lemma_meta=None):
+    global _W_POOL, _W_HASHES, _W_BASE_SEED, _W_LEMMA_META
     _W_POOL = pool
     _W_HASHES = existing_hashes_snapshot
     _W_BASE_SEED = base_seed
+    _W_LEMMA_META = lemma_meta or {}
+    D.set_lemmas(lemmas or {})          # workers (forked after this) inherit the library
 
 
 def seed_for(idx: int) -> int:

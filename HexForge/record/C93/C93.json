@@ -232,5 +232,8 @@
   "lean": {
     "theorem_name": "C93",
     "status": "compiled"
-  }
+  },
+  "lemmas_used": [],
+  "generation": 0,
+  "proof_cost_expanded": 9.5
 }

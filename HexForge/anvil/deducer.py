@@ -130,6 +130,8 @@ class Fact:
     split_coeffs: Optional[dict] = None           # case_split linear expression
     split_kind: Optional[str] = None              # "conditional" | "bnb" (v0.6.6)
     branches: list = field(default_factory=list)  # case_split: [(label, Context, fid)]
+    lemma_cnum: Optional[int] = None              # v0.7: C-number of the lemma applied
+    lemma_premises: Optional[list] = None         # v0.7: the lemma's premises (for Lean)
     note: str = ""
 
     def value_at(self, vals: dict) -> Fraction:
@@ -299,6 +301,18 @@ def _bnb_pick_var(xstar: dict):
             best = (dist, v, floor(x))
     return (best[1], best[2]) if best is not None else None
 
+# v0.7 §2: lemma library — proved conjectures used as extra conditional theorems.
+# ``LEMMAS`` maps C-number -> {"premises": [{coeffs,rel,rhs}], "coeffs": {var:Fraction},
+# "const": Fraction, "rel": ">="} where (coeffs,const,rel) is the conclusion as a Fact
+# form (coeffs·x + const >= 0).  Set per run by the generator; empty by default.
+LEMMAS: dict = {}
+
+
+def set_lemmas(lemmas: dict):
+    global LEMMAS
+    LEMMAS = lemmas
+
+
 DEFAULT_MAX_ROUNDS = 8
 # v0.6.5 §4: case-split nesting raised 2 → 3 (the 3rd level reuses the same
 # thresholds: f_2 ∈ {7,8}, big-face total ∈ {3,4}).  The per-group work budget
@@ -318,7 +332,7 @@ class Context:
 
     def __init__(self, premises=None, assumptions=None, depth=DEFAULT_SPLIT_DEPTH,
                  max_rounds=DEFAULT_MAX_ROUNDS, extra_directions=None, label="",
-                 use_conditional_split=True, use_bnb=True):
+                 use_conditional_split=True, use_bnb=True, use_lemmas=True):
         self.facts: list = []
         self._by_lhs: dict = {}     # lhs_key -> Fact (strongest)
         self._markers: set = set()  # triggered-conditional / attempted-split keys
@@ -330,6 +344,7 @@ class Context:
         # search for a cheaper proof under different method restrictions).
         self.use_conditional_split = use_conditional_split
         self.use_bnb = use_bnb
+        self.use_lemmas = use_lemmas            # v0.7: may apply library lemmas
         self.children: dict = {}    # (var, c, "ge"/"le") -> Context
 
         # 1. Unconditional inventory facts.
@@ -393,6 +408,47 @@ class Context:
             f = Fact(next(self._counter), coeffs, const, rel,
                      rule="conditional", inv_name=e["name"], deps=[trig.fid])
             self._markers.add(key)
+            if self._add(f):
+                changed = True
+        return changed
+
+    # ── action: trigger library lemmas (v0.7 §2) ─────────────────────────────
+    def _premise_entails(self, pr):
+        """Return a pool Fact entailing premise ``pr`` ({coeffs, rel, rhs}), else None."""
+        cf = {v: Fraction(c) for v, c in pr["coeffs"].items()}
+        rhs = Fraction(pr["rhs"])
+        rel = pr["rel"]
+        if rel == ">=":
+            return self._entails(cf, -rhs)
+        if rel == "<=":
+            return self._entails({v: -c for v, c in cf.items()}, rhs)
+        if rel in ("=", "=="):
+            ge = self._entails(cf, -rhs)
+            le = self._entails({v: -c for v, c in cf.items()}, rhs)
+            return ge if (ge is not None and le is not None) else None
+        return None
+
+    def _trigger_lemmas(self) -> bool:
+        if not self.use_lemmas or not LEMMAS:
+            return False
+        changed = False
+        for cnum in sorted(LEMMAS):                 # deterministic order
+            key = ("lemma", cnum)
+            if key in self._markers:
+                continue
+            lem = LEMMAS[cnum]
+            deps, ok = [], True
+            for pr in lem["premises"]:              # all premises must be entailed
+                dep = self._premise_entails(pr)
+                if dep is None:
+                    ok = False
+                    break
+                deps.append(dep.fid)
+            if not ok:
+                continue
+            self._markers.add(key)
+            f = Fact(next(self._counter), dict(lem["coeffs"]), lem["const"], lem["rel"],
+                     rule="lemma", lemma_cnum=cnum, lemma_premises=lem["premises"], deps=deps)
             if self._add(f):
                 changed = True
         return changed
@@ -542,6 +598,7 @@ class Context:
         for rnd in range(self.max_rounds):
             changed = False
             changed |= self._trigger_conditionals()
+            changed |= self._trigger_lemmas()
             # bounded pairwise elimination only on the first pass (supplementary
             # to the LP-directed bounds, which are the main engine).  Skipped once
             # the pool is large: with the expanded v0.6.1 variable set it is
@@ -695,7 +752,7 @@ class Context:
                           extra_directions=self.directions[len(BASE_DIRECTIONS):],
                           label=f"{self.label}/{text}",
                           use_conditional_split=self.use_conditional_split,
-                          use_bnb=self.use_bnb)
+                          use_bnb=self.use_bnb, use_lemmas=self.use_lemmas)
             for f in base_prem:
                 ctx._add(Fact(next(ctx._counter), dict(f.coeffs), f.const, f.rel,
                               rule=f.rule, note=f.note))
@@ -770,7 +827,7 @@ def traceback(ctx: Context, fact: Fact) -> list:
         seen.add(f.fid)
         if f.rule in ("premise", "assumption", "inventory"):
             pass  # leaves; still emit for premises/inventory below
-        elif f.rule == "conditional":
+        elif f.rule in ("conditional", "lemma"):
             for d in f.deps:
                 if d in fact_by_id:
                     visit(fact_by_id[d])
@@ -801,6 +858,11 @@ def traceback(ctx: Context, fact: Fact) -> list:
             step["inventory"] = f.inv_name
             step["tactic"] = "linarith"
             step["deps"] = f.deps
+        elif f.rule == "lemma":                    # v0.7 §2
+            step["lemma_cnum"] = f.lemma_cnum
+            step["lemma_premises"] = f.lemma_premises
+            step["tactic"] = "linarith"
+            step["deps"] = f.deps                  # one entailing fact fid per premise
         elif f.rule == "premise":
             step["note"] = f.note
         elif f.rule == "assumption":
@@ -836,6 +898,37 @@ def _inv_form(name: str):
     e = inventory.INVENTORY_BY_NAME[name]
     coeffs, const, rel = _conc_to_form(e["conclusion"])
     return coeffs, const, rel
+
+
+def _dep_entails_premise(dep: Fact, pr: dict) -> bool:
+    """v0.7: does already-verified fact ``dep`` entail lemma premise ``pr``
+    ({coeffs, rel, rhs})?  Strict for >=/<=; lenient (same LHS) for = (Lean is the
+    final arbiter for lemma applications)."""
+    cf = {v: Fraction(c) for v, c in pr["coeffs"].items()}
+    rhs = Fraction(pr["rhs"])
+    rel = pr["rel"]
+    if rel in ("=", "=="):
+        pt = _primitive(cf, -rhs)
+        pd = _primitive(dep.coeffs, dep.const)
+        if pt is None or pd is None:
+            return False
+        kt = tuple(sorted(pt[0].items()))
+        kd = tuple(sorted(pd[0].items()))
+        kdn = tuple(sorted({v: -x for v, x in pd[0].items()}.items()))
+        return kt == kd or kt == kdn
+    if rel == ">=":
+        tc, tk = cf, -rhs
+    else:                                            # "<="
+        tc, tk = {v: -c for v, c in cf.items()}, rhs
+    prim_t = _primitive(tc, tk)
+    prim_d = _primitive(dep.coeffs, dep.const)
+    if prim_t is None or prim_d is None:
+        return False
+    it, nt = prim_t
+    idd, nd = prim_d
+    if tuple(sorted(it.items())) != tuple(sorted(idd.items())):
+        return False
+    return -nd >= -nt
 
 
 def recheck(ctx: Context, fact: Fact, premises: list) -> tuple:
@@ -930,6 +1023,25 @@ def recheck(ctx: Context, fact: Fact, premises: list) -> tuple:
                 if cfact.rel == ">=" and f.rel == ">=":
                     if cfact.bound() < f.bound():
                         return False
+            return True
+        if f.rule == "lemma":                      # v0.7 §2
+            lem = LEMMAS.get(f.lemma_cnum)
+            if lem is None:
+                return False
+            # the asserted conclusion must match this lemma's proven conclusion
+            if not (same_form(lem["coeffs"], lem["const"], f.coeffs, f.const)
+                    and lem["rel"] == f.rel):
+                return False
+            prems = lem["premises"]
+            if len(f.deps) != len(prems):
+                return False
+            # each premise must be entailed by its cited (and itself valid) dep
+            for pr, d in zip(prems, f.deps):
+                dep = fid_map.get(d)
+                if dep is None or not check(dep, local_ctx, local_asm):
+                    return False
+                if not _dep_entails_premise(dep, pr):
+                    return False
             return True
         return False
 

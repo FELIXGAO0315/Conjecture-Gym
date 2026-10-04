@@ -1,28 +1,20 @@
 {
   "id": "C47",
-  "created_at": "2026-10-03T17:17:41.277862+00:00",
+  "created_at": "2026-10-04T00:41:41.318296+00:00",
   "generator": {
-    "version": "0.6.7",
-    "seed": 2024006753
+    "version": "0.7",
+    "seed": 2024006709
   },
   "conjecture": {
-    "formula": "if ((is_simple) and (f_2>=_37) and (p_4 = 0) and (p_3 = 0)), then p6 >= ((((0.5 * p3) + (-1 * p5)) + 25))",
+    "formula": "if ((is_simple) and (f_2>=_21) and (p_3 = 0) and (p_4 = 0)), then p6 >= ((((0.5 * p3) + (-1 * p5)) + 17))",
     "premises": [
       {
-        "text": "f_2 >= 37",
+        "text": "f_2 >= 21",
         "coeffs": {
           "f_2": 1
         },
         "rel": ">=",
-        "rhs": 37
-      },
-      {
-        "text": "p_4 = 0",
-        "coeffs": {
-          "p_4": 1
-        },
-        "rel": "=",
-        "rhs": 0
+        "rhs": 21
       },
       {
         "text": "p_3 = 0",
@@ -31,19 +23,27 @@
         },
         "rel": "=",
         "rhs": 0
+      },
+      {
+        "text": "p_4 = 0",
+        "coeffs": {
+          "p_4": 1
+        },
+        "rel": "=",
+        "rhs": 0
       }
     ],
     "conclusion": {
-      "text": "2*p_6 >= p_3 - 2*p_5 + 50",
+      "text": "2*p_6 >= p_3 - 2*p_5 + 34",
       "coeffs": {
         "p_6": 2,
         "p_3": -1,
         "p_5": 2
       },
       "rel": ">=",
-      "rhs": 50
+      "rhs": 34
     },
-    "natural_language": "Let M be a simple 3-polytope (a simple 3-connected planar map), with p_k the number of k-gonal faces, f_2 the total number of faces, and sum_{k>=7} p_k the number of faces of size at least 7. Suppose f_2 >= 37, p_4 = 0, p_3 = 0. Then 2*p_6 >= p_3 - 2*p_5 + 50."
+    "natural_language": "Let M be a simple 3-polytope (a simple 3-connected planar map), with p_k the number of k-gonal faces, f_2 the total number of faces, and sum_{k>=7} p_k the number of faces of size at least 7. Suppose f_2 >= 21, p_3 = 0, p_4 = 0. Then 2*p_6 >= p_3 - 2*p_5 + 34."
   },
   "proof": {
     "inventory_used": [
@@ -81,13 +81,13 @@
       {
         "fid": 3,
         "rule": "premise",
-        "text": "1*f_2 + -37 >= 0",
+        "text": "1*f_2 + -21 >= 0",
         "coeffs": {
           "f_2": "1"
         },
-        "const": "-37",
+        "const": "-21",
         "rel": ">=",
-        "note": "f_2 >= 37"
+        "note": "f_2 >= 21"
       },
       {
         "fid": 4,
@@ -122,17 +122,6 @@
       {
         "fid": 6,
         "rule": "premise",
-        "text": "1*p_4 == 0",
-        "coeffs": {
-          "p_4": "1"
-        },
-        "const": "0",
-        "rel": "==",
-        "note": "p_4 = 0"
-      },
-      {
-        "fid": 7,
-        "rule": "premise",
         "text": "1*p_3 == 0",
         "coeffs": {
           "p_3": "1"
@@ -142,14 +131,25 @@
         "note": "p_3 = 0"
       },
       {
+        "fid": 7,
+        "rule": "premise",
+        "text": "1*p_4 == 0",
+        "coeffs": {
+          "p_4": "1"
+        },
+        "const": "0",
+        "rel": "==",
+        "note": "p_4 = 0"
+      },
+      {
         "fid": 8,
         "rule": "combination",
-        "text": "1*p_5 + 1*p_6 + -49/2 >= 0",
+        "text": "1*p_5 + 1*p_6 + -33/2 >= 0",
         "coeffs": {
           "p_6": "1",
           "p_5": "1"
         },
-        "const": "-49/2",
+        "const": "-33/2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
@@ -167,19 +167,19 @@
           "1/2",
           "1/2",
           "-1/2",
-          "-3/2",
-          "-2"
+          "-2",
+          "-3/2"
         ]
       },
       {
         "fid": 9,
         "rule": "rounding",
-        "text": "1*p_5 + 1*p_6 + -25 >= 0",
+        "text": "1*p_5 + 1*p_6 + -17 >= 0",
         "coeffs": {
           "p_6": "1",
           "p_5": "1"
         },
-        "const": "-25",
+        "const": "-17",
         "rel": ">=",
         "tactic": "omega",
         "deps": [
@@ -189,18 +189,18 @@
       {
         "fid": 10,
         "rule": "combination",
-        "text": "-1*p_3 + 2*p_5 + 2*p_6 + -50 >= 0",
+        "text": "-1*p_3 + 2*p_5 + 2*p_6 + -34 >= 0",
         "coeffs": {
           "p_6": "2",
           "p_3": "-1",
           "p_5": "2"
         },
-        "const": "-50",
+        "const": "-34",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           9,
-          7
+          6
         ],
         "mults": [
           "2",
@@ -210,15 +210,15 @@
     ]
   },
   "iris": {
-    "T": 0.0,
-    "R": 0.0,
+    "T": 0.0018450184501845018,
+    "R": 1.0,
     "L": 0.0,
-    "score": 0.0
+    "score": 1.0018450184501846
   },
-  "attained": "unknown",
-  "touch": null,
+  "attained": "yes",
+  "touch": 1,
   "arith_sharp": true,
-  "arith_min": 50,
+  "arith_min": 34,
   "depth_type": "split_needed",
   "proof_stats": {
     "case_splits": 0,
@@ -230,8 +230,13 @@
   },
   "proof_cost_initial": 8.0,
   "proof_cost": 8.0,
+  "proof_cost_expanded": 8.0,
   "shorten_rounds": 0,
-  "supersedes": [],
+  "generation": 0,
+  "lemmas_used": [],
+  "supersedes": [
+    "if ((is_simple) and (f_2>=_37) and (p_4 = 0) and (p_3 = 0)), then p6 >= ((((0.5 * p3) + (-1 * p5)) + 25))"
+  ],
   "hardness": 0.8888888888888888,
   "lean": {
     "theorem_name": "C47",

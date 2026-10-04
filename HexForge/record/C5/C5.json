@@ -310,5 +310,8 @@
   "lean": {
     "theorem_name": "C5",
     "status": "compiled"
-  }
+  },
+  "lemmas_used": [],
+  "generation": 0,
+  "proof_cost_expanded": 13.5
 }

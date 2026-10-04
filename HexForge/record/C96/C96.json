@@ -188,5 +188,8 @@
   "lean": {
     "theorem_name": "C96",
     "status": "compiled"
-  }
+  },
+  "lemmas_used": [],
+  "generation": 0,
+  "proof_cost_expanded": 6.5
 }

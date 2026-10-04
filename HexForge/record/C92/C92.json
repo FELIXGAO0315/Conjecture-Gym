@@ -1,41 +1,41 @@
 {
   "id": "C92",
-  "created_at": "2026-10-03T17:28:50.622921+00:00",
+  "created_at": "2026-10-04T07:32:35.322083+00:00",
   "generator": {
-    "version": "0.6.7",
-    "seed": 2024007249
+    "version": "0.7",
+    "seed": 2025007152
   },
   "conjecture": {
-    "formula": "if ((is_simple) and (f_2>=_34) and (p_3 <= 2)), then p6 >= ((((-1 * p4) + (-1 * p5)) + 13))",
+    "formula": "if ((is_simple) and (f_2>=_12) and (p_3 <= 1)), then p6 >= ((((-1 * p4) + (-1 * p5)) + 7))",
     "premises": [
       {
-        "text": "f_2 >= 34",
+        "text": "f_2 >= 12",
         "coeffs": {
           "f_2": 1
         },
         "rel": ">=",
-        "rhs": 34
+        "rhs": 12
       },
       {
-        "text": "p_3 <= 2",
+        "text": "p_3 <= 1",
         "coeffs": {
           "p_3": 1
         },
         "rel": "<=",
-        "rhs": 2
+        "rhs": 1
       }
     ],
     "conclusion": {
-      "text": "p_6 >= -p_4 - p_5 + 13",
+      "text": "p_6 >= -p_4 - p_5 + 7",
       "coeffs": {
         "p_6": 1,
         "p_4": 1,
         "p_5": 1
       },
       "rel": ">=",
-      "rhs": 13
+      "rhs": 7
     },
-    "natural_language": "Let M be a simple 3-polytope (a simple 3-connected planar map), with p_k the number of k-gonal faces, f_2 the total number of faces, and sum_{k>=7} p_k the number of faces of size at least 7. Suppose f_2 >= 34, p_3 <= 2. Then p_6 >= -p_4 - p_5 + 13."
+    "natural_language": "Let M be a simple 3-polytope (a simple 3-connected planar map), with p_k the number of k-gonal faces, f_2 the total number of faces, and sum_{k>=7} p_k the number of faces of size at least 7. Suppose f_2 >= 12, p_3 <= 1. Then p_6 >= -p_4 - p_5 + 7."
   },
   "proof": {
     "inventory_used": [
@@ -85,24 +85,24 @@
       {
         "fid": 4,
         "rule": "premise",
-        "text": "1*f_2 + -34 >= 0",
+        "text": "1*f_2 + -12 >= 0",
         "coeffs": {
           "f_2": "1"
         },
-        "const": "-34",
+        "const": "-12",
         "rel": ">=",
-        "note": "f_2 >= 34"
+        "note": "f_2 >= 12"
       },
       {
         "fid": 5,
         "rule": "premise",
-        "text": "-1*p_3 + 2 >= 0",
+        "text": "-1*p_3 + 1 >= 0",
         "coeffs": {
           "p_3": "-1"
         },
-        "const": "2",
+        "const": "1",
         "rel": ">=",
-        "note": "p_3 <= 2"
+        "note": "p_3 <= 1"
       },
       {
         "fid": 6,
@@ -137,13 +137,13 @@
       {
         "fid": 8,
         "rule": "combination",
-        "text": "1*p_4 + 1*p_5 + 1*p_6 + -38/3 >= 0",
+        "text": "1*p_4 + 1*p_5 + 1*p_6 + -20/3 >= 0",
         "coeffs": {
           "p_6": "1",
           "p_4": "1",
           "p_5": "1"
         },
-        "const": "-38/3",
+        "const": "-20/3",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
@@ -168,13 +168,13 @@
       {
         "fid": 9,
         "rule": "rounding",
-        "text": "1*p_4 + 1*p_5 + 1*p_6 + -13 >= 0",
+        "text": "1*p_4 + 1*p_5 + 1*p_6 + -7 >= 0",
         "coeffs": {
           "p_6": "1",
           "p_4": "1",
           "p_5": "1"
         },
-        "const": "-13",
+        "const": "-7",
         "rel": ">=",
         "tactic": "omega",
         "deps": [
@@ -184,15 +184,15 @@
     ]
   },
   "iris": {
-    "T": 0.0,
-    "R": 0.0,
-    "L": 0.0,
-    "score": 0.0
+    "T": 0.00015383432043688947,
+    "R": 1.0,
+    "L": 0.043726946944662615,
+    "score": 1.0438807812650994
   },
-  "attained": "unknown",
-  "touch": null,
+  "attained": "yes",
+  "touch": 2,
   "arith_sharp": true,
-  "arith_min": 13,
+  "arith_min": 7,
   "depth_type": "rounding_only",
   "proof_stats": {
     "case_splits": 0,
@@ -204,8 +204,13 @@
   },
   "proof_cost_initial": 7.5,
   "proof_cost": 7.5,
+  "proof_cost_expanded": 7.5,
   "shorten_rounds": 0,
-  "supersedes": [],
+  "generation": 0,
+  "lemmas_used": [],
+  "supersedes": [
+    "if ((is_simple) and (f_2>=_34) and (p_3 <= 2)), then p6 >= ((((-1 * p4) + (-1 * p5)) + 13))"
+  ],
   "hardness": 1.0714285714285714,
   "lean": {
     "theorem_name": "C92",

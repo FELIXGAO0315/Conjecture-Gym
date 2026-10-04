@@ -270,5 +270,8 @@
   "lean": {
     "theorem_name": "C65",
     "status": "compiled"
-  }
+  },
+  "lemmas_used": [],
+  "generation": 0,
+  "proof_cost_expanded": 10.0
 }

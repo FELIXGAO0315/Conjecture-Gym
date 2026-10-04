@@ -1,41 +1,41 @@
 {
   "id": "C63",
-  "created_at": "2026-10-03T17:22:58.041740+00:00",
+  "created_at": "2026-10-04T07:31:00.728145+00:00",
   "generator": {
-    "version": "0.6.7",
-    "seed": 2024007000
+    "version": "0.7",
+    "seed": 2025007132
   },
   "conjecture": {
-    "formula": "if ((is_simple) and (f_2>=_45) and (p_4 <= 1)), then p6 >= ((((-2 * p3) + (-2 * p5)) + 28))",
+    "formula": "if ((is_simple) and (f_2>=_12) and (p_4 <= 2)), then p6 >= ((((-2 * p3) + (-2 * p5)) + 10))",
     "premises": [
       {
-        "text": "f_2 >= 45",
+        "text": "f_2 >= 12",
         "coeffs": {
           "f_2": 1
         },
         "rel": ">=",
-        "rhs": 45
+        "rhs": 12
       },
       {
-        "text": "p_4 <= 1",
+        "text": "p_4 <= 2",
         "coeffs": {
           "p_4": 1
         },
         "rel": "<=",
-        "rhs": 1
+        "rhs": 2
       }
     ],
     "conclusion": {
-      "text": "p_6 >= -2*p_3 - 2*p_5 + 28",
+      "text": "p_6 >= -2*p_3 - 2*p_5 + 10",
       "coeffs": {
         "p_6": 1,
         "p_3": 2,
         "p_5": 2
       },
       "rel": ">=",
-      "rhs": 28
+      "rhs": 10
     },
-    "natural_language": "Let M be a simple 3-polytope (a simple 3-connected planar map), with p_k the number of k-gonal faces, f_2 the total number of faces, and sum_{k>=7} p_k the number of faces of size at least 7. Suppose f_2 >= 45, p_4 <= 1. Then p_6 >= -2*p_3 - 2*p_5 + 28."
+    "natural_language": "Let M be a simple 3-polytope (a simple 3-connected planar map), with p_k the number of k-gonal faces, f_2 the total number of faces, and sum_{k>=7} p_k the number of faces of size at least 7. Suppose f_2 >= 12, p_4 <= 2. Then p_6 >= -2*p_3 - 2*p_5 + 10."
   },
   "proof": {
     "inventory_used": [
@@ -51,35 +51,35 @@
       {
         "fid": 1,
         "rule": "case_split",
-        "text": "2*p_3 + 2*p_5 + 1*p_6 + -28 >= 0",
+        "text": "2*p_3 + 2*p_5 + 1*p_6 + -10 >= 0",
         "coeffs": {
           "p_6": "1",
           "p_3": "2",
           "p_5": "2"
         },
-        "const": "-28",
+        "const": "-10",
         "rel": ">=",
         "tactic": "by_cases",
         "split_var": "bnb:p_3",
-        "split_threshold": 14,
+        "split_threshold": 5,
         "split_coeffs": {
           "p_3": "1"
         },
         "split_kind": "bnb",
         "cases": [
           {
-            "assume": "1*p_3 >= 14",
+            "assume": "1*p_3 >= 5",
             "steps": [
               {
                 "fid": 2,
                 "rule": "assumption",
-                "text": "1*p_3 + -14 >= 0",
+                "text": "1*p_3 + -5 >= 0",
                 "coeffs": {
                   "p_3": "1"
                 },
-                "const": "-14",
+                "const": "-5",
                 "rel": ">=",
-                "note": "1*p_3 >= 14"
+                "note": "1*p_3 >= 5"
               },
               {
                 "fid": 3,
@@ -106,13 +106,13 @@
               {
                 "fid": 5,
                 "rule": "combination",
-                "text": "2*p_3 + 2*p_5 + 1*p_6 + -28 >= 0",
+                "text": "2*p_3 + 2*p_5 + 1*p_6 + -10 >= 0",
                 "coeffs": {
                   "p_6": "1",
                   "p_3": "2",
                   "p_5": "2"
                 },
-                "const": "-28",
+                "const": "-10",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
@@ -129,7 +129,7 @@
             ]
           },
           {
-            "assume": "1*p_3 <= 13",
+            "assume": "1*p_3 <= 4",
             "steps": [
               {
                 "fid": 6,
@@ -146,35 +146,35 @@
               {
                 "fid": 7,
                 "rule": "premise",
-                "text": "1*f_2 + -45 >= 0",
+                "text": "1*f_2 + -12 >= 0",
                 "coeffs": {
                   "f_2": "1"
                 },
-                "const": "-45",
+                "const": "-12",
                 "rel": ">=",
-                "note": "f_2 >= 45"
+                "note": "f_2 >= 12"
               },
               {
                 "fid": 8,
                 "rule": "premise",
-                "text": "-1*p_4 + 1 >= 0",
+                "text": "-1*p_4 + 2 >= 0",
                 "coeffs": {
                   "p_4": "-1"
                 },
-                "const": "1",
+                "const": "2",
                 "rel": ">=",
-                "note": "p_4 <= 1"
+                "note": "p_4 <= 2"
               },
               {
                 "fid": 9,
                 "rule": "assumption",
-                "text": "-1*p_3 + 13 >= 0",
+                "text": "-1*p_3 + 4 >= 0",
                 "coeffs": {
                   "p_3": "-1"
                 },
-                "const": "13",
+                "const": "4",
                 "rel": ">=",
-                "note": "1*p_3 <= 13"
+                "note": "1*p_3 <= 4"
               },
               {
                 "fid": 10,
@@ -209,13 +209,13 @@
               {
                 "fid": 12,
                 "rule": "combination",
-                "text": "2*p_3 + 2*p_5 + 1*p_6 + -28 >= 0",
+                "text": "2*p_3 + 2*p_5 + 1*p_6 + -10 >= 0",
                 "coeffs": {
                   "p_6": "1",
                   "p_3": "2",
                   "p_5": "2"
                 },
-                "const": "-28",
+                "const": "-10",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
@@ -242,15 +242,15 @@
     ]
   },
   "iris": {
-    "T": 0.0,
-    "R": 0.0,
-    "L": 0.0,
-    "score": 0.0
+    "T": 0.00047378395451674036,
+    "R": 1.0,
+    "L": 0.09920947376656813,
+    "score": 1.0996832577210849
   },
-  "attained": "unknown",
-  "touch": null,
+  "attained": "yes",
+  "touch": 3,
   "arith_sharp": true,
-  "arith_min": 28,
+  "arith_min": 10,
   "depth_type": "split_needed",
   "proof_stats": {
     "case_splits": 1,
@@ -260,10 +260,15 @@
     "roundings": 0,
     "inventory_theorems": 1
   },
-  "proof_cost_initial": 29.5,
+  "proof_cost_initial": 31.5,
   "proof_cost": 10.0,
+  "proof_cost_expanded": 10.0,
   "shorten_rounds": 1,
-  "supersedes": [],
+  "generation": 0,
+  "lemmas_used": [],
+  "supersedes": [
+    "if ((is_simple) and (f_2>=_45) and (p_4 <= 1)), then p6 >= ((((-2 * p3) + (-2 * p5)) + 28))"
+  ],
   "hardness": 1.4285714285714286,
   "lean": {
     "theorem_name": "C63",

@@ -232,8 +232,16 @@ def main(argv):
     print(f"  existing record: {len(existing_hashes)} conjectures, "
           f"{len(skel_index)} skeletons, next id C{next_id}")
 
-    # share the pool and snapshot with forked workers (copy-on-write)
-    G.set_worker_globals(pool_data, snapshot_hashes, base_seed)
+    # §I (v0.7): select the lemma library from the current record (fixed for this run)
+    lemmas, lemma_meta, lemma_data = G.select_lemma_library(G.RECORD)
+    print(f"  lemma library: {len(lemmas)} lemmas (<=2 premises, attained=yes, "
+          f"cap {G.LEMMA_LIB_MAX})")
+    for c in sorted(lemmas):
+        d = lemma_data[c]
+        print(f"    C{c} (gen {d.get('generation', 0)}): {d['conjecture']['formula']}")
+
+    # share the pool, snapshot, and lemma library with forked workers (copy-on-write)
+    G.set_worker_globals(pool_data, snapshot_hashes, base_seed, lemmas, lemma_meta)
 
     stats = defaultdict(int)
     sampled = 0
@@ -248,6 +256,7 @@ def main(argv):
     disp = {"next": 1, "collect": 1}         # dispatch/collect indices (shared)
     write_index_log = []                     # (name, idx, depth_type, mode) in commit order
     compile_failed_idx = []                  # premise indices whose Lean compile failed
+    protected = set()                        # §6 (v0.7): C-names cited in some lemmas_used
 
     stop = {"flag": False}
     soundness = {"err": None}
@@ -321,6 +330,9 @@ def main(argv):
                 if not G.skeleton_better(metrics, ex):
                     stats["same_skeleton_worse"] += 1
                     return False
+                if ex["name"] in protected:          # §6: a used lemma is never replaced
+                    stats["lemma_protected"] += 1
+                    return False
                 mode, target_name = "replace", ex["name"]
                 old_entry = ex
                 supersedes = [ex["formula"]] + list(ex.get("supersedes", []))
@@ -329,13 +341,16 @@ def main(argv):
                 next_id += 1
                 total_written += 1
             data = G.assemble_data(prop, target_name, supersedes)
-            lean_full = F.LEAN_HEADER + F.build_theorem(
-                target_name, prop["premises"], prop["disp"], prop["tb"], display=True)
+            # §5 (v0.7): inline the (recursively) used lemmas so the file compiles alone
+            lean_full = F.build_record_lean(
+                target_name, prop["premises"], prop["disp"], prop["tb"], lemma_data)
             existing_hashes[h] = target_name
             skel_index[skel] = {"name": target_name,
                                 "formula": data["conjecture"]["formula"],
                                 "supersedes": supersedes, **metrics}
             G.write_record(data, lean_full)
+            for r in prop["lemma_refs"]:             # §6: protect the lemmas it depends on
+                protected.add(r)
             if mode == "replace":
                 replaced += 1
                 write_index_log.append((target_name, idx, dt, "replace"))
@@ -359,8 +374,13 @@ def main(argv):
                         F.build_theorem(f"HFprov{idx}", prop["premises"], prop["disp"],
                                         prop["tb"], display=True))
                        for idx, prop in pending]
+            # §5 (v0.7): one shared preamble of inlined lemma defs for the whole batch
+            batch_cnums = set()
+            for _idx, prop in pending:
+                batch_cnums |= F._lemma_cnums_in(prop["tb"])
+            preamble = F.lemma_defs_block(batch_cnums, lemma_data) if batch_cnums else ""
             t = time.time()
-            results, meta = F.compile_batch(entries, timeout=300)
+            results, meta = F.compile_batch(entries, timeout=300, preamble=preamble)
             batch_count += 1
             batch_time_total += time.time() - t
             bisection_total += meta["bisections"]
@@ -594,9 +614,10 @@ def _print_summary(stats, sampled, added, replaced, elapsed, sample_time_total,
                    "p6_padding", "too_many_terms", "proof_reconstruct_failed",
                    "premise_weakening", "linear_only", "not_attained",
                    "too_shallow", "duplicate", "premise_minimized_duplicate",
-                   "same_skeleton_worse", "recheck_failed", "depth_mismatch",
-                   "rounding_only_skipped", "split_needed_skipped",
-                   "too_slow", "compile_failed"):
+                   "same_skeleton_worse", "lemma_protected", "recheck_failed",
+                   "depth_mismatch", "rounding_only_skipped", "split_needed_skipped",
+                   "too_slow", "lemma_bound_helped", "lemma_dropped_dependency",
+                   "compile_failed"):
         print(f"  {reason:28s}: {stats.get(reason, 0)}")
 
     # §6.6 memory + Lean batches

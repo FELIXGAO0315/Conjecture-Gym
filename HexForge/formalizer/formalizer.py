@@ -304,6 +304,16 @@ def _emit_step(step, lines, indent, text2hyp, case_hyps):
                 lines.append(f"{indent}  linarith [hb]")
         return
 
+    if rule == "lemma":
+        # v0.7 §5: apply the inlined lemma HF_lemma_C{k}; discharge each of its
+        # premises from the cited entailing fact (deps align with premise order).
+        k = step["lemma_cnum"]
+        args = " ".join(f"(by zify; linarith [s{d}])" for d in step["deps"])
+        lines.append(f"{indent}have {hid} : {stmt} := by")
+        lines.append(f"{indent}  have hlem := HF_lemma_C{k} maps hM {args}".rstrip())
+        lines.append(f"{indent}  linarith [hlem]")
+        return
+
     if rule == "combination":
         deps = ", ".join(f"s{d}" for d in step["deps"])
         if rel == "==":
@@ -412,6 +422,56 @@ def build_lean(name: str, premises: list, conclusion: dict, proof_steps: list,
                                        used_inventory, display)
 
 
+# ── v0.7 §5: inline lemmas so each record compiles on its own ─────────────────
+def _lemma_cnums_in(steps) -> set:
+    """C-numbers of every lemma step in a proof (recursing into case branches)."""
+    out = set()
+    for s in steps:
+        if s.get("rule") == "lemma":
+            out.add(s["lemma_cnum"])
+        for c in s.get("cases", []):
+            out |= _lemma_cnums_in(c.get("steps", []))
+    return out
+
+
+def _lemma_topo_order(root_cnums, lemma_data) -> list:
+    """Transitive closure of used lemmas, topologically ordered (a lemma appears
+    after every lemma it itself uses).  ``lemma_data``: cnum -> record json."""
+    order, seen = [], set()
+
+    def visit(k):
+        if k in seen:
+            return
+        seen.add(k)
+        for j in _lemma_cnums_in(lemma_data[k]["proof"]["steps"]):
+            visit(j)
+        order.append(k)
+
+    for k in sorted(root_cnums):
+        visit(k)
+    return order
+
+
+def lemma_defs_block(cnums, lemma_data) -> str:
+    """Render ``HF_lemma_C{k}`` theorems (header-less) for the transitive closure of
+    ``cnums``, topologically ordered, as one block."""
+    defs = []
+    for k in _lemma_topo_order(set(cnums), lemma_data):
+        d = lemma_data[k]
+        defs.append(build_theorem(f"HF_lemma_C{k}", d["conjecture"]["premises"],
+                                  d["conjecture"]["conclusion"], d["proof"]["steps"],
+                                  display=True))
+    return "\n\n".join(defs)
+
+
+def build_record_lean(name, premises, conclusion, proof_steps, lemma_data,
+                      display=True) -> str:
+    """Standalone source for one record: header + inlined lemma defs + the theorem."""
+    block = lemma_defs_block(_lemma_cnums_in(proof_steps), lemma_data)
+    body = build_theorem(name, premises, conclusion, proof_steps, display=display)
+    return LEAN_HEADER + (block + "\n\n" if block else "") + body
+
+
 # ── compilation ─────────────────────────────────────────────────────────────
 import re as _re
 
@@ -461,21 +521,24 @@ def compile_lean(name: str, source: str, timeout: int = 300) -> tuple:
     return _run_lean(name, source, timeout)
 
 
-def compile_batch(entries: list, timeout: int = 300):
+def compile_batch(entries: list, timeout: int = 300, preamble: str = ""):
     """v0.6.4 §III: compile many theorems in ONE file (Mathlib loaded once).
 
     ``entries`` is a list of ``(name, theorem_src)`` with header-less theorem
-    bodies and unique names.  On a whole-batch failure the batch is bisected to
-    locate the offender(s); only the failing theorems are reported as failed.
+    bodies and unique names.  ``preamble`` (v0.7 §5) is a shared block of inlined
+    ``HF_lemma_C{k}`` definitions placed once after the header, so lemma-using
+    theorems in the batch can reference them.  On a whole-batch failure the batch is
+    bisected to locate the offender(s); only the failing theorems are reported failed.
 
     Returns ``(results, meta)`` where ``results`` maps name -> bool (compiled)
     and ``meta`` is ``{"bisections": k}`` (number of extra sub-compiles beyond
     the initial whole-batch attempt)."""
     results = {}
     meta = {"bisections": 0}
+    pre = (preamble + "\n\n") if preamble else ""
 
     def src_of(subset):
-        return LEAN_HEADER + "\n\n".join(t for _n, t in subset) + "\n"
+        return LEAN_HEADER + pre + "\n\n".join(t for _n, t in subset) + "\n"
 
     def stem_of(subset):
         return "_HexBatch_" + "_".join(n for n, _t in subset[:1]) + f"_{len(subset)}"
