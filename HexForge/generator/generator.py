@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent           # HexForge/
 DATA = ROOT / "data" / "plantri_pool.json"
 RECORD = ROOT / "record"
 
-GENERATOR_VERSION = "0.7"
+GENERATOR_VERSION = "0.7.1"
 MAX_COEFF = 6
 
 # v0.6.5 §2: the old wall-clock DIRECTION_BUDGET_SEC (truncate enumeration after N
@@ -371,9 +371,25 @@ def _used_premise_texts(tb: list, acc: set):
 _FACE_SPLIT_SUB = [v for v in PROP_VARS if v != "f_2"]   # p_3..p_10, tail
 
 
+def _expand_big_faces(coeffs: dict) -> dict:
+    """§3.1 (v0.7.1): rewrite a ``sum_pk_after_p6`` coefficient into equal coefficients
+    on the current tail-count variables (p_7..p_{M_MAX}, sum_pk_after_p{M_MAX}), so that
+    M_MAX=6 records (which wrote ``sum_pk_after_p6``) are comparable to / usable in the
+    M_MAX=10 variable system.  Identity at M_MAX=6 (tail-count == [sum_pk_after_p6])."""
+    if "sum_pk_after_p6" not in coeffs:
+        return dict(coeffs)
+    c = coeffs["sum_pk_after_p6"]
+    out = {k: v for k, v in coeffs.items() if k != "sum_pk_after_p6"}
+    for v in INV.TAIL_COUNT_VARS:
+        out[v] = out.get(v, 0) + c
+    return out
+
+
 def canonicalize(coeffs: dict) -> dict:
     """Replace f_2 by p_3+p_4+p_5+p_6+sum_pk_after_p6, giving a form over the
-    five remaining proposition variables (plus p_6)."""
+    five remaining proposition variables (plus p_6).  v0.7.1: a legacy
+    ``sum_pk_after_p6`` term is first expanded to the tail-count variables."""
+    coeffs = _expand_big_faces(coeffs)
     out = {v: Fraction(c) for v, c in coeffs.items() if v != "f_2"}
     a = Fraction(coeffs.get("f_2", 0))
     if a != 0:
@@ -554,10 +570,15 @@ from math import ceil as _ceil
 #   (Jučovič: f_2 >= 7 ; Barnette: big_faces >= 3), plus the second level.
 _SPLIT_THRESHOLDS = [("f_2", {"f_2": 1}, [7, 8]),
                      ("big_faces", dict(BIG_FACES), [3, 4])]
-# directions: a*p_6 (a in {1,2}) plus up to two terms chosen from these atoms with
-# coefficients in {-2,-1,1,2}.  v0.6.3 §2.5: the conclusion may only use
-# p_3, p_4, p_5 and sum_pk_after_p6 (the tail); f_2 is excluded.
-_DIR_TERMS = ["p_3", "p_4", "p_5", TAIL]
+# directions: a*p_6 (a in {1,2}) plus up to two terms with coefficients in {-2,-1,1,2}.
+# v0.7.1 §2.6: term options are p_3,p_4,p_5, the individual large faces p_7..p_{M_MAX},
+# the tail sum_pk_after_p{M_MAX}, and the merged "big_faces" (= Σ_{k≥7} p_k, displayed
+# as sum_pk_after_p6).  At M_MAX=6 there are no individual large faces and big_faces ==
+# the tail, so this reduces to [p_3, p_4, p_5, sum_pk_after_p6] (unchanged).  f_2 is
+# excluded from conclusions.
+_LARGE_DIR = [v for v in INV.TAIL_COUNT_VARS if v != TAIL]   # p_7..p_{M_MAX} (none at 6)
+_DIR_TERMS = (["p_3", "p_4", "p_5"] + _LARGE_DIR + [TAIL]
+              + (["big_faces"] if _LARGE_DIR else []))
 _DIR_COEFFS = (-2, -1, 1, 2)
 
 
@@ -1517,8 +1538,13 @@ def select_lemma_library(record_dir: Path):
     for cnum, data in cand:
         cj = data["conjecture"]
         concl = cj["conclusion"]
-        lemmas[cnum] = {"premises": cj["premises"],
-                        "coeffs": {k: Fraction(v) for k, v in concl["coeffs"].items()},
+        # §3.1: expand a legacy sum_pk_after_p6 term into the current tail-count
+        # variables so the lemma's premises/conclusion live in the M_MAX=10 system.
+        prems = [{"coeffs": _expand_big_faces(p["coeffs"]), "rel": p["rel"],
+                  "rhs": p["rhs"]} for p in cj["premises"]]
+        lemmas[cnum] = {"premises": prems,
+                        "coeffs": {k: Fraction(v)
+                                   for k, v in _expand_big_faces(concl["coeffs"]).items()},
                         "const": Fraction(-int(concl["rhs"])), "rel": ">="}
         lemma_meta[cnum] = {"generation": data.get("generation", 0),
                             "proof_cost_expanded": data.get("proof_cost_expanded",
@@ -1565,7 +1591,7 @@ def _skel_lhs(coeffs):
 def premise_skeleton(pr):
     """Keep variables/coeffs/relation; replace the constant by a placeholder,
     EXCEPT keep ``x = 0`` (an '='-premise, which is structural)."""
-    lhs = _skel_lhs(pr["coeffs"])
+    lhs = _skel_lhs(_expand_big_faces(pr["coeffs"]))     # §3.1: legacy big-faces expand
     if pr["rel"] == "=":
         return (lhs, "=", int(pr["rhs"]))        # structural (x = 0): keep 0
     return (lhs, pr["rel"], "*")                 # placeholder for the constant

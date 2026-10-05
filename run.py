@@ -524,7 +524,43 @@ def main(argv):
                    writes_by_depth, new_skel_segments, batch_count,
                    batch_time_total, bisection_total, mem.peak, n_workers,
                    phase1, phase2)
+    _print_v071_stats(stats, max_id)
     _recheck_sample(base_seed)
+    return 0
+
+
+def _print_v071_stats(stats, pre_max_id):
+    """§4 (v0.7.1): dimension/lemma diagnostics over the records written this run
+    (id > ``pre_max_id``)."""
+    import collections
+    gens = collections.Counter()
+    large = merged = arith_false = 0
+    for d in G.RECORD.iterdir():
+        if not d.is_dir():
+            continue
+        try:
+            if int(d.name[1:]) <= pre_max_id:
+                continue
+        except ValueError:
+            continue
+        data = json.load(open(d / f"{d.name}.json"))
+        gens[data.get("generation", 0)] += 1
+        f = data["conjecture"]["formula"]
+        if any(t in f for t in ("p7", "p8", "p9", "p10", "sum_pk_after_p10")):
+            large += 1
+        elif "sum_pk_after_p6" in f:
+            merged += 1
+        if not data.get("arith_sharp", True):
+            arith_false += 1
+    es = stats.get("enum_samples", 0)
+    print("\nv0.7.1 diagnostics (records written this run):")
+    print(f"  avg directions / group    : "
+          f"{(stats.get('directions_total', 0) / es) if es else 0:.1f}")
+    print(f"  conclusion uses p7..p10 / sum_pk_after_p10 (individual): {large}")
+    print(f"  conclusion uses only merged sum_pk_after_p6            : {merged}")
+    print(f"  lemma_bound_helped (v_int_lemma > v_int_base): {stats.get('lemma_bound_helped', 0)}")
+    print(f"  generation distribution   : {dict(sorted(gens.items()))}")
+    print(f"  arith_sharp == false      : {arith_false}")
     return 0
 
 

@@ -30,7 +30,7 @@ from __future__ import annotations
 from fractions import Fraction
 
 # Largest face size listed individually; the tail covers k > M_MAX.
-M_MAX = 6
+M_MAX = 10
 
 # tail variable name tracks M_MAX: Σ_{k>M_MAX} p_k
 TAIL_VAR = f"sum_pk_after_p{M_MAX}"

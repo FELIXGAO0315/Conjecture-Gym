@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## HexForge (v0.7)
+## HexForge (v0.7.1)
 
 HexForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about simple 3-polytopes, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures on p₆ — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -60,6 +60,37 @@ default auto-sized from cores and memory). Generation runs across worker
 processes but results are consumed in strict premise-index order, so the record
 is independent of the worker count.
 
+### Conjecture format
+
+Every conjecture is a lower bound on p_6 (6-gonal faces) under linear premises, written
+
+```
+if ((is_simple) and (<premise> and ...)), then p6 >= (<expression>)
+```
+
+Variables are the face counts p_3, p_4, p_5, the individually tracked large faces
+p_7, p_8, p_9, p_10, the tail `sum_pk_after_p10` (= Σ_{k≥11} p_k), and the total face
+count f_2. The merged expression `sum_pk_after_p6` denotes Σ_{k≥7} p_k
+(= p_7 + p_8 + p_9 + p_10 + sum_pk_after_p10).
+
+- **Premises** may use p_3, p_4, p_5, p_7, p_8, p_9, p_10, sum_pk_after_p10,
+  sum_pk_after_p6, and f_2. Premises never mention p_6. (Variables are written with the
+  underscore: `p_7`, `f_2`.)
+- **Conclusion** is a lower bound on p6 using p3, p4, p5, p7, p8, p9, p10,
+  sum_pk_after_p10, sum_pk_after_p6 — never f_2. (Isolated p6 is written without the
+  underscore: `p6`, `p3`.)
+- **Merge rule:** if p7, p8, p9, p10 and sum_pk_after_p10 all carry the same coefficient
+  in the conclusion, they must be written as the single term `sum_pk_after_p6`.
+- **Brevity:** at most 3 terms besides p6 in the conclusion (a merged `sum_pk_after_p6`
+  counts as one term); enumerated direction coefficients have absolute value at most 2.
+
+Examples:
+
+```
+if ((is_simple) and (p_4 = 0) and (p_5 <= 2) and (f_2>=_7)), then p6 >= (((-0.5 * sum_pk_after_p6) + 2))
+if ((is_simple) and (f_2>=_45) and (p_9 <= 1) and (p_10 = 0)), then p6 >= (((-0.5 * p7) + 20))
+```
+
 ### Axiom base
 
 All reasoning uses only the closed axiom base in `Inventory.lean` (Juc_EulerFormula, JucovicTheorem, Barnette_P6Bound) and elementary sum lemmas proved without `sorry` in `HexLemmas.lean`. `Inventory.lean` is never modified.
@@ -70,6 +101,7 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v0.7.1** — Higher dimension (M_MAX = 10: p_7..p_10 tracked individually, tail for k ≥ 11) with a formal conjecture format; existing records remain valid unchanged.
 - **v0.7** — Proved conjectures become lemmas: a lemma library selected from the record is used as conditional theorems; generation tracks how many layers of lemmas a proof builds on; hardness uses the expanded proof cost including lemmas; lemma proofs are inlined so every Lean file compiles on its own.
 - **v0.6.7** — Cost-bounded re-proving finds the shortest proof for each conjecture; hardness computed from it (raw value, larger is harder); tiers removed; rounding-only conjectures capped at 20% instead of a fixed target.
 - **v0.6.6** — Branch-and-bound case splits on fractional LP variables (shared nesting limit 3), predicted tiers, recalibrated work budget.

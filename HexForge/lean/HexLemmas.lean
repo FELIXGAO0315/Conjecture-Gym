@@ -203,6 +203,67 @@ lemma tail_juc_half (M : SimplyCon3ConnectedMap g) :
   have hco : 2 * (((k : ℤ) + 1) / 2 - 6) - (((k : ℤ) - 6) - 6) ≥ 0 := by omega
   nlinarith [mul_nonneg hp hco]
 
+-- ── tail lemmas (k ≥ 11, for M_MAX = 10) ────────────────────────────────────
+-- Same per-term bounding as the Ico-7 versions, over Finset.Ico 11; constants are
+-- the minima over k ≥ 11:  k − 6 ≥ 5 ;  ⌊(k+1)/2⌋ − 6 ≥ 0 ;  ⌊k/2⌋ ≥ 5.
+
+/-- tail_excess_10: Σ_{k≥11}(k−6)p_k ≥ 5·Σ_{k≥11} p_k  (k − 6 ≥ 5). -/
+lemma tail_excess_10 (M : SimplyCon3ConnectedMap g) :
+    (∑ k ∈ Finset.Ico 11 (M.m + 1), ((k : ℤ) - 6) * (M.p_i k : ℤ)) ≥
+      5 * ∑ k ∈ Finset.Ico 11 (M.m + 1), (M.p_i k : ℤ) := by
+  rw [Finset.mul_sum]
+  apply Finset.sum_le_sum
+  intro k hk
+  rw [Finset.mem_Ico] at hk
+  have hk11 : (11 : ℤ) ≤ (k : ℤ) := by exact_mod_cast hk.1
+  have hp : (0 : ℤ) ≤ (M.p_i k : ℤ) := by positivity
+  have hco : ((k : ℤ) - 6) - 5 ≥ 0 := by omega
+  nlinarith [mul_nonneg hp hco]
+
+/-- tail_juc_lower_10: Σ_{k≥11}(⌊(k+1)/2⌋−6)p_k ≥ 0·Σ_{k≥11} p_k  (⌊(k+1)/2⌋ − 6 ≥ 0). -/
+lemma tail_juc_lower_10 (M : SimplyCon3ConnectedMap g) :
+    (∑ k ∈ Finset.Ico 11 (M.m + 1), (((k : ℤ) + 1) / 2 - 6) * (M.p_i k : ℤ)) ≥
+      0 * ∑ k ∈ Finset.Ico 11 (M.m + 1), (M.p_i k : ℤ) := by
+  rw [Finset.mul_sum]
+  apply Finset.sum_le_sum
+  intro k hk
+  rw [Finset.mem_Ico] at hk
+  have hk11 : (11 : ℤ) ≤ (k : ℤ) := by exact_mod_cast hk.1
+  have hp : (0 : ℤ) ≤ (M.p_i k : ℤ) := by positivity
+  have hco : (((k : ℤ) + 1) / 2 - 6) - 0 ≥ 0 := by omega
+  nlinarith [mul_nonneg hp hco]
+
+/-- tail_juc_upper_10: Σ(k−6)p − Σ(⌊(k+1)/2⌋−6)p ≥ 5·Σ p  (⌊k/2⌋ ≥ 5). -/
+lemma tail_juc_upper_10 (M : SimplyCon3ConnectedMap g) :
+    (∑ k ∈ Finset.Ico 11 (M.m + 1), ((k : ℤ) - 6) * (M.p_i k : ℤ)) -
+      (∑ k ∈ Finset.Ico 11 (M.m + 1), (((k : ℤ) + 1) / 2 - 6) * (M.p_i k : ℤ)) ≥
+      5 * ∑ k ∈ Finset.Ico 11 (M.m + 1), (M.p_i k : ℤ) := by
+  rw [← Finset.sum_sub_distrib, Finset.mul_sum]
+  apply Finset.sum_le_sum
+  intro k hk
+  rw [Finset.mem_Ico] at hk
+  have hk11 : (11 : ℤ) ≤ (k : ℤ) := by exact_mod_cast hk.1
+  have hp : (0 : ℤ) ≤ (M.p_i k : ℤ) := by positivity
+  have hco : ((k : ℤ) - 6) - (((k : ℤ) + 1) / 2 - 6) - 5 ≥ 0 := by omega
+  nlinarith [mul_nonneg hp hco]
+
+/-- tail_juc_half_10: 2·Σ(⌊(k+1)/2⌋−6)p ≥ Σ(k−6)p − 6·Σ p  (2⌊(k+1)/2⌋ ≥ k). -/
+lemma tail_juc_half_10 (M : SimplyCon3ConnectedMap g) :
+    2 * (∑ k ∈ Finset.Ico 11 (M.m + 1), (((k : ℤ) + 1) / 2 - 6) * (M.p_i k : ℤ)) ≥
+      (∑ k ∈ Finset.Ico 11 (M.m + 1), ((k : ℤ) - 6) * (M.p_i k : ℤ)) -
+      6 * ∑ k ∈ Finset.Ico 11 (M.m + 1), (M.p_i k : ℤ) := by
+  rw [Finset.mul_sum,
+      show (6 : ℤ) * ∑ k ∈ Finset.Ico 11 (M.m + 1), (M.p_i k : ℤ) =
+        ∑ k ∈ Finset.Ico 11 (M.m + 1), 6 * (M.p_i k : ℤ) from Finset.mul_sum _ _ _,
+      ← Finset.sum_sub_distrib]
+  apply Finset.sum_le_sum
+  intro k hk
+  rw [Finset.mem_Ico] at hk
+  have hk11 : (11 : ℤ) ≤ (k : ℤ) := by exact_mod_cast hk.1
+  have hp : (0 : ℤ) ≤ (M.p_i k : ℤ) := by positivity
+  have hco : 2 * (((k : ℤ) + 1) / 2 - 6) - (((k : ℤ) - 6) - 6) ≥ 0 := by omega
+  nlinarith [mul_nonneg hp hco]
+
 -- ── Barnette side condition: Σ_{k≥7} p_k ≥ 3  ⇒  m ≥ 6 ──────────────────────
 lemma barnette_m_ge_six (M : SimplyCon3ConnectedMap g)
     (hsum : ∑ k ∈ Finset.Ico 7 (M.m + 1), (M.p_i k : ℤ) ≥ 3) : M.m ≥ 6 := by

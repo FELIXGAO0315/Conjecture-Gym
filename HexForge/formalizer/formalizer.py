@@ -88,11 +88,12 @@ _ORDER = (["p_3", "p_4", "p_5", "p_6"] + [f"p_{k}" for k in range(7, M_MAX + 1)]
 _seen = set()
 _ORDER = [v for v in _ORDER if not (v in _seen or _seen.add(v))]
 
+# v0.7.1: at M_MAX=10 the tail sums are over Ico 11, so the tail lemmas are the
+# ``_10`` variants (W_tail/J_tail/tail over k≥11); at M_MAX=6 they are over Ico 7.
+_TAIL_SUFFIX = "_10" if _HAS_LARGE else ""
 _TAIL_LEMMA = {
-    "tail_excess": "SimplyCon3ConnectedMap.tail_excess maps",
-    "tail_juc_lower": "SimplyCon3ConnectedMap.tail_juc_lower maps",
-    "tail_juc_upper": "SimplyCon3ConnectedMap.tail_juc_upper maps",
-    "tail_juc_half": "SimplyCon3ConnectedMap.tail_juc_half maps",
+    name: f"SimplyCon3ConnectedMap.{name}{_TAIL_SUFFIX} maps"
+    for name in ("tail_excess", "tail_juc_lower", "tail_juc_upper", "tail_juc_half")
 }
 
 _REL = {">=": "≥", "<=": "≤", "==": "=", "=": "="}
