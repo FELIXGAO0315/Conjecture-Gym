@@ -1,8 +1,9 @@
-"""Step-by-step translation of a deduction proof into Lean 4, plus compilation.
+"""Hex-domain Lean 4 translation: deduction proof -> Lean theorem, plus the
+hex compile wrappers (which defer the actual ``lake env lean`` calls to the
+domain-agnostic ``formalizer.formalizer`` module).
 
-Unlike v0.0 (which handed every hypothesis to a single ``omega``), each deducer
-step becomes one Lean ``have`` whose justification cites exactly the dependencies
-of that step:
+Each deducer step becomes one Lean ``have`` whose justification cites exactly the
+dependencies of that step:
 
     inventory entry   -> call the Inventory / HexLemmas lemma, close locally
     linear combination-> linarith [the dependency `have`s]
@@ -10,10 +11,6 @@ of that step:
     case split        -> by_cases, each branch expanded step by step
     conditional thm   -> apply JucovicTheorem / Barnette_P6Bound with its
                          hypothesis discharged from the trigger dependency
-
-The ``json`` proof steps, the ``md`` proof, and this Lean proof therefore
-correspond one-to-one.  A proof that fails to compile is dropped (never patched
-back to a monolithic ``omega``).
 
 Statement conventions (spec §4): p_k -> ``maps.p_i k``; the tail/face sums are
 the exact Finset sums below; everything with subtraction or a negative
@@ -23,12 +20,14 @@ coefficient is stated in ℤ.
 from __future__ import annotations
 
 import subprocess
-import time
 from fractions import Fraction
 from math import gcd
 from pathlib import Path
 
-LEAN_DIR = Path(__file__).resolve().parent.parent / "lean"
+from ...formalizer import formalizer as _CF
+from .inventory import M_MAX, TAIL_VAR, TAIL_COUNT_VARS
+
+LEAN_DIR = Path(__file__).resolve().parent / "lean"
 
 # v0.6.4 §III: the shared import header.  Every record / batch theorem uses the
 # identical preamble so Mathlib is elaborated once per batch file.
@@ -36,6 +35,8 @@ LEAN_HEADER = ("import Mathlib\n"
                "import Inventory\n"
                "import HexLemmas\n\n"
                "open Finset\n\n")
+
+_HEX_BATCH_STEM = "_HexBatch_"
 
 
 # ── v0.6.4 §I: automatic HexLemmas rebuild ───────────────────────────────────
@@ -56,9 +57,8 @@ def ensure_hexlemmas_fresh():
         raise RuntimeError("lake build HexLemmas failed:\n" + out[:4000])
     return "rebuilt"
 
-# ── atom → Lean ℤ expression (M_MAX-aware) ──────────────────────────────────
-from ..anvil.inventory import M_MAX, TAIL_VAR, TAIL_COUNT_VARS
 
+# ── atom → Lean ℤ expression (M_MAX-aware) ──────────────────────────────────
 _TAIL_START = M_MAX + 1                       # 7 for M_MAX=6, 11 for M_MAX=10
 _HAS_LARGE = M_MAX >= 7                       # are p_7..p_{M_MAX} individual?
 _SUM_TAIL = f"∑ k ∈ Finset.Ico {_TAIL_START} (maps.m + 1), (maps.p_i k : ℤ)"
@@ -472,93 +472,11 @@ def build_record_lean(name, premises, conclusion, proof_steps, lemma_data,
     return LEAN_HEADER + (block + "\n\n" if block else "") + body
 
 
-# ── compilation ─────────────────────────────────────────────────────────────
-import re as _re
-
-
-def _check_source(returncode, out, source):
-    """Shared success criteria (§2 v0.5, §III.4 v0.6.4): return code 0, no
-    ``error:``, no ``declaration uses 'sorry'`` warning, and no banned token in
-    the source itself.  Returns ``(ok, reason_str)``."""
-    banned = [w for w in ("sorry", "admit", "axiom", "native_decide")
-              if _re.search(r"\b" + w + r"\b", source)]
-    reasons = []
-    if returncode != 0:
-        reasons.append(f"return code {returncode}")
-    if "error:" in out:
-        reasons.append("error: in output")
-    if "declaration uses 'sorry'" in out:
-        reasons.append("declaration uses 'sorry'")
-    if banned:
-        reasons.append("banned tokens in source: " + ",".join(banned))
-    return (not reasons), "; ".join(reasons)
-
-
-def _run_lean(stem: str, source: str, timeout: int):
-    """Write ``{stem}.lean`` in the Lean project, run ``lake env lean`` on it,
-    and delete it.  Returns ``(ok, message)``."""
-    target = LEAN_DIR / f"{stem}.lean"
-    target.write_text(source)
-    try:
-        res = subprocess.run(
-            ["lake", "env", "lean", str(target)],
-            cwd=str(LEAN_DIR), capture_output=True, text=True, timeout=timeout,
-        )
-    except subprocess.TimeoutExpired:
-        target.unlink(missing_ok=True)
-        return False, "compile timeout"
-    out = (res.stdout + res.stderr).strip()
-    ok, reason = _check_source(res.returncode, out, source)
-    target.unlink(missing_ok=True)
-    if ok:
-        return True, "ok"
-    return False, (reason + " || " + out)[:2000]
-
-
+# ── compilation (defer to the domain-agnostic machinery) ──────────────────────
 def compile_lean(name: str, source: str, timeout: int = 300) -> tuple:
-    """Compile a single full (header + theorem) source.  Used for standalone
-    record verification (checkpoint §9.5) and single-conjecture fallbacks."""
-    return _run_lean(name, source, timeout)
+    return _CF.compile_lean(name, source, LEAN_DIR, timeout)
 
 
 def compile_batch(entries: list, timeout: int = 300, preamble: str = ""):
-    """v0.6.4 §III: compile many theorems in ONE file (Mathlib loaded once).
-
-    ``entries`` is a list of ``(name, theorem_src)`` with header-less theorem
-    bodies and unique names.  ``preamble`` (v0.7 §5) is a shared block of inlined
-    ``HF_lemma_C{k}`` definitions placed once after the header, so lemma-using
-    theorems in the batch can reference them.  On a whole-batch failure the batch is
-    bisected to locate the offender(s); only the failing theorems are reported failed.
-
-    Returns ``(results, meta)`` where ``results`` maps name -> bool (compiled)
-    and ``meta`` is ``{"bisections": k}`` (number of extra sub-compiles beyond
-    the initial whole-batch attempt)."""
-    results = {}
-    meta = {"bisections": 0}
-    pre = (preamble + "\n\n") if preamble else ""
-
-    def src_of(subset):
-        return LEAN_HEADER + pre + "\n\n".join(t for _n, t in subset) + "\n"
-
-    def stem_of(subset):
-        return "_HexBatch_" + "_".join(n for n, _t in subset[:1]) + f"_{len(subset)}"
-
-    def recurse(subset, is_top):
-        if not subset:
-            return
-        ok, _msg = _run_lean(stem_of(subset), src_of(subset), timeout)
-        if not is_top:
-            meta["bisections"] += 1
-        if ok:
-            for n, _t in subset:
-                results[n] = True
-            return
-        if len(subset) == 1:
-            results[subset[0][0]] = False
-            return
-        mid = len(subset) // 2
-        recurse(subset[:mid], False)
-        recurse(subset[mid:], False)
-
-    recurse(list(entries), True)
-    return results, meta
+    return _CF.compile_batch(entries, LEAN_DIR, LEAN_HEADER, timeout=timeout,
+                             preamble=preamble, stem_prefix=_HEX_BATCH_STEM)

@@ -26,8 +26,33 @@ from typing import Optional
 import numpy as np
 from scipy.optimize import linprog
 
-from . import inventory
-from .inventory import ALL_VARS, PROP_VARS
+# ── domain injection (PolyForge v1.0) ───────────────────────────────────────
+# The engine is domain-agnostic: the variable set, axiom base (inventory), and
+# the search configuration (directions / split specs / branch-and-bound vars)
+# are supplied by the active domain via :func:`configure`, which the generator
+# calls (in the parent, before any worker is forked) during run setup.  Until
+# then these names are ``None``; every function that reads them runs only after
+# configuration, so forked workers inherit the configured globals.
+inventory = None            # the domain's inventory module (INVENTORY, …)
+ALL_VARS = None             # full ordered variable list
+PROP_VARS = None            # proposition (non-auxiliary) variables
+BASE_DIRECTIONS = None      # directed objectives explored every round
+SPLIT_SPECS = None          # conditional-theorem case-split specs
+BNB_VARS = None             # branch-and-bound split variables
+
+
+def configure(domain) -> None:
+    """Wire the engine to ``domain`` (see :mod:`PolyForge.domains.base`).  Sets
+    the module-level engine configuration read by :class:`Context` and
+    :class:`Fact`.  Must be called before any deduction (and before forking
+    workers, so the configuration is inherited copy-on-write)."""
+    global inventory, ALL_VARS, PROP_VARS, BASE_DIRECTIONS, SPLIT_SPECS, BNB_VARS
+    inventory = domain.inventory
+    ALL_VARS = domain.inventory.ALL_VARS
+    PROP_VARS = domain.inventory.PROP_VARS
+    BASE_DIRECTIONS = domain.base_directions
+    SPLIT_SPECS = domain.split_specs
+    BNB_VARS = domain.bnb_vars
 
 # ── deterministic per-group work budget (v0.6.5 §2) ─────────────────────────
 # A group's cost is measured by the number of LP/MILP solves it triggers (a
@@ -241,48 +266,11 @@ def _solve_exact(A: list, b: list):
 # ════════════════════════════════════════════════════════════════════════════
 # Deduction context (one node of the case-split tree)
 # ════════════════════════════════════════════════════════════════════════════
-# Directed objectives explored every round.  Each is a coefficient dict; the
-# engine finds the tightest provable lower bound ``dir . x >= b`` on the pool.
-_TAIL_COUNT = {v: 1 for v in inventory.TAIL_COUNT_VARS}   # p_7..p_10 + tail
-
-
-def _base_directions() -> list:
-    dirs = []
-    for v in PROP_VARS:
-        dirs.append({v: 1})
-    combos = [
-        dict({"p_6": 2}, **_TAIL_COUNT),          # 2 p_6 + (tail count)
-        {"p_6": 3},
-        {"p_6": 1, "p_5": -1},
-        {"p_6": 1, "p_5": 1},
-        {"p_6": 1, "p_4": -1},
-        {"p_6": 1, "p_3": -1},
-        dict({"p_6": 1}, **_TAIL_COUNT),
-        {"p_6": 2, "p_5": 1},
-        {"p_6": 1, "f_2": -1},
-        {"p_3": 1, "p_4": 1, "p_5": 1},
-        {"p_4": 1, "p_5": 1},
-    ]
-    dirs.extend(combos)
-    # also seek upper bounds (max) by minimising the negation
-    dirs.extend([{v: -c for v, c in d.items()} for d in list(dirs)])
-    return dirs
-
-
-BASE_DIRECTIONS = _base_directions()
-
-# Case-split expressions and their thresholds (conditional trigger c and c+1).
-# Each spec is (label, coeff-dict, thresholds) — the split is on a linear form.
-SPLIT_SPECS = [
-    ("tail_count", dict(_TAIL_COUNT), [3, 4]),   # Barnette trigger
-    ("f_2", {"f_2": 1}, [7, 8]),                 # Jučovič trigger
-]
-
-# v0.6.6 §1: branch-and-bound case splits.  When the LP optimum for a direction we
-# are trying to bound lands on a FRACTIONAL value of one of these variables, split
-# on ``var <= floor(x*)`` vs ``var >= ceil(x*)`` so the proof depth can grow beyond
-# what the fixed conditional-theorem splits (tail_count, f_2) allow.
-BNB_VARS = ["p_3", "p_4", "p_5", "p_6", "sum_pk_after_p6", "f_2"]
+# The search configuration consumed below — ``BASE_DIRECTIONS`` (directed
+# objectives explored every round), ``SPLIT_SPECS`` (conditional-theorem case
+# splits), and ``BNB_VARS`` (branch-and-bound split variables) — is supplied by
+# the active domain through :func:`configure` (set as module globals above), so
+# nothing here names domain-specific variables.
 _BNB_FRAC_TOL = 1e-6
 
 
@@ -314,9 +302,9 @@ def set_lemmas(lemmas: dict):
 
 
 DEFAULT_MAX_ROUNDS = 8
-# v0.6.5 §4: case-split nesting raised 2 → 3 (the 3rd level reuses the same
-# thresholds: f_2 ∈ {7,8}, big-face total ∈ {3,4}).  The per-group work budget
-# (§2) keeps the deeper, exponentially larger split trees in check.
+# v0.6.5 §4: case-split nesting raised 2 → 3 (the 3rd level reuses the domain's
+# ``split_specs`` thresholds).  The per-group work budget (§2) keeps the deeper,
+# exponentially larger split trees in check.
 DEFAULT_SPLIT_DEPTH = 3
 # v0.6.2: candidates come from systematic direction enumeration (generator), not
 # from pairwise Fourier–Motzkin, so pairwise is off by default.  The facts the
@@ -1054,22 +1042,6 @@ def recheck(ctx: Context, fact: Fact, premises: list) -> tuple:
         return False, f"recheck exception: {exc}"
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# Evaluating variables on a real p-vector (for soundness regression)
-# ════════════════════════════════════════════════════════════════════════════
-def vars_from_pvec(pvec: dict) -> dict:
-    """Compute all deduction variables exactly from a face vector.
-
-    ``pvec`` maps face size (int or str) -> count.  W_tail/J_tail are the exact
-    weighted sums over k > M_MAX; large faces p_7..p_{M_MAX} are individual."""
-    mm = inventory.M_MAX
-    p = {int(k): int(v) for k, v in pvec.items()}
-    vals = {"p_3": p.get(3, 0), "p_4": p.get(4, 0), "p_5": p.get(5, 0),
-            "p_6": p.get(6, 0)}
-    for k in range(7, mm + 1):
-        vals[f"p_{k}"] = p.get(k, 0)
-    vals[inventory.TAIL_VAR] = sum(v for k, v in p.items() if k > mm)
-    vals["f_2"] = sum(v for k, v in p.items() if k >= 3)
-    vals["W_tail"] = sum((k - 6) * v for k, v in p.items() if k > mm)
-    vals["J_tail"] = sum(((k + 1) // 2 - 6) * v for k, v in p.items() if k > mm)
-    return {k: Fraction(v) for k, v in vals.items()}
+# Evaluating the deduction variables on a concrete dataset point (for the
+# soundness regression) is domain-specific — it lives in the domain
+# (e.g. ``domains.hex.deduction.vars_from_pvec``), not in the generic engine.

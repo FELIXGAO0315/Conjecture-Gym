@@ -1,17 +1,21 @@
-"""Conjecture generator: sample premises, deduce, select, formalise, score, write.
+"""Hex-domain conjecture generator: sample premises, deduce, select, formalise,
+score, write.
 
-Exposes functions only (no CLI); ``run.py`` drives them.  A single deduction
+Exposes functions only (no CLI); the common driver (``run.py`` + the engine's
+worker loop) drives them through the hex :class:`Domain`.  A single deduction
 closure yields many candidate p₆ facts, which are filtered, de-duplicated,
 minimised by traceback, exactly re-checked, regression-tested on every real
 p-vector, formalised in Lean, scored, and written to ``record/C{n}/``.
+
+The domain-agnostic parts of the flow (the deduction cache, proof renumbering,
+the soundness regression, markdown rendering, record writing, and the worker
+entry point) live in :mod:`PolyForge.generator.generator` and are imported here.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import random
-import shutil
 from collections import defaultdict
 from datetime import datetime, timezone
 from fractions import Fraction
@@ -21,20 +25,46 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import linprog, milp, LinearConstraint, Bounds
 
-from ..anvil import deducer as D
-from ..anvil.deducer import Context, traceback, recheck, fact_text, vars_from_pvec
-from ..anvil import inventory as INV
-from ..anvil.inventory import PROP_VARS, ALL_VARS
-from ..formalizer import formalizer as F
-from ..scoring import iris as IRIS
-from ..scoring import hardness as HARD
+from ...anvil import deducer as D
+from ...anvil.deducer import Context, traceback, recheck, fact_text
+from . import inventory as INV
+from .inventory import PROP_VARS, ALL_VARS
+from . import formalizer as F
+from . import iris as IRIS
+from .deduction import vars_from_pvec
+from ...scoring import hardness as HARD
+from ...generator import generator as CG
+from ...generator.generator import (
+    cached_context, _ctx_cache_clear, renumber_steps, soundness_check,
+    _pvec_satisfies, _count_derivation_steps, _used_inventory,
+    _used_premise_texts, _primitive_int,
+)
 
-ROOT = Path(__file__).resolve().parent.parent           # HexForge/
+ROOT = Path(__file__).resolve().parent                  # domains/hex/
 DATA = ROOT / "data" / "plantri_pool.json"
 RECORD = ROOT / "record"
+LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "0.7"
+# newly-written hex records are stamped with the shared generator version ("1.0")
+GENERATOR_VERSION = CG.GENERATOR_VERSION
 MAX_COEFF = 6
+
+# hex hardness parameters: the three Inventory *theorems* (heavier weight) and the
+# auxiliary-variable names, passed to the domain-agnostic scoring.hardness.
+_HARD_INV_THEOREMS = ("Juc_EulerFormula", "JucovicTheorem", "Barnette_P6Bound")
+_HARD_AUX_VARS = ("W", "J")
+
+
+def _proof_difficulty(tb):
+    return HARD.proof_difficulty(tb, _HARD_INV_THEOREMS, _HARD_AUX_VARS)
+
+
+def _proof_structure_stats(tb):
+    return HARD.proof_structure_stats(tb, _HARD_INV_THEOREMS)
+
+
+def _hardness(tb, premises, conclusion):
+    return HARD.hardness(tb, premises, conclusion, _HARD_INV_THEOREMS, _HARD_AUX_VARS)
 
 # v0.6.5 §2: the old wall-clock DIRECTION_BUDGET_SEC (truncate enumeration after N
 # seconds, keeping a random subset) is removed — it made the candidate set depend on
@@ -221,19 +251,6 @@ def sample_premises(rng: random.Random) -> list:
     return out
 
 
-def _pvec_satisfies(vals: dict, premises: list) -> bool:
-    for pr in premises:
-        lhs = sum(Fraction(c) * vals.get(v, 0) for v, c in pr["coeffs"].items())
-        rhs = Fraction(pr["rhs"])
-        if pr["rel"] == "=" and lhs != rhs:
-            return False
-        if pr["rel"] == ">=" and lhs < rhs:
-            return False
-        if pr["rel"] == "<=" and lhs > rhs:
-            return False
-    return True
-
-
 def premises_nonempty(premises: list, pvec_vars: list) -> bool:
     return any(_pvec_satisfies(v, premises) for v in pvec_vars)
 
@@ -249,121 +266,10 @@ def pool_covered(premises: list) -> bool:
     return True
 
 
-# ── deduction cache (§4) ─────────────────────────────────────────────────────
-# Memoise saturated contexts by (premises, extra_directions).  The algorithm's
-# sequence of calls is unchanged; identical calls return the identical pool, so
-# results (conclusions, proofs, scores) are unaffected — only recomputation is
-# avoided.  Fids are renumbered deterministically at record-build time, so output
-# is independent of how many contexts were actually built.
-_CTX_CACHE: dict = {}
-_CTX_ORDER: list = []
-_CTX_CAP = 256
-# Toggle for the performance-equivalence check (HEXFORGE_NOCACHE=1 disables the
-# cache; output must be identical with and without it).
-USE_CACHE = os.environ.get("HEXFORGE_NOCACHE") != "1"
-
-
-def _ctx_cache_clear():
-    _CTX_CACHE.clear()
-    _CTX_ORDER.clear()
-
-
-def _dir_sig(extra_dirs):
-    return tuple(sorted(tuple(sorted((v, int(c)) for v, c in d.items()))
-                        for d in (extra_dirs or [])))
-
-
-def _prem_sig(premises):
-    return tuple(sorted((tuple(sorted(pr["coeffs"].items())), pr["rel"],
-                         int(pr["rhs"])) for pr in premises))
-
-
-def cached_context(premises, extra_directions=None, use_lemmas=True):
-    if not USE_CACHE:
-        ctx = Context(premises=premises, depth=D.DEFAULT_SPLIT_DEPTH,
-                      extra_directions=extra_directions, use_lemmas=use_lemmas)
-        ctx.saturate()
-        return ctx
-    key = (_prem_sig(premises), _dir_sig(extra_directions), use_lemmas)
-    ctx = _CTX_CACHE.get(key)
-    if ctx is not None:
-        return ctx
-    ctx = Context(premises=premises, depth=D.DEFAULT_SPLIT_DEPTH,
-                  extra_directions=extra_directions, use_lemmas=use_lemmas)
-    ctx.saturate()
-    _CTX_CACHE[key] = ctx
-    _CTX_ORDER.append(key)
-    if len(_CTX_ORDER) > _CTX_CAP:
-        old = _CTX_ORDER.pop(0)
-        _CTX_CACHE.pop(old, None)
-    return ctx
-
-
-# ── deterministic fid renumbering (§4) ───────────────────────────────────────
-def renumber_steps(tb: list) -> list:
-    """Renumber every step's fid (and dep references) to 1,2,3,… in traversal
-    order, so the recorded proof is independent of the global fact counter."""
-    mapping: dict = {}
-    counter = [0]
-
-    def first(steps):
-        for s in steps:
-            counter[0] += 1
-            mapping[s["fid"]] = counter[0]
-            if s["rule"] == "case_split":
-                for cse in s["cases"]:
-                    first(cse["steps"])
-
-    def rewrite(steps):
-        for s in steps:
-            s["fid"] = mapping[s["fid"]]
-            if "deps" in s:
-                s["deps"] = [mapping[d] for d in s["deps"]]
-            if s["rule"] == "case_split":
-                for cse in s["cases"]:
-                    rewrite(cse["steps"])
-
-    first(tb)
-    rewrite(tb)
-    return tb
-
-
-# ── candidate selection ──────────────────────────────────────────────────────
-def _primitive_int(coeffs: dict, const: Fraction):
-    prim = D._primitive(coeffs, const)
-    if prim is None:
-        return None
-    ic, nc = prim
-    return {v: int(c) for v, c in ic.items()}, nc
-
-
-def _count_derivation_steps(tb: list) -> int:
-    n = 0
-    for s in tb:
-        if s["rule"] in ("combination", "rounding", "conditional", "case_split"):
-            n += 1
-        if s["rule"] == "case_split":
-            for c in s["cases"]:
-                n += _count_derivation_steps(c["steps"])
-    return n
-
-
-def _used_inventory(tb: list, acc: set):
-    for s in tb:
-        if s.get("inventory"):
-            acc.add(s["inventory"])
-        if s["rule"] == "case_split":
-            for c in s["cases"]:
-                _used_inventory(c["steps"], acc)
-
-
-def _used_premise_texts(tb: list, acc: set):
-    for s in tb:
-        if s["rule"] == "premise":
-            acc.add(s["text"])
-        if s["rule"] == "case_split":
-            for c in s["cases"]:
-                _used_premise_texts(c["steps"], acc)
+# (The deduction cache, deterministic fid renumbering, and the small generic
+# proof-walk helpers — _primitive_int / _count_derivation_steps / _used_inventory
+# / _used_premise_texts — are domain-agnostic and imported from
+# PolyForge.generator.generator at the top of this module.)
 
 
 # ── canonical form (§2): eliminate f_2 via face_split ────────────────────────
@@ -1256,7 +1162,7 @@ def _reprove(pruned, conclusion, depth, use_cond, use_bnb, use_lemmas=True):
     if fact is None:
         return None
     tb = traceback(ctx, fact)
-    return ctx, fact, tb, HARD.proof_difficulty(tb)
+    return ctx, fact, tb, _proof_difficulty(tb)
 
 
 def shortest_lemma_free(pruned, conclusion):
@@ -1286,7 +1192,7 @@ def shorten_proof(pruned, conclusion, tb, ctx, fact, init_cost, use_lemmas=True)
     ``use_lemmas`` keeps library lemmas available during the search."""
     best = (tb, ctx, fact, init_cost)
     # §1.4: a proof with no case split is already structurally minimal — skip it.
-    if HARD.proof_structure_stats(tb)["case_splits"] == 0:
+    if _proof_structure_stats(tb)["case_splits"] == 0:
         return best[0], best[1], best[2], best[3], 0
     rounds = 0
     try:
@@ -1623,22 +1529,7 @@ def build_skeleton_index(record_dir: Path, features):
     return idx
 
 
-# ── soundness regression ─────────────────────────────────────────────────────
-def soundness_check(premises: list, conclusion: dict, pvecs: list, pvec_vars: list):
-    """Raise if any real p-vector satisfies the premises but violates the
-    conclusion (indicates a bug in inventory or deducer)."""
-    ccoeffs = {v: Fraction(c) for v, c in conclusion["coeffs"].items()}
-    crhs = Fraction(conclusion["rhs"])
-    for pv, vals in zip(pvecs, pvec_vars):
-        if not _pvec_satisfies(vals, premises):
-            continue
-        lhs = sum(c * vals.get(v, 0) for v, c in ccoeffs.items())
-        ok = lhs >= crhs if conclusion["rel"] == ">=" else lhs <= crhs
-        if not ok:
-            raise AssertionError(
-                f"SOUNDNESS VIOLATION: p-vector {pv} satisfies premises "
-                f"{premises} but violates conclusion {conclusion} "
-                f"(lhs={lhs}, rhs={crhs})")
+# (soundness_check is domain-agnostic and imported from the common generator.)
 
 
 # ── natural language / formula rendering ─────────────────────────────────────
@@ -1726,48 +1617,8 @@ def natural_language(premises: list, conclusion: dict) -> str:
     return f"{intro} Then {concl}."
 
 
-# ── markdown ────────────────────────────────────────────────────────────────
-def _steps_md(steps: list, depth: int) -> list:
-    lines = []
-    ind = "  " * depth
-    for s in steps:
-        rule = s["rule"]
-        if rule == "premise":
-            lines.append(f"{ind}- Premise: `{s['text']}`.")
-        elif rule == "assumption":
-            lines.append(f"{ind}- Assumption: `{s['text']}`.")
-        elif rule == "inventory":
-            lines.append(f"{ind}- Inventory `{s['inventory']}`: `{s['text']}`.")
-        elif rule == "conditional":
-            lines.append(f"{ind}- Inventory theorem `{s['inventory']}` "
-                         f"(via `linarith`): `{s['text']}`.")
-        elif rule == "combination":
-            lines.append(f"{ind}- Linear combination (`linarith`): `{s['text']}`.")
-        elif rule == "rounding":
-            lines.append(f"{ind}- Integer rounding (`omega`): `{s['text']}`.")
-        elif rule == "case_split":
-            lines.append(f"{ind}- Case split (`by_cases`) on "
-                         f"`{s['split_var']}` at threshold {s['split_threshold']}: "
-                         f"`{s['text']}`.")
-            for i, cse in enumerate(s["cases"], 1):
-                lines.append(f"{ind}  - **Case {i}** (`{cse['assume']}`):")
-                lines += _steps_md(cse["steps"], depth + 2)
-    return lines
-
-
-def build_md(data: dict) -> str:
-    cj = data["conjecture"]
-    lines = [f"# {data['id']}", "", "## Statement", "",
-             cj["natural_language"], "",
-             f"**Formula.** `{cj['formula']}`", "",
-             "## Proof", ""]
-    lines += _steps_md(data["proof"]["steps"], 0)
-    lines += ["", "## Scores", "",
-              f"- IRIS: T={data['iris']['T']:.4f}, R={data['iris']['R']:.4f}, "
-              f"L={data['iris']['L']:.4f}, score={data['iris']['score']:.4f}",
-              f"- hardness: {data['hardness']:.4f}",
-              f"- Lean: {data['lean']['status']}"]
-    return "\n".join(lines) + "\n"
+# (Record markdown rendering — _steps_md / build_md — is domain-agnostic and
+# lives in the common generator; write_record there calls it.)
 
 
 # ── one attempt (worker side, v0.6.4 §II) ────────────────────────────────────
@@ -1943,7 +1794,7 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
             stats["skipped_pool_checks"] += 1
 
         touch_val = iris["touch_size"] if attained == "yes" else None
-        hard = HARD.hardness(tb, pruned, disp)
+        hard = _hardness(tb, pruned, disp)
 
         # §2 (v0.6.1): arithmetic sharpness — is c the integer minimum of the
         # conclusion LHS over premises + Inventory?
@@ -1983,7 +1834,7 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
 
         # §1 (v0.6.7): cost-bounded re-proving — lowest-cost proof of the SAME
         # conclusion (lemmas available only if they help this direction, §2 v0.7).
-        proof_cost_initial = HARD.proof_difficulty(tb)
+        proof_cost_initial = _proof_difficulty(tb)
         tb, ctx_m, fact, proof_cost, shorten_rounds = shorten_proof(
             pruned, conclusion, tb, ctx_m, fact, proof_cost_initial,
             use_lemmas=lemma_helps)
@@ -2034,7 +1885,7 @@ def _process_premise_set_impl(rng, pool, existing_hashes, stats, seed, accept="s
             continue
 
         # proof-structure stats from the FINAL (shortest) proof (v0.6.7: no tiers)
-        proof_stats = HARD.proof_structure_stats(tb)
+        proof_stats = _proof_structure_stats(tb)
 
         return {
             "seed": seed,
@@ -2108,68 +1959,14 @@ def assemble_data(proposal: dict, target: str, supersedes: list) -> dict:
     }
 
 
-# ── multiprocessing worker plumbing (v0.6.4 §II) ──────────────────────────────
-# Set in the parent before the Pool is forked so each worker inherits the loaded
-# pool (copy-on-write) rather than receiving it pickled per task.
-_W_POOL = None
-_W_HASHES = None
-_W_BASE_SEED = None
-
-
+# ── worker-side lemma metadata (v0.7) ─────────────────────────────────────────
+# The lemma library's per-lemma metadata (generation, expanded proof cost) is set
+# in the parent before the Pool is forked, so each worker inherits it copy-on-write.
+# The pool, snapshot and base seed now live on the domain object; the worker entry
+# point and record writing are domain-agnostic (see PolyForge.generator.generator).
 _W_LEMMA_META = {}        # cnum -> {"generation", "proof_cost_expanded"} (v0.7)
 
 
-def set_worker_globals(pool, existing_hashes_snapshot, base_seed,
-                       lemmas=None, lemma_meta=None):
-    global _W_POOL, _W_HASHES, _W_BASE_SEED, _W_LEMMA_META
-    _W_POOL = pool
-    _W_HASHES = existing_hashes_snapshot
-    _W_BASE_SEED = base_seed
+def set_lemma_meta(lemma_meta) -> None:
+    global _W_LEMMA_META
     _W_LEMMA_META = lemma_meta or {}
-    D.set_lemmas(lemmas or {})          # workers (forked after this) inherit the library
-
-
-def seed_for(idx: int) -> int:
-    """Deterministic per-premise-set seed from the base seed and the index (§II.2)."""
-    return _W_BASE_SEED * 1_000_003 + idx
-
-
-def worker(idx: int, accept: str = "split_needed"):
-    """Top-level (picklable) worker entry.  Returns a tuple whose first element is
-    one of ``"ok"`` / ``"soundness"`` describing the outcome.  ``accept`` selects the
-    depth_type this call produces (``"split_needed"`` for the main phase,
-    ``"rounding_only"`` for the supplement phase)."""
-    import time as _t
-    _ctx_cache_clear()
-    seed = seed_for(idx)
-    rng = random.Random(seed)
-    local_stats = defaultdict(int)
-    t0 = _t.time()
-    try:
-        prop = process_premise_set(rng, _W_POOL, _W_HASHES, local_stats, seed, accept)
-    except AssertionError as exc:
-        return ("soundness", idx, str(exc), dict(local_stats), _t.time() - t0)
-    return ("ok", idx, prop, dict(local_stats), _t.time() - t0)
-
-
-# ── atomic record writing ────────────────────────────────────────────────────
-def write_record(data: dict, lean_src: str):
-    """Write to a temp dir first, then rename to C{n}/ atomically."""
-    name = data["id"]
-    RECORD.mkdir(exist_ok=True)
-    tmp = RECORD / f".{name}.tmp"
-    if tmp.exists():
-        shutil.rmtree(tmp)
-    tmp.mkdir(parents=True)
-    (tmp / f"{name}.json").write_text(json.dumps(data, indent=2, ensure_ascii=False))
-    (tmp / f"{name}.md").write_text(build_md(data))
-    (tmp / f"{name}.lean").write_text(lean_src)
-    final = RECORD / name
-    if final.exists():
-        shutil.rmtree(final)
-    os.replace(tmp, final)
-    # the compiled copy lives only in the record; remove the working file that
-    # the formalizer left inside the Lean project
-    lean_working = F.LEAN_DIR / f"{name}.lean"
-    if lean_working.exists():
-        lean_working.unlink()

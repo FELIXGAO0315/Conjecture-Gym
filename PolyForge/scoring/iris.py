@@ -1,11 +1,11 @@
-"""IRIS score for a conjecture.
+"""IRIS score for a conjecture (domain-agnostic core).
 
     score = T + R + L
 
-evaluated on the *dataset* = the real p-vectors (from plantri_pool.json) that
-satisfy the conjecture's premises, with feature vector
-
-    x = (p_3, p_4, p_5, p_6, sum_pk_after_p6, f_2).
+evaluated on the *dataset* = the domain objects (feature vectors) that satisfy
+the conjecture's premises.  Each object is described by an integer feature
+vector ``x`` whose coordinate order is given by ``feature_vars`` (a list of the
+variable names, supplied by the domain).
 
     T = |touch| / |dataset|              tightness  (fraction on the equality face)
     R = rank(touch matrix) / |touch|     independence of the touching points
@@ -22,23 +22,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..anvil.inventory import M_MAX, TAIL_VAR
 
-FEATURES = (["p_3", "p_4", "p_5", "p_6"] + [f"p_{k}" for k in range(7, M_MAX + 1)]
-            + [TAIL_VAR, "f_2"])
-
-
-def features_from_pvec(pvec: dict) -> tuple:
-    p = {int(k): int(v) for k, v in pvec.items()}
-    feats = [p.get(3, 0), p.get(4, 0), p.get(5, 0), p.get(6, 0)]
-    feats += [p.get(k, 0) for k in range(7, M_MAX + 1)]
-    feats.append(sum(v for k, v in p.items() if k > M_MAX))   # tail
-    feats.append(sum(v for k, v in p.items() if k >= 3))       # f_2
-    return tuple(feats)
-
-
-def _sat(coeffs: dict, rel: str, rhs: int, feat: tuple) -> bool:
-    lhs = sum(int(coeffs.get(v, 0)) * feat[i] for i, v in enumerate(FEATURES))
+def _sat(coeffs: dict, rel: str, rhs: int, feat: tuple, feature_vars) -> bool:
+    lhs = sum(int(coeffs.get(v, 0)) * feat[i] for i, v in enumerate(feature_vars))
     if rel == "=":
         return lhs == rhs
     if rel == ">=":
@@ -48,9 +34,9 @@ def _sat(coeffs: dict, rel: str, rhs: int, feat: tuple) -> bool:
     raise ValueError(rel)
 
 
-def _is_equality_point(conclusion: dict, feat: tuple) -> bool:
+def _is_equality_point(conclusion: dict, feat: tuple, feature_vars) -> bool:
     coeffs, rhs = conclusion["coeffs"], int(conclusion["rhs"])
-    lhs = sum(int(coeffs.get(v, 0)) * feat[i] for i, v in enumerate(FEATURES))
+    lhs = sum(int(coeffs.get(v, 0)) * feat[i] for i, v in enumerate(feature_vars))
     return lhs == rhs
 
 
@@ -77,15 +63,18 @@ def _diameter(points: np.ndarray) -> float:
     return float(np.sqrt(((points - points[b]) ** 2).sum(-1).max()))
 
 
-def iris_score(premises: list, conclusion: dict, pool_features: list) -> dict:
-    """``pool_features`` is a list of 6-tuples (one per real p-vector)."""
+def iris_score(premises: list, conclusion: dict, pool_features: list,
+               feature_vars) -> dict:
+    """``pool_features`` is a list of feature tuples (one per domain object);
+    ``feature_vars`` gives the variable name of each tuple coordinate."""
     dataset = [f for f in pool_features
-               if all(_sat(pr["coeffs"], pr["rel"], int(pr["rhs"]), f) for pr in premises)]
+               if all(_sat(pr["coeffs"], pr["rel"], int(pr["rhs"]), f, feature_vars)
+                      for pr in premises)]
     n = len(dataset)
     if n == 0:
         return {"T": 0.0, "R": 0.0, "L": 0.0, "score": 0.0,
                 "dataset_size": 0, "touch_size": 0}
-    touch = [f for f in dataset if _is_equality_point(conclusion, f)]
+    touch = [f for f in dataset if _is_equality_point(conclusion, f, feature_vars)]
     nt = len(touch)
     if nt == 0:
         return {"T": 0.0, "R": 0.0, "L": 0.0, "score": 0.0,

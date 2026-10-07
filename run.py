@@ -1,14 +1,16 @@
-"""HexForge entry point (v0.6.4 — parallel generation, batched Lean).
+"""PolyForge entry point (v1.0 — domain modules, parallel generation, batched Lean).
 
 Usage (run from the Conjecture-Gym root):
 
-    python -m run hexforge              # run until Ctrl+C
-    python -m run hexforge N            # N split_needed, then floor(N/4) rounding_only
-    python -m run hexforge --minutes M  # run for M minutes
-    python -m run hexforge N --minutes M  # stop at whichever comes first
+    python -m run polyforge <domain>              # run until Ctrl+C
+    python -m run polyforge <domain> N            # N split_needed, then floor(N/4) rounding_only
+    python -m run polyforge <domain> --minutes M  # run for M minutes
+    python -m run polyforge <domain> N --minutes M  # stop at whichever comes first
 
-``N`` is the MAIN-phase target (``split_needed`` records); the SUPPLEMENT phase then
-adds AT MOST ``floor(N * RO_MAX_RATIO)`` = ``floor(N/4)`` ``rounding_only`` records.
+``<domain>`` is ``hex`` (the original p₆ subject) or ``graph`` (a skeleton in this
+version — it prints a notice and exits, since the graph Inventory is not yet wired
+up).  ``N`` is the MAIN-phase target (``split_needed`` records); the SUPPLEMENT phase
+then adds AT MOST ``floor(N * RO_MAX_RATIO)`` = ``floor(N/4)`` ``rounding_only`` records.
 
 Options:
     --seed S     base seed (default: random)
@@ -16,18 +18,16 @@ Options:
 
 Each premise set is processed in a worker process (sampling, direction
 enumeration, proof reconstruction, all checks, the integer counter-model gate,
-and scoring).  The main process alone judges skeletons, numbers, compiles (in
-batches, so Mathlib loads once per batch), and writes records.  Results are
-consumed in strict premise-index order, so the output is independent of the
-number of workers.
+and scoring) by the active domain.  The main process alone judges skeletons,
+numbers, compiles (in batches, so Mathlib loads once per batch), and writes
+records.  Results are consumed in strict premise-index order, so the output is
+independent of the number of workers.
 
-v0.6.4 §IV: generation runs in two phases.  The MAIN phase produces only
-``split_needed`` records (``N`` of them, or until the Ctrl+C / 85%-of-budget);
-rounding_only directions are dropped right after enumeration, never reconstructed.
-The SUPPLEMENT phase then produces AT MOST ``floor(S * RO_MAX_RATIO)`` ``rounding_only``
-records (an upper cap), where ``S`` is the main-phase count (so rounding_only are at
-most 20% of the total).  The supplement phase's premise seeds continue the main
-phase's index, so the whole record is reproducible regardless of worker count.
+Generation runs in two phases.  The MAIN phase produces only ``split_needed``
+records; the SUPPLEMENT phase then produces AT MOST ``floor(S * RO_MAX_RATIO)``
+``rounding_only`` records, where ``S`` is the main-phase count.  The supplement
+phase's premise seeds continue the main phase's index, so the whole record is
+reproducible regardless of worker count.
 """
 
 from __future__ import annotations
@@ -54,8 +54,8 @@ import threading
 import time
 from collections import defaultdict
 
-from HexForge.generator import generator as G
-from HexForge.formalizer import formalizer as F
+from PolyForge.generator import generator as CG
+from PolyForge.domains import load_domain, DOMAIN_NAMES
 
 # ── tunables (v0.6.4) ─────────────────────────────────────────────────────────
 LEAN_BATCH_SIZE = 20            # §III.1: compile this many theorems at once
@@ -176,10 +176,14 @@ def _init_depth_counts(record_dir):
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 def parse_args(argv):
-    if len(argv) < 2 or argv[1] != "hexforge":
+    if len(argv) < 3 or argv[1] != "polyforge":
+        return None
+    domain = argv[2]
+    if domain not in DOMAIN_NAMES:
+        print(f"unknown domain: {domain!r} (expected one of {DOMAIN_NAMES})")
         return None
     target = minutes = seed = workers = None
-    rest = argv[2:]
+    rest = argv[3:]
     i = 0
     while i < len(rest):
         a = rest[i]
@@ -193,55 +197,66 @@ def parse_args(argv):
             target = int(a); i += 1
         else:
             print(f"unrecognised argument: {a}"); return None
-    return {"target": target, "minutes": minutes, "seed": seed, "workers": workers}
+    return {"domain": domain, "target": target, "minutes": minutes,
+            "seed": seed, "workers": workers}
 
 
 def main(argv):
     import random
     opts = parse_args(argv)
     if opts is None:
-        print("usage: python -m run hexforge [N] [--minutes M] [--seed S] [--workers W]")
+        print("usage: python -m run polyforge <domain> [N] [--minutes M] "
+              "[--seed S] [--workers W]")
+        print(f"       <domain> in {DOMAIN_NAMES}")
         return 1
+
+    domain = load_domain(opts["domain"])
+
+    # §II.2: graph domain is a skeleton in this version — notice and exit.
+    if getattr(domain, "ready", True) is False:
+        print(domain.notice)
+        return 0
+
     target = opts["target"]
     minutes = opts["minutes"]
     base_seed = opts["seed"] if opts["seed"] is not None else random.randrange(1 << 30)
     n_workers, worker_basis = choose_workers(opts["workers"])
 
-    print(f"HexForge v{G.GENERATOR_VERSION}  (base seed {base_seed})")
+    print(f"PolyForge v{domain.generator_version}  domain={domain.name}  "
+          f"(base seed {base_seed})")
     print(f"  N_WORKERS = {n_workers}   [{worker_basis}]")
     if target is not None:
         print(f"  stop after {target} new conjectures")
     if minutes is not None:
         print(f"  time budget {minutes:g} minutes")
 
-    # §I: rebuild HexLemmas if the source changed (before any compile / import)
-    status = F.ensure_hexlemmas_fresh()
-    print(f"  HexLemmas: {status}")
+    # §I: rebuild the domain's Lean lemma library if the source changed
+    status = domain.ensure_lean_fresh()
+    print(f"  Lean lemmas: {status}")
 
-    print("loading real-polytope pool ...")
-    pvecs, features = G.load_pool()
-    pvec_vars = [G.vars_from_pvec(pv) for pv in pvecs]
-    pool_data = (pvecs, features, pvec_vars)
-    print(f"  {len(pvecs)} real simple 3-polytopes loaded")
+    print("loading dataset pool ...")
+    pool_data = domain.load_pool()
+    pvecs = pool_data[0]
+    print(f"  {len(pvecs)} objects loaded")
 
-    existing_hashes, max_id = G.load_existing_hashes(G.RECORD)
+    existing_hashes, max_id = domain.load_existing_hashes()
     next_id = max_id + 1
-    skel_index = G.build_skeleton_index(G.RECORD, features)
-    _, total_written, _ = _init_depth_counts(G.RECORD)
+    features = pool_data[1]
+    skel_index = domain.build_skeleton_index(features)
+    _, total_written, _ = _init_depth_counts(domain.record_dir)
     snapshot_hashes = dict(existing_hashes)   # immutable view for workers
     print(f"  existing record: {len(existing_hashes)} conjectures, "
           f"{len(skel_index)} skeletons, next id C{next_id}")
 
     # §I (v0.7): select the lemma library from the current record (fixed for this run)
-    lemmas, lemma_meta, lemma_data = G.select_lemma_library(G.RECORD)
-    print(f"  lemma library: {len(lemmas)} lemmas (<=2 premises, attained=yes, "
-          f"cap {G.LEMMA_LIB_MAX})")
+    lemmas, lemma_meta, lemma_data = domain.select_lemma_library()
+    print(f"  lemma library: {len(lemmas)} lemmas")
     for c in sorted(lemmas):
         d = lemma_data[c]
         print(f"    C{c} (gen {d.get('generation', 0)}): {d['conjecture']['formula']}")
 
     # share the pool, snapshot, and lemma library with forked workers (copy-on-write)
-    G.set_worker_globals(pool_data, snapshot_hashes, base_seed, lemmas, lemma_meta)
+    domain.set_run_context(pool_data, snapshot_hashes, base_seed, lemmas, lemma_meta)
 
     stats = defaultdict(int)
     sampled = 0
@@ -282,29 +297,9 @@ def main(argv):
     def run_phase(accept, target, deadline):
         """Dispatch / compile / commit loop for ONE phase.  Produces up to ``target``
         new records of depth_type ``accept`` (``target=None`` → until Ctrl+C or the
-        deadline).
-
-        Determinism / correctness (the record is exactly the first ``target``
-        premise sets, in index order, that pass EVERY check including Lean compile):
-
-        * Worker payloads are collected in strict premise-index order and held in
-          ``pending`` (also index order).
-        * A batch is compiled with *provisional* names (``HFprov{idx}``); the final
-          ``C{n}`` is assigned only at COMMIT, so a compile failure never burns a
-          number — the freed slot is filled by the next passing candidate (§rule 1).
-        * COMMIT happens in strict index order, only after the batch's compile
-          results are known; earlier batches are fully committed first.  Hence the
-          decision for candidate ``k`` always has every ``<k`` final result,
-          including Lean (§rule 1), independent of how batches were split (§rule 2).
-        * Once the ``target``-th new record is committed we stop; higher-index
-          candidates (already compiled or still in flight) are discarded and never
-          trigger a replacement (§rule 3).  The theorem name is the only thing that
-          differs between the batch-compiled source and the written ``C{n}.lean``;
-          Lean provability is name-independent and §9.5 re-verifies standalone.
-
-        Dispatch/collect indices in ``disp`` continue across phases so the supplement
-        phase's seeds follow the main phase's.  Returns (new_writes, replacements,
-        boundary_idx, wall_seconds); the caller resumes at ``boundary_idx + 1``."""
+        deadline).  See the module docstring and the per-step comments for the
+        determinism argument (the record is exactly the first ``target`` premise sets,
+        in index order, that pass EVERY check including Lean compile)."""
         nonlocal next_id, total_written, sampled, sample_time_total
         nonlocal batch_count, batch_time_total, bisection_total
         phase_t0 = time.time()
@@ -327,7 +322,7 @@ def main(argv):
             mode, target_name, supersedes, old_entry = "new", None, [], None
             if skel in skel_index:
                 ex = skel_index[skel]
-                if not G.skeleton_better(metrics, ex):
+                if not domain.skeleton_better(metrics, ex):
                     stats["same_skeleton_worse"] += 1
                     return False
                 if ex["name"] in protected:          # §6: a used lemma is never replaced
@@ -340,15 +335,15 @@ def main(argv):
                 target_name = f"C{next_id}"
                 next_id += 1
                 total_written += 1
-            data = G.assemble_data(prop, target_name, supersedes)
+            data = domain.assemble_data(prop, target_name, supersedes)
             # §5 (v0.7): inline the (recursively) used lemmas so the file compiles alone
-            lean_full = F.build_record_lean(
+            lean_full = domain.build_record_lean(
                 target_name, prop["premises"], prop["disp"], prop["tb"], lemma_data)
             existing_hashes[h] = target_name
             skel_index[skel] = {"name": target_name,
                                 "formula": data["conjecture"]["formula"],
                                 "supersedes": supersedes, **metrics}
-            G.write_record(data, lean_full)
+            CG.write_record(data, lean_full, domain.record_dir, domain.lean_dir)
             for r in prop["lemma_refs"]:             # §6: protect the lemmas it depends on
                 protected.add(r)
             if mode == "replace":
@@ -371,16 +366,16 @@ def main(argv):
             if not pending:
                 return
             entries = [(f"HFprov{idx}",
-                        F.build_theorem(f"HFprov{idx}", prop["premises"], prop["disp"],
-                                        prop["tb"], display=True))
+                        domain.build_theorem(f"HFprov{idx}", prop["premises"], prop["disp"],
+                                             prop["tb"], display=True))
                        for idx, prop in pending]
             # §5 (v0.7): one shared preamble of inlined lemma defs for the whole batch
             batch_cnums = set()
             for _idx, prop in pending:
-                batch_cnums |= F._lemma_cnums_in(prop["tb"])
-            preamble = F.lemma_defs_block(batch_cnums, lemma_data) if batch_cnums else ""
+                batch_cnums |= domain.lemma_cnums_in(prop["tb"])
+            preamble = domain.lemma_defs_block(batch_cnums, lemma_data) if batch_cnums else ""
             t = time.time()
-            results, meta = F.compile_batch(entries, timeout=300, preamble=preamble)
+            results, meta = domain.compile_batch(entries, preamble=preamble)
             batch_count += 1
             batch_time_total += time.time() - t
             bisection_total += meta["bisections"]
@@ -426,7 +421,7 @@ def main(argv):
             # full (results already collected/sequenced but not yet committed).
             while (not halt) and len(inflight) < WINDOW \
                     and (len(ready) + len(pending)) < COMMIT_BUFFER_CAP:
-                inflight[disp["next"]] = wp.apply_async(G.worker, (disp["next"], accept))
+                inflight[disp["next"]] = wp.apply_async(CG.worker, (disp["next"], accept))
                 disp["next"] += 1
             progressed = False
             # (2) collect ANY finished results out of order (frees window slots so a
@@ -487,17 +482,15 @@ def main(argv):
         S = phase1[0]
         if not soundness["err"]:
             # ── supplement phase: rounding_only, CAP floor(S * RO_MAX_RATIO) ────
-            # §3 (v0.6.7): this is an upper cap, not a fixed target — the phase stops
-            # at the cap OR the time budget, whichever first (whatever it gets is kept).
-            ro_cap = int(S * G.RO_MAX_RATIO)
+            ro_cap = int(S * domain.ro_max_ratio)
             if ro_cap > 0:
                 stop["flag"] = False      # re-arm after a Ctrl+C-ended main phase
                 print(f"\nsupplement phase: up to {ro_cap} rounding_only "
-                      f"(cap = floor({S} * {G.RO_MAX_RATIO}))")
+                      f"(cap = floor({S} * {domain.ro_max_ratio}))")
                 phase2 = run_phase("rounding_only", ro_cap, full_deadline)
             else:
                 print(f"\nsupplement phase skipped: S={S} → cap floor("
-                      f"{S} * {G.RO_MAX_RATIO}) = 0 rounding_only")
+                      f"{S} * {domain.ro_max_ratio}) = 0 rounding_only")
     finally:
         mem.stop()
         wp.terminate()
@@ -520,20 +513,21 @@ def main(argv):
     print("  " + (", ".join(f"{n}=idx{ix}({md})" for n, ix, _dt, md in write_index_log)
                   or "(none)"))
     print(f"compile-failure-skipped premise indices: {compile_failed_idx or 'none'}")
-    _print_summary(stats, sampled, added, replaced, elapsed, sample_time_total,
+    _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time_total,
                    writes_by_depth, new_skel_segments, batch_count,
                    batch_time_total, bisection_total, mem.peak, n_workers,
                    phase1, phase2)
-    _recheck_sample(base_seed)
+    _recheck_sample(domain, base_seed)
     return 0
 
 
-def _recheck_sample(base_seed, k=5):
+def _recheck_sample(domain, base_seed, k=5):
     """§III.5: randomly pick k records and compile their C{n}.lean standalone,
     confirming that theorems verified inside a batch also compile on their own
     (a batch-vs-standalone disagreement would be flagged here — §rule 2)."""
     import random as _r
-    recs = [d for d in G.RECORD.iterdir()
+    record_dir = domain.record_dir
+    recs = [d for d in record_dir.iterdir()
             if d.is_dir() and (d / f"{d.name}.lean").exists()]
     if not recs:
         return
@@ -541,7 +535,7 @@ def _recheck_sample(base_seed, k=5):
     print(f"\n§III.5 standalone re-compile of {len(pick)} random records:")
     bad = []
     for d in sorted(pick, key=lambda d: int(d.name[1:]) if d.name[1:].isdigit() else 0):
-        ok, msg = F.compile_lean(d.name, (d / f"{d.name}.lean").read_text())
+        ok, msg = domain.compile_lean(d.name, (d / f"{d.name}.lean").read_text())
         print(f"  {d.name}: {'OK' if ok else 'FAIL — ' + msg[:200]}")
         if not ok:
             bad.append(d.name)
@@ -549,15 +543,15 @@ def _recheck_sample(base_seed, k=5):
         print(f"  !!! standalone compile DISAGREES with batch for: {bad}")
 
 
-def _print_summary(stats, sampled, added, replaced, elapsed, sample_time_total,
+def _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time_total,
                    writes_by_depth, new_skel_segments, batch_count,
                    batch_time_total, bisection_total, peak_bytes, n_workers,
                    phase1=None, phase2=None):
-    by_depth, n_unknown, n_total = scan_records(G.RECORD)
+    by_depth, n_unknown, n_total = scan_records(domain.record_dir)
     mins = elapsed / 60.0 if elapsed else 0.0
 
     print("\n" + "=" * 64)
-    print("HexForge v{} run summary".format(G.GENERATOR_VERSION))
+    print("PolyForge v{} ({}) run summary".format(domain.generator_version, domain.name))
     print("=" * 64)
 
     # §6.1 throughput
