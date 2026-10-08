@@ -1,0 +1,234 @@
+{
+  "id": "C109",
+  "created_at": "2026-10-08T08:02:14.333959+00:00",
+  "generator": {
+    "version": "1.1",
+    "seed": 2024007651
+  },
+  "conjecture": {
+    "formula": "if ((is_tree) and (-alpha + 2*radius >= 0)), then (alpha + 2*radius >= 3)",
+    "properties_premises": [
+      {
+        "name": "is_tree"
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "2*radius >= 1*alpha",
+        "coeffs": {
+          "radius": 2,
+          "alpha": -1
+        },
+        "rel": ">=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "alpha + 2*radius >= 3",
+      "coeffs": {
+        "alpha": 1,
+        "radius": 2
+      },
+      "rel": ">=",
+      "rhs": 3
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, -alpha + 2*radius >= 0. Then alpha + 2*radius >= 3."
+  },
+  "properties": [
+    "is_tree"
+  ],
+  "conclusion_property": null,
+  "proof": {
+    "inventory_used": [
+      "alpha_ge_one",
+      "gallai",
+      "nonneg_m",
+      "tau_le_card_sub_one",
+      "tree_edges"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*m >= 0",
+        "coeffs": {
+          "m": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_m"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "-1*n + 1*m + 1 == 0",
+        "coeffs": {
+          "m": "1",
+          "n": "-1"
+        },
+        "const": "1",
+        "rel": "==",
+        "inventory": "tree_edges"
+      },
+      {
+        "fid": 3,
+        "rule": "combination",
+        "text": "1*n + -1 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2
+        ],
+        "mults": [
+          "1",
+          "-1"
+        ]
+      },
+      {
+        "fid": 4,
+        "rule": "conditional",
+        "text": "1*alpha + -1 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "alpha_ge_one",
+        "tactic": "linarith",
+        "deps": [
+          3
+        ]
+      },
+      {
+        "fid": 5,
+        "rule": "premise",
+        "text": "-1*alpha + 2*radius >= 0",
+        "coeffs": {
+          "radius": "2",
+          "alpha": "-1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "2*radius >= 1*alpha"
+      },
+      {
+        "fid": 6,
+        "rule": "conditional",
+        "text": "1*n + -1*tau + -1 >= 0",
+        "coeffs": {
+          "tau": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "tau_le_card_sub_one",
+        "tactic": "linarith",
+        "deps": [
+          3
+        ]
+      },
+      {
+        "fid": 7,
+        "rule": "inventory",
+        "text": "-1*n + 1*alpha + 1*tau == 0",
+        "coeffs": {
+          "alpha": "1",
+          "tau": "1",
+          "n": "-1"
+        },
+        "const": "0",
+        "rel": "==",
+        "inventory": "gallai"
+      },
+      {
+        "fid": 8,
+        "rule": "combination",
+        "text": "1*radius + -1/2 >= 0",
+        "coeffs": {
+          "radius": "1"
+        },
+        "const": "-1/2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          5,
+          6,
+          7
+        ],
+        "mults": [
+          "1/2",
+          "1/2",
+          "1/2"
+        ]
+      },
+      {
+        "fid": 9,
+        "rule": "rounding",
+        "text": "1*radius + -1 >= 0",
+        "coeffs": {
+          "radius": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          8
+        ]
+      },
+      {
+        "fid": 10,
+        "rule": "combination",
+        "text": "1*alpha + 2*radius + -3 >= 0",
+        "coeffs": {
+          "alpha": "1",
+          "radius": "2"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          4,
+          9
+        ],
+        "mults": [
+          "1",
+          "2"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.0625,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0625
+  },
+  "attained": "yes",
+  "touch": 1,
+  "depth_type": "split_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 4
+  },
+  "proof_cost_initial": 12.5,
+  "proof_cost": 12.5,
+  "proof_cost_expanded": 12.5,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 2.5,
+  "lean": {
+    "theorem_name": "C109",
+    "status": "compiled"
+  }
+}

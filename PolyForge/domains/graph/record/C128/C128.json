@@ -1,0 +1,179 @@
+{
+  "id": "C128",
+  "created_at": "2026-10-08T08:05:17.950491+00:00",
+  "generator": {
+    "version": "1.1",
+    "seed": 2024007855
+  },
+  "conjecture": {
+    "formula": "if ((is_bipartite) and (is_acyclic) and (2*max_deg - tau >= 0) and (alpha - 2*tau >= 0)), then (chi - alpha <= 0)",
+    "properties_premises": [
+      {
+        "name": "is_bipartite"
+      },
+      {
+        "name": "is_acyclic"
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "2*max_deg >= 1*tau",
+        "coeffs": {
+          "max_deg": 2,
+          "tau": -1
+        },
+        "rel": ">=",
+        "rhs": 0
+      },
+      {
+        "text": "1*alpha >= 2*tau",
+        "coeffs": {
+          "alpha": 1,
+          "tau": -2
+        },
+        "rel": ">=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "chi - alpha <= 0",
+      "coeffs": {
+        "alpha": -1,
+        "chi": 1
+      },
+      "rel": "<=",
+      "rhs": 0
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_bipartite, is_acyclic, 2*max_deg - tau >= 0, alpha - 2*tau >= 0. Then chi - alpha <= 0."
+  },
+  "properties": [
+    "is_bipartite",
+    "is_acyclic"
+  ],
+  "conclusion_property": null,
+  "proof": {
+    "inventory_used": [
+      "acyclic_chi",
+      "chi_le_n",
+      "gallai"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*n + -1*chi >= 0",
+        "coeffs": {
+          "chi": "-1",
+          "n": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "chi_le_n"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "-1*chi + 2 >= 0",
+        "coeffs": {
+          "chi": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "inventory": "acyclic_chi"
+      },
+      {
+        "fid": 3,
+        "rule": "premise",
+        "text": "1*alpha + -2*tau >= 0",
+        "coeffs": {
+          "alpha": "1",
+          "tau": "-2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "1*alpha >= 2*tau"
+      },
+      {
+        "fid": 4,
+        "rule": "inventory",
+        "text": "-1*n + 1*alpha + 1*tau == 0",
+        "coeffs": {
+          "alpha": "1",
+          "tau": "1",
+          "n": "-1"
+        },
+        "const": "0",
+        "rel": "==",
+        "inventory": "gallai"
+      },
+      {
+        "fid": 5,
+        "rule": "combination",
+        "text": "-2*chi + 2*alpha + 4/3 >= 0",
+        "coeffs": {
+          "alpha": "2",
+          "chi": "-2"
+        },
+        "const": "4/3",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "mults": [
+          "4/3",
+          "2/3",
+          "2/3",
+          "4/3"
+        ]
+      },
+      {
+        "fid": 6,
+        "rule": "rounding",
+        "text": "-1*chi + 1*alpha >= 0",
+        "coeffs": {
+          "alpha": "1",
+          "chi": "-1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          5
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.07407407407407407,
+    "R": 0.75,
+    "L": 0.41089070180665904,
+    "score": 1.2349647758807332
+  },
+  "attained": "yes",
+  "touch": 4,
+  "depth_type": "rounding_only",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 3
+  },
+  "proof_cost_initial": 9.0,
+  "proof_cost": 9.0,
+  "proof_cost_expanded": 9.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.125,
+  "lean": {
+    "theorem_name": "C128",
+    "status": "compiled"
+  }
+}

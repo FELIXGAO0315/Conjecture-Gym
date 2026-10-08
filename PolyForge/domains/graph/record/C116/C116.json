@@ -1,0 +1,168 @@
+{
+  "id": "C116",
+  "created_at": "2026-10-08T08:02:14.337404+00:00",
+  "generator": {
+    "version": "1.1",
+    "seed": 2024007749
+  },
+  "conjecture": {
+    "formula": "if ((not_bipartite) and (-n + 2*max_deg >= 0)), then (2*max_deg + chi >= 7)",
+    "properties_premises": [
+      {
+        "name": "not_bipartite"
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "2*max_deg >= 1*n",
+        "coeffs": {
+          "max_deg": 2,
+          "n": -1
+        },
+        "rel": ">=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "2*max_deg + chi >= 7",
+      "coeffs": {
+        "chi": 1,
+        "max_deg": 2
+      },
+      "rel": ">=",
+      "rhs": 7
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose not_bipartite, -n + 2*max_deg >= 0. Then 2*max_deg + chi >= 7."
+  },
+  "properties": [
+    "not_bipartite"
+  ],
+  "conclusion_property": null,
+  "proof": {
+    "inventory_used": [
+      "chi_le_n",
+      "not_bipartite_chi"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*chi + -3 >= 0",
+        "coeffs": {
+          "chi": "1"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "inventory": "not_bipartite_chi"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "1*n + -1*chi >= 0",
+        "coeffs": {
+          "chi": "-1",
+          "n": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "chi_le_n"
+      },
+      {
+        "fid": 3,
+        "rule": "premise",
+        "text": "-1*n + 2*max_deg >= 0",
+        "coeffs": {
+          "max_deg": "2",
+          "n": "-1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "2*max_deg >= 1*n"
+      },
+      {
+        "fid": 4,
+        "rule": "combination",
+        "text": "1*max_deg + -3/2 >= 0",
+        "coeffs": {
+          "max_deg": "1"
+        },
+        "const": "-3/2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          2,
+          1,
+          3
+        ],
+        "mults": [
+          "1/2",
+          "1/2",
+          "1/2"
+        ]
+      },
+      {
+        "fid": 5,
+        "rule": "rounding",
+        "text": "1*max_deg + -2 >= 0",
+        "coeffs": {
+          "max_deg": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          4
+        ]
+      },
+      {
+        "fid": 6,
+        "rule": "combination",
+        "text": "2*max_deg + 1*chi + -7 >= 0",
+        "coeffs": {
+          "chi": "1",
+          "max_deg": "2"
+        },
+        "const": "-7",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          5
+        ],
+        "mults": [
+          "1",
+          "2"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.002,
+    "R": 1.0,
+    "L": 0.14433756729740646,
+    "score": 1.1463375672974065
+  },
+  "attained": "yes",
+  "touch": 2,
+  "depth_type": "split_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 1
+  },
+  "proof_cost_initial": 6.0,
+  "proof_cost": 6.0,
+  "proof_cost_expanded": 6.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.2,
+  "lean": {
+    "theorem_name": "C116",
+    "status": "compiled"
+  }
+}

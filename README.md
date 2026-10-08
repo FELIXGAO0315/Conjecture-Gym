@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## PolyForge (v1.0)
+## PolyForge (v1.1)
 
 PolyForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about a mathematical subject, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -17,7 +17,7 @@ PolyForge separates a **domain-agnostic engine** from the **domains** that plug 
 This version ships two domains:
 
 - **hex** — the original HexForge subject: p₆ of simple 3-connected planar maps (simple 3-polytopes). Fully wired and unchanged from v0.7; the 212-conjecture record is preserved and reproduced byte-for-byte.
-- **graph** — a skeleton for the next stage (graph theory on top of Mathlib's proved graph theorems). It has its own Lean project (recent Mathlib) and a graph dataset, but does not yet generate conjectures.
+- **graph** — graph theory on top of Mathlib's proved graph theorems (stage 1, linear). It has its own Lean project (Mathlib v4.34.0), a graph dataset (all 1253 graphs with ≤ 7 vertices), a linear Inventory (Mathlib theorems plus self-proved `GraphLemmas` — the Gallai identity α+τ=n, max degree ≤ edges, ℕ∞→ℕ finiteness/conversions, …), and generates conjectures that are linear (in)equalities among graph invariants under property premises.
 
 ### Pipeline
 
@@ -88,12 +88,33 @@ is independent of the worker count.
 
 Each domain reasons only over its own closed axiom base. The hex domain uses the three theorems in `Inventory.lean` (Juc_EulerFormula, JucovicTheorem, Barnette_P6Bound) and elementary sum lemmas proved without `sorry` in `HexLemmas.lean`; `Inventory.lean` is never modified. The graph domain's `GraphLemmas.lean` builds on Mathlib's proved graph theorems.
 
+### Conjecture format (graph)
+
+A graph conjecture is `if (<premises>), then (<conclusion>)`, where every premise and the conclusion concern a finite simple graph `G`.
+
+**Variables** (all ℕ-valued): `n` (vertices), `m` (edges), `max_deg`, `min_deg`, `chi` (chromatic number), `omega` (clique number), `alpha` (independence number), `tau` (vertex-cover number), `diam` (diameter), `radius`, `girth`.
+
+**Properties** (premises only): `is_connected`, `is_tree`, `is_acyclic`, `is_bipartite`, `not_bipartite`, `has_cycle`, `is_regular(d)`, `is_k_edge_connected(k)`, `nontrivial` (n ≥ 2). Implications are applied automatically (`is_tree ⟹ is_connected ∧ is_acyclic`, `is_acyclic ⟹ is_bipartite`, `has_cycle ⟺ ¬is_acyclic`, `is_bipartite ⟺ chi ≤ 2`).
+
+**Finiteness restrictions.** `diam`/`radius` are in ℕ∞ and finite only for connected graphs, so they may appear (in premises, conclusion, or proof) only when `is_connected` is a premise; `girth` is in ℕ∞ and finite only when the graph has a cycle, so it needs `has_cycle`. `chi` and `tau` are ℕ∞ but always finite for a finite graph (used via `toNat`).
+
+**Format rules.** Premises: 0–2 property premises and 1–2 numeric premises (an upper/lower bound on a variable, or a simple relation between two variables). Conclusion: a linear (in)equality with a main variable (coefficient 1 or 2) and at most 3 other terms (coefficients |·| ≤ 2); both upper and lower bounds are mined. Conclusions equivalent to a known property are tagged in the JSON for stage-3 retrieval: `properties` lists the property premises, and `conclusion_property` names the equivalent property when the conclusion is one of `chi ≤ 2 → is_bipartite`, `chi ≤ 1 → edgeless`, `chi ≥ 3 → not_bipartite`, `max_deg = min_deg → is_regular`, or (under `is_connected`) `m = n − 1 → is_tree`; otherwise it is `null`. These tags are metadata only (no Lean proof required).
+
+**Examples.**
+
+```
+if ((is_connected) and (has_cycle) and (girth >= 5)), then (diam >= 2)
+if ((is_tree) and (n >= 10)), then (m >= 9)
+if ((not_bipartite)), then (chi >= 3)
+```
+
 ### Versioning
 
 Each major version has eight minor versions, x.0 through x.7, after which the major version increments: 0.0 → … → 0.7 → 1.0 → … → 1.7 → 2.0 → … → 2.7. A third component (e.g. 0.6.1) marks a patch within a minor version.
 
 ### Changelog
 
+- **v1.1** — Graph domain, stage 1: linear inventory from Mathlib plus self-proved lemmas (Gallai identity, max degree ≤ edges, …), property premises, conclusions on any invariant, property tags for future structural conjectures.
 - **v1.0** — Renamed to PolyForge; domain-specific code moved into domains/; hex (p6) kept unchanged as the first domain; graph domain skeleton with its own Lean project (recent Mathlib) and a graph dataset.
 - **v0.7** — Proved conjectures become lemmas: a lemma library selected from the record is used as conditional theorems; generation tracks how many layers of lemmas a proof builds on; hardness uses the expanded proof cost including lemmas; lemma proofs are inlined so every Lean file compiles on its own.
 - **v0.6.7** — Cost-bounded re-proving finds the shortest proof for each conjecture; hardness computed from it (raw value, larger is harder); tiers removed; rounding-only conjectures capped at 20% instead of a fixed target.

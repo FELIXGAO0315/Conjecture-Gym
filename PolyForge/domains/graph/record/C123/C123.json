@@ -1,0 +1,164 @@
+{
+  "id": "C123",
+  "created_at": "2026-10-08T08:05:17.943964+00:00",
+  "generator": {
+    "version": "1.1",
+    "seed": 2024007827
+  },
+  "conjecture": {
+    "formula": "if ((has_cycle) and (is_connected) and (2*m - 2*diam >= 0) and (2*min_deg - tau >= 0)), then (radius + girth >= 4)",
+    "properties_premises": [
+      {
+        "name": "has_cycle"
+      },
+      {
+        "name": "is_connected"
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "2*m >= 2*diam",
+        "coeffs": {
+          "m": 2,
+          "diam": -2
+        },
+        "rel": ">=",
+        "rhs": 0
+      },
+      {
+        "text": "2*min_deg >= 1*tau",
+        "coeffs": {
+          "min_deg": 2,
+          "tau": -1
+        },
+        "rel": ">=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "radius + girth >= 4",
+      "coeffs": {
+        "girth": 1,
+        "radius": 1
+      },
+      "rel": ">=",
+      "rhs": 4
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose has_cycle, is_connected, 2*m - 2*diam >= 0, 2*min_deg - tau >= 0. Then radius + girth >= 4."
+  },
+  "properties": [
+    "has_cycle",
+    "is_connected"
+  ],
+  "conclusion_property": null,
+  "proof": {
+    "inventory_used": [
+      "diam_le_two_radius",
+      "girth_ge_three",
+      "girth_le_diam"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "-1*diam + 2*radius >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "radius": "2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "diam_le_two_radius"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "2*diam + -1*girth + 1 >= 0",
+        "coeffs": {
+          "girth": "-1",
+          "diam": "2"
+        },
+        "const": "1",
+        "rel": ">=",
+        "inventory": "girth_le_diam"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "1*girth + -3 >= 0",
+        "coeffs": {
+          "girth": "1"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "inventory": "girth_ge_three"
+      },
+      {
+        "fid": 4,
+        "rule": "combination",
+        "text": "1*radius + 1*girth + -7/2 >= 0",
+        "coeffs": {
+          "girth": "1",
+          "radius": "1"
+        },
+        "const": "-7/2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3
+        ],
+        "mults": [
+          "1/2",
+          "1/4",
+          "5/4"
+        ]
+      },
+      {
+        "fid": 5,
+        "rule": "rounding",
+        "text": "1*radius + 1*girth + -4 >= 0",
+        "coeffs": {
+          "girth": "1",
+          "radius": "1"
+        },
+        "const": "-4",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          4
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.27586206896551724,
+    "R": 0.03125,
+    "L": 1.0,
+    "score": 1.3071120689655173
+  },
+  "attained": "yes",
+  "touch": 160,
+  "depth_type": "rounding_only",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 3
+  },
+  "proof_cost_initial": 8.5,
+  "proof_cost": 8.5,
+  "proof_cost_expanded": 8.5,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.0625,
+  "lean": {
+    "theorem_name": "C123",
+    "status": "compiled"
+  }
+}

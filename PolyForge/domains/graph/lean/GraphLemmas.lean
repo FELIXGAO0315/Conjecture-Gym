@@ -136,4 +136,126 @@ theorem isEdgeConnected_le_minDegree [Nontrivial V] {k : ℕ}
     (h : G.IsEdgeConnected k) : k ≤ G.minDegree :=
   G.le_minDegree_of_forall_le_degree k (fun _ => h.le_degree)
 
+/-! ### ℤ wrapper lemmas (v1.1 §I.2)
+
+One per inventory entry, stating the relation in ℤ over the invariant
+expressions (n→card, m→edgeFinset.card, max_deg/min_deg→max/minDegree,
+chi→chromaticNumber.toNat, omega→cliqueNum, alpha→indepNum,
+tau→vertexCoverNum.toNat, diam→diam, radius→radius.toNat, girth→girth).  The
+graph formalizer `have`-introduces exactly these and closes with linarith/omega.
+Property hypotheses are stated in the v1.1 §I.3 forms; positivity/nontriviality
+are supplied as card bounds (`1 ≤ card` / `2 ≤ card`) and the Nonempty/Nontrivial
+instances are derived inside. -/
+
+-- 1
+theorem omega_le_chi_int : (G.cliqueNum : ℤ) ≤ (G.chromaticNumber.toNat : ℤ) := by
+  exact_mod_cast cliqueNum_le_chromaticNumber_toNat G
+-- 2
+theorem chi_le_n_int : (G.chromaticNumber.toNat : ℤ) ≤ (Fintype.card V : ℤ) := by
+  exact_mod_cast chromaticNumber_toNat_le_card G
+-- 3
+theorem min_le_max_int : (G.minDegree : ℤ) ≤ (G.maxDegree : ℤ) := by
+  exact_mod_cast G.minDegree_le_maxDegree
+-- 4
+theorem max_lt_card_int (hn : 1 ≤ Fintype.card V) :
+    (G.maxDegree : ℤ) ≤ (Fintype.card V : ℤ) - 1 := by
+  haveI : Nonempty V := Fintype.card_pos_iff.mp (by omega)
+  have h := G.maxDegree_lt_card_verts
+  omega
+-- 5
+theorem max_le_edges_int : (G.maxDegree : ℤ) ≤ (G.edgeFinset.card : ℤ) := by
+  exact_mod_cast maxDegree_le_card_edgeFinset G
+-- 6
+theorem tau_le_card_sub_one_int (hn : 1 ≤ Fintype.card V) :
+    (G.vertexCoverNum.toNat : ℤ) ≤ (Fintype.card V : ℤ) - 1 := by
+  haveI : Nonempty V := Fintype.card_pos_iff.mp (by omega)
+  have h := vertexCoverNum_toNat_le_card_sub_one G
+  omega
+-- 7
+theorem gallai_int :
+    (G.indepNum : ℤ) + (G.vertexCoverNum.toNat : ℤ) = (Fintype.card V : ℤ) := by
+  exact_mod_cast indepNum_add_vertexCoverNum_toNat G
+-- 8a
+theorem chi_ge_one_int (hn : 1 ≤ Fintype.card V) : (1 : ℤ) ≤ (G.chromaticNumber.toNat : ℤ) := by
+  haveI : Nonempty V := Fintype.card_pos_iff.mp (by omega)
+  exact_mod_cast one_le_chromaticNumber_toNat G
+-- 8b
+theorem omega_ge_one_int (hn : 1 ≤ Fintype.card V) : (1 : ℤ) ≤ (G.cliqueNum : ℤ) := by
+  haveI : Nonempty V := Fintype.card_pos_iff.mp (by omega)
+  exact_mod_cast one_le_cliqueNum G
+-- 8c
+theorem alpha_ge_one_int (hn : 1 ≤ Fintype.card V) : (1 : ℤ) ≤ (G.indepNum : ℤ) := by
+  haveI : Nonempty V := Fintype.card_pos_iff.mp (by omega)
+  exact_mod_cast one_le_indepNum G
+-- 9a
+theorem radius_le_diam_int (h : G.Connected) :
+    (G.radius.toNat : ℤ) ≤ (G.diam : ℤ) := by
+  exact_mod_cast radius_toNat_le_diam G h
+-- 9b
+theorem diam_le_two_radius_int (h : G.Connected) :
+    (G.diam : ℤ) ≤ 2 * (G.radius.toNat : ℤ) := by
+  have := diam_le_two_mul_radius_toNat G h; omega
+-- 10
+theorem tree_edges_int (h : G.IsTree) :
+    (G.edgeFinset.card : ℤ) = (Fintype.card V : ℤ) - 1 := by
+  have := h.card_edgeFinset; omega
+-- 11
+theorem tree_min_deg_int (h : G.IsTree) (hn : 2 ≤ Fintype.card V) :
+    (G.minDegree : ℤ) = 1 := by
+  haveI : Nontrivial V := Fintype.one_lt_card_iff_nontrivial.mp (by omega)
+  have := h.minDegree_eq_one_of_nontrivial; omega
+-- 12
+theorem acyclic_chi_int (h : G.IsAcyclic) : (G.chromaticNumber.toNat : ℤ) ≤ 2 := by
+  have h2 := ENat.toNat_le_toNat h.chromaticNumber_le_two (by simp)
+  simp only [ENat.toNat_ofNat] at h2
+  exact_mod_cast h2
+-- 13
+theorem girth_le_diam_int (h : G.Connected) (_hc : ¬ G.IsAcyclic) :
+    (G.girth : ℤ) ≤ 2 * (G.diam : ℤ) + 1 := by
+  haveI := h.nonempty
+  have hne : G.ediam ≠ ⊤ := SimpleGraph.connected_iff_ediam_ne_top.mp h
+  have := G.girth_le_two_mul_diam_add_one hne; omega
+-- 14
+theorem girth_ge_three_int (hc : ¬ G.IsAcyclic) : (3 : ℤ) ≤ (G.girth : ℤ) := by
+  have := G.three_le_girth hc; omega
+-- 15
+theorem connected_min_deg_int (h : G.Connected) (hn : 2 ≤ Fintype.card V) :
+    (1 : ℤ) ≤ (G.minDegree : ℤ) := by
+  haveI : Nontrivial V := Fintype.one_lt_card_iff_nontrivial.mp (by omega)
+  have := h.preconnected.minDegree_pos_of_nontrivial; omega
+-- 16a
+theorem regular_max_int {d : ℕ} (h : G.IsRegularOfDegree d) (hn : 1 ≤ Fintype.card V) :
+    (G.maxDegree : ℤ) = (d : ℤ) := by
+  haveI : Nonempty V := Fintype.card_pos_iff.mp (by omega)
+  have := h.maxDegree_eq; omega
+-- 16b
+theorem regular_min_int {d : ℕ} (h : G.IsRegularOfDegree d) (hn : 1 ≤ Fintype.card V) :
+    (G.minDegree : ℤ) = (d : ℤ) := by
+  haveI : Nonempty V := Fintype.card_pos_iff.mp (by omega)
+  have := h.minDegree_eq; omega
+-- 17
+theorem edge_conn_min_deg_int {k : ℕ} (h : G.IsEdgeConnected k) (hn : 2 ≤ Fintype.card V) :
+    (k : ℤ) ≤ (G.minDegree : ℤ) := by
+  haveI : Nontrivial V := Fintype.one_lt_card_iff_nontrivial.mp (by omega)
+  have := isEdgeConnected_le_minDegree G h; omega
+-- bipartite ⟺ chi ≤ 2 (property premise → numeric chi fact, §II.3)
+theorem bipartite_chi_int (h : G.IsBipartite) : (G.chromaticNumber.toNat : ℤ) ≤ 2 := by
+  have h2 := ENat.toNat_le_toNat (chromaticNumber_le_two_iff_isBipartite.mpr h) (by simp)
+  simp only [ENat.toNat_ofNat] at h2
+  exact_mod_cast h2
+theorem not_bipartite_chi_int (h : ¬ G.IsBipartite) : (3 : ℤ) ≤ (G.chromaticNumber.toNat : ℤ) := by
+  have hne := chromaticNumber_ne_top G
+  have h2 : ¬ (G.chromaticNumber ≤ 2) := fun hc => h (chromaticNumber_le_two_iff_isBipartite.mp hc)
+  have h3 : (2 : ℕ∞) < G.chromaticNumber := not_le.mp h2
+  rw [← ENat.natCast_toNat hne] at h3
+  have h4 : 2 < G.chromaticNumber.toNat := by exact_mod_cast h3
+  omega
+
+/-! ### property-implication discharge (§II.2, used by the formalizer) -/
+
+theorem isTree_connected (h : G.IsTree) : G.Connected := h.connected
+theorem isTree_acyclic (h : G.IsTree) : G.IsAcyclic := h.isAcyclic
+theorem isAcyclic_bipartite (h : G.IsAcyclic) : G.IsBipartite :=
+  chromaticNumber_le_two_iff_isBipartite.mp h.chromaticNumber_le_two
+
 end PolyForge.Graph
