@@ -1,108 +1,96 @@
 {
   "id": "C41",
-  "created_at": "2026-10-08T07:48:12.672909+00:00",
+  "created_at": "2026-10-09T02:33:50.187149+00:00",
   "generator": {
-    "version": "1.1",
-    "seed": 2024006727
+    "version": "1.1.1",
+    "seed": 2024008067
   },
   "conjecture": {
-    "formula": "if ((is_connected) and (nontrivial) and (diam >= 5) and (radius <= 3)), then (min_deg + 2*radius >= 7)",
+    "formula": "if ((not_bipartite) and (alpha >= 3) and (-2*max_deg + chi <= 0)), then (min_deg >= -2*max_deg + 4)",
     "properties_premises": [
       {
-        "name": "is_connected"
-      },
-      {
-        "name": "nontrivial"
+        "name": "not_bipartite"
       }
     ],
     "numeric_premises": [
       {
-        "text": "diam >= 5",
+        "text": "alpha >= 3",
         "coeffs": {
-          "diam": 1
+          "alpha": 1
         },
         "rel": ">=",
-        "rhs": 5
+        "rhs": 3
       },
       {
-        "text": "radius <= 3",
+        "text": "chi <= 2*max_deg",
         "coeffs": {
-          "radius": 1
+          "chi": 1,
+          "max_deg": -2
         },
         "rel": "<=",
-        "rhs": 3
+        "rhs": 0
       }
     ],
     "conclusion": {
-      "text": "min_deg + 2*radius >= 7",
+      "text": "min_deg >= -2*max_deg + 4",
       "coeffs": {
         "min_deg": 1,
-        "radius": 2
+        "max_deg": 2
       },
       "rel": ">=",
-      "rhs": 7
+      "rhs": 4
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_connected, nontrivial, diam >= 5, radius <= 3. Then min_deg + 2*radius >= 7."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose not_bipartite, alpha >= 3, -2*max_deg + chi <= 0. Then min_deg >= -2*max_deg + 4."
   },
+  "primary_var": "min_deg",
+  "dalmatian": "significant",
   "properties": [
-    "is_connected",
-    "nontrivial"
+    "not_bipartite"
   ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
-      "connected_min_deg",
-      "diam_le_two_radius"
+      "nonneg_min_deg",
+      "not_bipartite_chi"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
         "rule": "inventory",
-        "text": "1*min_deg + -1 >= 0",
+        "text": "1*chi + -3 >= 0",
         "coeffs": {
-          "min_deg": "1"
+          "chi": "1"
         },
-        "const": "-1",
+        "const": "-3",
         "rel": ">=",
-        "inventory": "connected_min_deg"
+        "inventory": "not_bipartite_chi"
       },
       {
         "fid": 2,
-        "rule": "inventory",
-        "text": "-1*diam + 2*radius >= 0",
+        "rule": "premise",
+        "text": "2*max_deg + -1*chi >= 0",
         "coeffs": {
-          "diam": "-1",
-          "radius": "2"
+          "chi": "-1",
+          "max_deg": "2"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "diam_le_two_radius"
+        "note": "chi <= 2*max_deg"
       },
       {
         "fid": 3,
-        "rule": "premise",
-        "text": "1*diam + -5 >= 0",
-        "coeffs": {
-          "diam": "1"
-        },
-        "const": "-5",
-        "rel": ">=",
-        "note": "diam >= 5"
-      },
-      {
-        "fid": 4,
         "rule": "combination",
-        "text": "1*radius + -5/2 >= 0",
+        "text": "1*max_deg + -3/2 >= 0",
         "coeffs": {
-          "radius": "1"
+          "max_deg": "1"
         },
-        "const": "-5/2",
+        "const": "-3/2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
-          2,
-          3
+          1,
+          2
         ],
         "mults": [
           "1/2",
@@ -110,49 +98,60 @@
         ]
       },
       {
-        "fid": 5,
+        "fid": 4,
         "rule": "rounding",
-        "text": "1*radius + -3 >= 0",
+        "text": "1*max_deg + -2 >= 0",
         "coeffs": {
-          "radius": "1"
+          "max_deg": "1"
         },
-        "const": "-3",
+        "const": "-2",
         "rel": ">=",
         "tactic": "omega",
         "deps": [
-          4
+          3
         ]
+      },
+      {
+        "fid": 5,
+        "rule": "inventory",
+        "text": "1*min_deg >= 0",
+        "coeffs": {
+          "min_deg": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_min_deg"
       },
       {
         "fid": 6,
         "rule": "combination",
-        "text": "1*min_deg + 2*radius + -7 >= 0",
+        "text": "2*max_deg + 1*min_deg + -4 >= 0",
         "coeffs": {
           "min_deg": "1",
-          "radius": "2"
+          "max_deg": "2"
         },
-        "const": "-7",
+        "const": "-4",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
-          1,
+          4,
           5
         ],
         "mults": [
-          "1",
-          "2"
+          "2",
+          "1"
         ]
       }
     ]
   },
   "iris": {
-    "T": 1.0,
-    "R": 0.18181818181818182,
-    "L": 1.0,
-    "score": 2.1818181818181817
+    "T": 0.009584664536741214,
+    "R": 0.2222222222222222,
+    "L": 0.31622776601683794,
+    "score": 0.5480346527758013
   },
   "attained": "yes",
-  "touch": 11,
+  "touch": 9,
   "depth_type": "split_needed",
   "proof_stats": {
     "case_splits": 0,
@@ -160,15 +159,15 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 1,
-    "inventory_theorems": 2
+    "inventory_theorems": 0
   },
-  "proof_cost_initial": 7.5,
-  "proof_cost": 7.5,
-  "proof_cost_expanded": 7.5,
+  "proof_cost_initial": 4.5,
+  "proof_cost": 4.5,
+  "proof_cost_expanded": 4.5,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.25,
+  "hardness": 0.6428571428571429,
   "lean": {
     "theorem_name": "C41",
     "status": "compiled"

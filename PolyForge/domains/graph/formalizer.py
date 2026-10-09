@@ -65,6 +65,10 @@ WRAPPER = {
     "edge_conn_min_deg": ("edge_conn_min_deg_int", ["is_k_edge_connected"], "n2"),
     "bipartite_chi": ("bipartite_chi_int", ["is_bipartite"], None),
     "not_bipartite_chi": ("not_bipartite_chi_int", ["not_bipartite"], None),
+    # v1.1.1 elementary facts
+    "diam_ge_one": ("diam_ge_one_int", ["is_connected"], "n2"),
+    "radius_ge_one": ("radius_ge_one_int", ["is_connected"], "n2"),
+    "connected_edges": ("connected_edges_int", ["is_connected"], None),
 }
 
 
@@ -242,25 +246,50 @@ def _emit_step(step, lines, indent, text2hyp, prop_hyps, case_hyps):
 
 
 # ── theorem assembly ──────────────────────────────────────────────────────────
-def _display_goal(conclusion):
-    """Nice oriented ℤ goal (main variable positive)."""
-    coeffs = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
-    main = None
+def _render_affine(ic, const):
+    """Render ``Σ ic[v]·Z[v] + const`` in ℤ (just ``const`` if all zero)."""
+    terms = []
     for v in VARS:
-        if coeffs.get(v, 0) != 0:
-            if main is None or abs(coeffs[v]) > abs(coeffs[main]):
-                main = v
-    rel, rhs = conclusion["rel"], int(conclusion["rhs"])
-    if main is not None and coeffs[main] < 0:
-        coeffs = {v: -c for v, c in coeffs.items()}
-        rel = "<=" if rel == ">=" else ">="
-        rhs = -rhs
-    return _ineq(coeffs, rel, rhs)
+        c = int(ic.get(v, 0))
+        if c == 0:
+            continue
+        atom = _Z[v]
+        terms.append(("-" if c < 0 else "+", atom if abs(c) == 1 else f"{abs(c)} * {atom}"))
+    if not terms:
+        return str(const)
+    sign, first = terms[0]
+    out = ("-" + first) if sign == "-" else first
+    for sign, piece in terms[1:]:
+        out += f" {sign} {piece}"
+    if const > 0:
+        out += f" + {const}"
+    elif const < 0:
+        out += f" - {-const}"
+    return out
+
+
+def _display_goal(conclusion, primary):
+    """§VII: ℤ goal with ``primary`` alone on the left (positive coefficient)."""
+    L = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
+    c = int(conclusion["rhs"])            # internal ">=" form
+    if primary is None or L.get(primary, 0) == 0:
+        primary = next((v for v in VARS if L.get(v, 0) == 1), None)
+        if primary is None:
+            primary = max(L, key=lambda v: (abs(L[v]), -VARS.index(v)))
+    if L[primary] >= 0:
+        coeffs, rel, rhs = L, "≥", c
+    else:
+        coeffs, rel, rhs = {v: -x for v, x in L.items()}, "≤", -c
+    a = coeffs[primary]
+    left = _Z[primary] if a == 1 else f"{a} * {_Z[primary]}"
+    rest = {v: -coeffs[v] for v in coeffs if v != primary}
+    return f"{left} {rel} {_render_affine(rest, rhs)}"
 
 
 def build_theorem(name, premises, conclusion, proof_steps, used_inventory=None, display=False):
     props = premises["props"]
     numeric = premises["numeric"]
+    primary = premises.get("primary")
     hyp_decls = []
     prop_hyps = {}
     for i, p in enumerate(props, 1):
@@ -273,7 +302,7 @@ def build_theorem(name, premises, conclusion, proof_steps, used_inventory=None, 
         hyp_decls.append(f"({hn} : {_ineq(pr['coeffs'], pr['rel'], int(pr['rhs']))})")
         text2hyp[pr.get("text", "")] = hn
     sig = (" " + " ".join(hyp_decls)) if hyp_decls else ""
-    goal = _display_goal(conclusion)
+    goal = _display_goal(conclusion, primary)
 
     lines = []
     for s in proof_steps:

@@ -174,6 +174,21 @@ INVENTORY = [
      "source": "GraphLemmas", "properties": ["is_k_edge_connected"], "finite": [],
      "guards": [], "param": "k",
      "conclusion": {"coeffs": _lin(min_deg=1), "rel": ">=", "rhs": "k"}},
+    # 18 — is_connected ∧ nontrivial : diam ≥ 1   (v1.1.1, GraphLemmas)
+    {"name": "diam_ge_one", "lean_name": "PolyForge.Graph.diam_ge_one_int",
+     "source": "GraphLemmas", "properties": ["is_connected", "nontrivial"], "finite": ["diam"],
+     "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(diam=1), "rel": ">=", "rhs": 1}},
+    # 19 — is_connected ∧ nontrivial : radius ≥ 1   (v1.1.1, GraphLemmas)
+    {"name": "radius_ge_one", "lean_name": "PolyForge.Graph.radius_ge_one_int",
+     "source": "GraphLemmas", "properties": ["is_connected", "nontrivial"], "finite": ["radius"],
+     "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(radius=1), "rel": ">=", "rhs": 1}},
+    # 20 — is_connected : m ≥ n − 1   (v1.1.1, GraphLemmas)
+    {"name": "connected_edges", "lean_name": "PolyForge.Graph.connected_edges_int",
+     "source": "GraphLemmas", "properties": ["is_connected"], "finite": [],
+     "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(m=1, n=-1), "rel": ">=", "rhs": -1}},
 ]
 
 INVENTORY_BY_NAME = {e["name"]: e for e in INVENTORY}

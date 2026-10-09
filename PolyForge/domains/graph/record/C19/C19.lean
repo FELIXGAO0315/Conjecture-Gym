@@ -4,31 +4,26 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C19 {V : Type} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : -(G.indepNum : ℤ) + 2 * (G.vertexCoverNum.toNat : ℤ) ≥ 0) (hn2 : (Fintype.card V : ℤ) ≤ 6) :
-    (G.cliqueNum : ℤ) - (G.indepNum : ℤ) ≤ 5 := by
-  have s1 : -(G.cliqueNum : ℤ) + (G.indepNum : ℤ) ≥ -5 := by
-    by_cases hc1 : (3 : ℤ) ≤ (G.chromaticNumber.toNat : ℤ)
-    · -- 1*chi >= 3
-      have s2 : (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by
-        have hw := omega_le_chi_int G
-        linarith [hw]
-      have s3 : (Fintype.card V : ℤ) - (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
-        have hw := chi_le_n_int G
-        linarith [hw]
-      have s4 : (G.chromaticNumber.toNat : ℤ) ≥ 3 := by have hcc := hc1; omega
-      have s5 : (Fintype.card V : ℤ) ≥ 3 := by linarith [s3, s4]
-      have s6 : (G.indepNum : ℤ) ≥ 1 := by
-        have hw := alpha_ge_one_int G (by omega)
-        linarith [hw]
-      have s7 : -(Fintype.card V : ℤ) ≥ -6 := by linarith [hn2]
-      have s8 : -2 * (G.cliqueNum : ℤ) + 2 * (G.indepNum : ℤ) ≥ -10 := by linarith [s2, s3, s6, s7]
-      linarith [s8]
-    · -- 1*chi <= 2
-      have s9 : (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by
-        have hw := omega_le_chi_int G
-        linarith [hw]
-      have s10 : (G.indepNum : ℤ) ≥ 0 := by positivity
-      have s11 : -(G.chromaticNumber.toNat : ℤ) ≥ -2 := by have hcc := hc1; omega
-      have s12 : -2 * (G.cliqueNum : ℤ) + 2 * (G.indepNum : ℤ) ≥ -4 := by linarith [s9, s10, s11]
-      linarith [s12]
-  linarith [s1]
+theorem C19 {V : Type} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] (hp1 : ¬ G.IsBipartite) (hn1 : (Fintype.card V : ℤ) - 2 * (G.indepNum : ℤ) ≥ 0) :
+    (G.maxDegree : ℤ) ≤ 2 * (Fintype.card V : ℤ) + 2 * (G.vertexCoverNum.toNat : ℤ) - 8 := by
+  have s1 : (Fintype.card V : ℤ) - (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
+    have hw := chi_le_n_int G
+    linarith [hw]
+  have s2 : (G.chromaticNumber.toNat : ℤ) ≥ 3 := by
+    have hw := not_bipartite_chi_int G hp1
+    linarith [hw]
+  have s3 : (Fintype.card V : ℤ) ≥ 3 := by linarith [s1, s2]
+  have s4 : (G.indepNum : ℤ) ≥ 1 := by
+    have hw := alpha_ge_one_int G (by omega)
+    linarith [hw]
+  have s5 : (Fintype.card V : ℤ) - 2 * (G.indepNum : ℤ) ≥ 0 := by linarith [hn1]
+  have s6 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) + (G.vertexCoverNum.toNat : ℤ) = 0 := by
+    have hw := gallai_int G
+    linarith [hw]
+  have s7 : 2 * (G.vertexCoverNum.toNat : ℤ) ≥ 3 := by linarith [s1, s2, s5, s6]
+  have s8 : (G.vertexCoverNum.toNat : ℤ) ≥ 2 := by have hr := s7; omega
+  have s9 : (Fintype.card V : ℤ) - (G.maxDegree : ℤ) ≥ 1 := by
+    have hw := max_lt_card_int G (by omega)
+    linarith [hw]
+  have s10 : 2 * (Fintype.card V : ℤ) - (G.maxDegree : ℤ) + 2 * (G.vertexCoverNum.toNat : ℤ) ≥ 8 := by linarith [s4, s8, s9, s6]
+  linarith [s10]

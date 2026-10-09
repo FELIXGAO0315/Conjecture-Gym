@@ -1,42 +1,51 @@
 {
   "id": "C5",
-  "created_at": "2026-10-08T07:40:07.168965+00:00",
+  "created_at": "2026-10-09T02:20:31.567275+00:00",
   "generator": {
-    "version": "1.1",
-    "seed": 2024006102
+    "version": "1.1.1",
+    "seed": 2024006372
   },
   "conjecture": {
-    "formula": "if ((tau <= 5)), then (-n + 2*chi - 2*alpha <= 4)",
+    "formula": "if ((chi <= 5) and (m - 2*min_deg >= 0)), then (chi <= alpha + 4)",
     "properties_premises": [],
     "numeric_premises": [
       {
-        "text": "tau <= 5",
+        "text": "chi <= 5",
         "coeffs": {
-          "tau": 1
+          "chi": 1
         },
         "rel": "<=",
         "rhs": 5
+      },
+      {
+        "text": "m >= 2*min_deg",
+        "coeffs": {
+          "m": 1,
+          "min_deg": -2
+        },
+        "rel": ">=",
+        "rhs": 0
       }
     ],
     "conclusion": {
-      "text": "-n + 2*chi - 2*alpha <= 4",
+      "text": "chi <= alpha + 4",
       "coeffs": {
-        "alpha": -2,
-        "chi": 2,
-        "n": -1
+        "chi": 1,
+        "alpha": -1
       },
       "rel": "<=",
       "rhs": 4
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose tau <= 5. Then -n + 2*chi - 2*alpha <= 4."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose chi <= 5, m - 2*min_deg >= 0. Then chi <= alpha + 4."
   },
+  "primary_var": "chi",
+  "dalmatian": "significant",
   "properties": [],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
       "alpha_ge_one",
       "chi_le_n",
-      "gallai",
       "nonneg_alpha"
     ],
     "lemmas_used": [],
@@ -44,11 +53,10 @@
       {
         "fid": 1,
         "rule": "case_split",
-        "text": "1*n + -2*chi + 2*alpha + 4 >= 0",
+        "text": "-1*chi + 1*alpha + 4 >= 0",
         "coeffs": {
-          "alpha": "2",
-          "chi": "-2",
-          "n": "1"
+          "chi": "-1",
+          "alpha": "1"
         },
         "const": "4",
         "rel": ">=",
@@ -123,48 +131,30 @@
               {
                 "fid": 6,
                 "rule": "premise",
-                "text": "-1*tau + 5 >= 0",
+                "text": "-1*chi + 5 >= 0",
                 "coeffs": {
-                  "tau": "-1"
+                  "chi": "-1"
                 },
                 "const": "5",
                 "rel": ">=",
-                "note": "tau <= 5"
+                "note": "chi <= 5"
               },
               {
                 "fid": 7,
-                "rule": "inventory",
-                "text": "-1*n + 1*alpha + 1*tau == 0",
-                "coeffs": {
-                  "alpha": "1",
-                  "tau": "1",
-                  "n": "-1"
-                },
-                "const": "0",
-                "rel": "==",
-                "inventory": "gallai"
-              },
-              {
-                "fid": 8,
                 "rule": "combination",
-                "text": "1*n + -2*chi + 2*alpha + 4 >= 0",
+                "text": "-1*chi + 1*alpha + 4 >= 0",
                 "coeffs": {
-                  "alpha": "2",
-                  "chi": "-2",
-                  "n": "1"
+                  "chi": "-1",
+                  "alpha": "1"
                 },
                 "const": "4",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
-                  2,
                   5,
-                  6,
-                  7
+                  6
                 ],
                 "mults": [
-                  "2",
-                  "1",
                   "1",
                   "1"
                 ]
@@ -175,19 +165,7 @@
             "assume": "1*chi <= 2",
             "steps": [
               {
-                "fid": 9,
-                "rule": "inventory",
-                "text": "1*n + -1*chi >= 0",
-                "coeffs": {
-                  "chi": "-1",
-                  "n": "1"
-                },
-                "const": "0",
-                "rel": ">=",
-                "inventory": "chi_le_n"
-              },
-              {
-                "fid": 10,
+                "fid": 8,
                 "rule": "inventory",
                 "text": "1*alpha >= 0",
                 "coeffs": {
@@ -198,7 +176,7 @@
                 "inventory": "nonneg_alpha"
               },
               {
-                "fid": 11,
+                "fid": 9,
                 "rule": "assumption",
                 "text": "-1*chi + 2 >= 0",
                 "coeffs": {
@@ -209,25 +187,22 @@
                 "note": "1*chi <= 2"
               },
               {
-                "fid": 12,
+                "fid": 10,
                 "rule": "combination",
-                "text": "1*n + -2*chi + 2*alpha + 2 >= 0",
+                "text": "-1*chi + 1*alpha + 2 >= 0",
                 "coeffs": {
-                  "alpha": "2",
-                  "chi": "-2",
-                  "n": "1"
+                  "chi": "-1",
+                  "alpha": "1"
                 },
                 "const": "2",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
-                  9,
-                  10,
-                  11
+                  8,
+                  9
                 ],
                 "mults": [
                   "1",
-                  "2",
                   "1"
                 ]
               }
@@ -238,10 +213,10 @@
     ]
   },
   "iris": {
-    "T": 0.0007987220447284345,
+    "T": 0.0008045052292839903,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.0007987220447285
+    "score": 1.000804505229284
   },
   "attained": "yes",
   "touch": 1,
@@ -252,15 +227,15 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 1,
     "roundings": 0,
-    "inventory_theorems": 4
+    "inventory_theorems": 2
   },
-  "proof_cost_initial": 15.0,
-  "proof_cost": 14.5,
-  "proof_cost_expanded": 14.5,
-  "shorten_rounds": 1,
+  "proof_cost_initial": 10.5,
+  "proof_cost": 10.5,
+  "proof_cost_expanded": 10.5,
+  "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.9,
+  "hardness": 1.5,
   "lean": {
     "theorem_name": "C5",
     "status": "compiled"

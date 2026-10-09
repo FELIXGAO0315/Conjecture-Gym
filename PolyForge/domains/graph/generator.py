@@ -43,7 +43,7 @@ DATA = ROOT / "data" / "graph_pool.json"
 RECORD = ROOT / "record"
 LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "1.1"
+GENERATOR_VERSION = "1.1.1"
 MAIN_COEFFS = (1, 2)          # main-variable coefficient
 OTHER_COEFFS = (-2, -1, 1, 2)  # other-term coefficients
 MAX_COEFF = 6                 # guard on display coefficients
@@ -147,12 +147,15 @@ def sample_premises(rng: random.Random):
         return {"coeffs": {v: 1}, "rel": rel, "rhs": c, "text": f"{v} {rel} {c}"}
 
     def relation():
+        # §II: two-variable relations only x≤y, x≥y, x≤2y, x≥2y
         if len(uvars) < 2:
             return bound()
         x, y = rng.sample(uvars, 2)
-        a, b = rng.randint(1, 2), rng.randint(1, 2)
-        return {"coeffs": {x: a, y: -b}, "rel": ">=", "rhs": 0,
-                "text": f"{a}*{x} >= {b}*{y}"}
+        rel = rng.choice([">=", "<="])
+        mult = rng.choice([1, 2])
+        rhs_txt = y if mult == 1 else f"{mult}*{y}"
+        return {"coeffs": {x: 1, y: -mult}, "rel": rel, "rhs": 0,
+                "text": f"{x} {rel} {rhs_txt}"}
 
     makers = [bound, bound, relation]
     for _ in range(n_num):
@@ -381,47 +384,53 @@ def _coprime(d):
     return {k: int(c) // g for k, c in d.items() if int(c) != 0}
 
 
-def enumerate_directions(usable):
-    """Main variable (coeff 1 or 2) + up to 2 other usable variables
-    (coeff |·| ≤ 2); both signs of the whole direction (upper and lower)."""
+def choose_primary(seed, usable):
+    """§III: deterministically rotate the primary variable per premise set (by the
+    per-set seed), among the finiteness-valid variables, in fixed VARS order."""
+    uorder = [v for v in VARS if v in usable]
+    if not uorder:
+        return None
+    start = seed % len(uorder)
+    return uorder[start]
+
+
+def enumerate_directions(usable, main):
+    """§III.2: directions with THE given primary variable (coeff 1 or 2) plus up to
+    2 other usable variables (coeff |·| ≤ 2); both signs (upper and lower bounds)."""
     seen, dirs = set(), []
-    uvars = sorted(usable)
+    others = [v for v in sorted(usable) if v != main]
 
     def add(d):
         d = _coprime(d)
-        if not d:
+        if not d or d.get(main, 0) == 0:
             return
         key = tuple(sorted(d.items()))
         if key in seen:
             return
         seen.add(key); dirs.append(d)
 
-    for main in uvars:
-        others = [v for v in uvars if v != main]
-        for a in MAIN_COEFFS:
-            base = {main: a}
-            add(dict(base))
-            for v in others:
-                for c in OTHER_COEFFS:
-                    add(dict(base, **{v: c}))
-            for v1, v2 in _it.combinations(others, 2):
-                for c1 in OTHER_COEFFS:
-                    for c2 in OTHER_COEFFS:
-                        add(dict(base, **{v1: c1, v2: c2}))
-    # both bounds: include negations
+    for a in MAIN_COEFFS:
+        base = {main: a}
+        add(dict(base))
+        for v in others:
+            for c in OTHER_COEFFS:
+                add(dict(base, **{v: c}))
+        for v1, v2 in _it.combinations(others, 2):
+            for c1 in OTHER_COEFFS:
+                for c2 in OTHER_COEFFS:
+                    add(dict(base, **{v1: c1, v2: c2}))
     for d in list(dirs):
         add({v: -c for v, c in d.items()})
-    return dirs, {tuple(sorted(_coprime(d).items())): main
-                  for main in uvars for d in [{main: 1}]}
+    return dirs
 
 
-def enumerate_candidates(premises, usable, stats, rng, accept):
+def enumerate_candidates(premises, usable, main, stats, rng, accept):
     pf = _premise_forms(premises)
     lin = pf + _unconditional_forms()
     lin += _triggerable_conditionals(lin)
     lin_mats = _prep(lin)
     tree = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH)
-    directions, _ = enumerate_directions(usable)
+    directions = enumerate_directions(usable, main)
     rng.shuffle(directions)
     stats["directions_total"] += len(directions)
     out = []
@@ -644,8 +653,39 @@ def counter_model(premises, conclusion):
                    integrality=np.ones(n), bounds=Bounds(bl, bu))
     except Exception:
         return None
-    if res is not None and res.success and res.x is not None:
-        return {v: int(round(res.x[idx[v]])) for v in VARS}
+    if not (res is not None and res.success and res.x is not None):
+        return None
+    model = {v: int(round(res.x[idx[v]])) for v in VARS}
+
+    # Exact verification (§III.6 gate must be precise): the big-M MILP can return a
+    # numerically-infeasible point.  Accept ``model`` as a genuine counter-model only
+    # if it exactly satisfies every premise and every active inventory fact (honouring
+    # the conditional-theorem implications) while violating the conclusion; otherwise
+    # it is a numerical artifact and there is no counter-model here.
+    def _sat(co, rel, rhs):
+        lhs = sum(Fraction(c) * model[v] for v, c in co.items())
+        rhs = Fraction(rhs)
+        if rel in ("=", "=="):
+            return lhs == rhs
+        if rel == ">=":
+            return lhs >= rhs
+        return lhs <= rhs
+    for pr in premises:
+        if not _sat(pr["coeffs"], pr["rel"], pr["rhs"]):
+            return None
+    for e in DED.INVENTORY:
+        c = e["conclusion"]
+        if not _sat(c["coeffs"], c["rel"], c["rhs"]):
+            return None
+    for e in DED.CONDITIONAL_THEOREMS:
+        hyp = e["hypothesis"]
+        if _sat(hyp["coeffs"], hyp["rel"], hyp["rhs"]):      # hypothesis holds → conclusion must
+            c = e["conclusion"]
+            if not _sat(c["coeffs"], c["rel"], c["rhs"]):
+                return None
+    if _sat(conclusion["coeffs"], conclusion["rel"], conclusion["rhs"]):
+        return None                                          # conclusion holds → not a counter-model
+    return model
     return None
 
 
@@ -694,7 +734,7 @@ def skeleton_better(new, old):
     return new["hardness"] > old["hardness"]
 
 
-# ── rendering (§IV) ───────────────────────────────────────────────────────────
+# ── rendering (§IV / §VII: primary on its own side) ──────────────────────────
 _REL_SYM = {">=": ">=", "<=": "<=", "=": "="}
 
 
@@ -713,15 +753,51 @@ def _premise_text(pr):
     return f"({_render_ineq(pr['coeffs'], pr['rel'], int(pr['rhs']))})"
 
 
-def formula_string(props, numeric, conclusion):
+def display_conclusion(conclusion, primary):
+    """§VII: orient the (internal ``>=``) conclusion so ``primary`` is alone on the
+    left with a positive coefficient.  Returns ``(disp, primary)`` where ``disp`` is
+    the full linear form ``{coeffs, rel, rhs}`` with ``primary`` positive (used for
+    the JSON conclusion, the Lean goal, and property tagging); if ``primary`` was
+    dropped in simplification, falls back to a remaining coefficient-1 variable."""
+    L = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
+    c = int(conclusion["rhs"])
+    if primary is None or L.get(primary, 0) == 0:
+        primary = next((v for v in VARS if L.get(v, 0) == 1), None) or _main_var(L)
+    a = L.get(primary, 0) if primary else 0
+    if a >= 0:
+        return {"coeffs": L, "rel": conclusion["rel"], "rhs": c}, primary
+    return ({"coeffs": {v: -x for v, x in L.items()},
+             "rel": "<=" if conclusion["rel"] == ">=" else ">=", "rhs": -c}, primary)
+
+
+def _render_isolated(disp, primary):
+    """Render ``a*primary REL (rest + rhs)`` with the primary variable alone left."""
+    coeffs = disp["coeffs"]
+    rhs = int(disp["rhs"])
+    a = int(coeffs[primary])
+    left = primary if a == 1 else f"{a}*{primary}"
+    rest = {v: -int(coeffs[v]) for v in coeffs if v != primary and int(coeffs[v]) != 0}
+    parts = []
+    for v in VARS:
+        rc = int(rest.get(v, 0))
+        if rc == 0:
+            continue
+        parts.append(v if rc == 1 else (f"-{v}" if rc == -1 else f"{rc}*{v}"))
+    if rhs != 0 or not parts:
+        parts.append(str(rhs))
+    rs = " + ".join(parts).replace("+ -", "- ")
+    return f"{left} {disp['rel']} {rs}"
+
+
+def formula_string(props, numeric, conclusion, primary):
     conds = [f"({p['name']}" + (f"({p['param']})" if 'param' in p else "") + ")" for p in props]
     conds += [_premise_text(pr) for pr in numeric]
     body = " and ".join(conds) if conds else "(true)"
-    d = _display_orient(conclusion)
-    return f"if ({body}), then ({_render_ineq(d['coeffs'], d['rel'], int(d['rhs']))})"
+    disp, prim = display_conclusion(conclusion, primary)
+    return f"if ({body}), then ({_render_isolated(disp, prim)})"
 
 
-def natural_language(props, numeric, conclusion):
+def natural_language(props, numeric, conclusion, primary):
     prem = []
     for p in props:
         prem.append(p['name'] + (f"({p['param']})" if 'param' in p else ""))
@@ -729,18 +805,19 @@ def natural_language(props, numeric, conclusion):
         prem.append(_render_ineq(pr["coeffs"], pr["rel"], int(pr["rhs"])))
     intro = ("Let G be a finite simple graph with the usual invariants "
              "(n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth).")
-    d = _display_orient(conclusion)
-    concl = _render_ineq(d["coeffs"], d["rel"], int(d["rhs"]))
+    disp, prim = display_conclusion(conclusion, primary)
+    concl = _render_isolated(disp, prim)
     if prem:
         return f"{intro} Suppose {', '.join(prem)}. Then {concl}."
     return f"{intro} Then {concl}."
 
 
 # ── conclusion_property tag (§IV.2) ───────────────────────────────────────────
-def conclusion_property(props, conclusion):
-    """Identify whether the conclusion is equivalent to a known property."""
-    c = {v: int(x) for v, x in conclusion["coeffs"].items()}
-    rel, rhs = conclusion["rel"], int(conclusion["rhs"])
+def conclusion_property(props, disp):
+    """Identify whether the (display-oriented) conclusion is equivalent to a known
+    property.  ``disp`` is the primary-positive full form {coeffs, rel, rhs}."""
+    c = {v: int(x) for v, x in disp["coeffs"].items()}
+    rel, rhs = disp["rel"], int(disp["rhs"])
     # single-variable chi bounds
     if set(c) == {"chi"} and c["chi"] == 1:
         if rel == "<=" and rhs == 2:
@@ -853,13 +930,147 @@ def iris_feature_vars(props, numeric, conclusion):
     return [v for v in VARS if v in used and v in usable]
 
 
+# ── decomposability filter (§IV) ──────────────────────────────────────────────
+def is_decomposable(premises, conclusion):
+    """True if the conclusion L ≥ c splits into two non-empty groups A, B whose
+    strongest provable bounds (using FULL deduction power — splits, B&B, rounding)
+    satisfy b_A + b_B ≥ c.  Conclusions are internal ``>=`` forms."""
+    L = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
+    c = int(conclusion["rhs"])
+    terms = list(L)
+    if len(terms) < 2:
+        return False
+    parts, seen = [], set()
+    for r in range(1, len(terms)):
+        for A in _it.combinations(terms, r):
+            Aset = frozenset(A); Bset = frozenset(terms) - Aset
+            key = frozenset((Aset, Bset))
+            if key in seen:
+                continue
+            seen.add(key); parts.append((Aset, Bset))
+    dirs = []
+    for Aset, Bset in parts:
+        for S in (Aset, Bset):
+            d = {v: L[v] for v in S}
+            dirs.append(d); dirs.append(_neg(d))
+    ctx = cached_context(premises, dirs)            # full power (depth 3 + split + B&B)
+
+    def bnd(S):
+        r = _strongest_in(ctx, {v: L[v] for v in S})
+        return r[0]["rhs"] if r else None
+
+    for Aset, Bset in parts:
+        bA, bB = bnd(Aset), bnd(Bset)
+        if bA is not None and bB is not None and bA + bB >= c:
+            return True
+    return False
+
+
+# ── logical redundancy vs record (§V) ─────────────────────────────────────────
+def _entailed_prem(constraints, pr):
+    cf = {v: Fraction(c) for v, c in pr["coeffs"].items()}
+    rhs = Fraction(pr["rhs"]); rel = pr["rel"]
+    if rel == ">=":
+        st, v, _ = _lp(_cvec(cf), _prep(constraints)); return st == "opt" and v - float(rhs) >= -_LP_TOL
+    if rel == "<=":
+        st, v, _ = _lp(_cvec({k: -c for k, c in cf.items()}), _prep(constraints))
+        return st == "opt" and v - float(-rhs) >= -_LP_TOL
+    return (_entailed_prem(constraints, {"coeffs": pr["coeffs"], "rel": ">=", "rhs": pr["rhs"]})
+            and _entailed_prem(constraints, {"coeffs": pr["coeffs"], "rel": "<=", "rhs": pr["rhs"]}))
+
+
+def is_redundant_vs_records(pset, numeric, conclusion, records, exclude_skeleton=None):
+    """A new conjecture is redundant if some existing record E — whose premises are
+    implied by the new premises (properties ⊆ closure, numeric LP-entailed) — plus
+    the Inventory derive the new conclusion with NO case split (linear + rounding)."""
+    base = _premise_forms(numeric) + _unconditional_forms()
+    base += _triggerable_conditionals(base)
+    d0 = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
+    for E in records:
+        if exclude_skeleton is not None and E.get("_skeleton") == exclude_skeleton:
+            continue
+        cj = E["conjecture"]
+        eprops = [p["name"] for p in cj.get("properties_premises", [])]
+        if not set(eprops).issubset(pset):
+            continue
+        enum = cj.get("numeric_premises", [])
+        if not all(_entailed_prem(base, pr) for pr in enum):
+            continue
+        econcl = cj["conclusion"]
+        extra = list(numeric) + [{"coeffs": {k: int(v) for k, v in econcl["coeffs"].items()},
+                                  "rel": econcl["rel"], "rhs": int(econcl["rhs"])}]
+        ctx = Context(premises=extra, depth=0, use_conditional_split=False, use_bnb=False,
+                      use_lemmas=False, extra_directions=[d0, _neg(d0)])
+        ctx.saturate()
+        if _find_fact(ctx, conclusion) is not None:
+            return True
+    return False
+
+
+# ── Dalmatian significance (§VI, IRIS binary significance) ────────────────────
+DALMATIAN_FILTER = True
+DALMATIAN_MIN_SUPPORT = 20
+
+
+def _primary_bound(disp, primary, gvals):
+    """From a primary-positive form ``a*primary + rest REL rhs``, the bound value on
+    ``primary`` at a graph: ``(rhs - rest(g)) / a`` (rel '>=' → lower, '<=' → upper)."""
+    coeffs = disp["coeffs"]
+    a = Fraction(int(coeffs[primary]))
+    rest = sum(Fraction(int(coeffs[v])) * gvals[v] for v in coeffs if v != primary)
+    return disp["rel"], (Fraction(int(disp["rhs"])) - rest) / a
+
+
+def dalmatian(props, numeric, conclusion, primary, existing, pool):
+    if not pool_covered(props, numeric):
+        return "unknown"
+    support = dataset_subset(pool, props, numeric)
+    if len(support) < DALMATIAN_MIN_SUPPORT:
+        return "unknown"
+    disp, prim = display_conclusion(conclusion, primary)
+    comps = []
+    for E in existing:
+        cj = E["conjecture"]
+        if E.get("primary_var") != prim:
+            continue
+        ed = {"coeffs": {k: int(v) for k, v in cj["conclusion"]["coeffs"].items()},
+              "rel": cj["conclusion"]["rel"], "rhs": int(cj["conclusion"]["rhs"])}
+        if int(ed["coeffs"].get(prim, 0)) <= 0 or ed["rel"] != disp["rel"]:
+            continue
+        comps.append((cj.get("properties_premises", []), cj.get("numeric_premises", []), ed))
+    for g in support:
+        gv = DED.vars_from_graph(g)
+        gvals = {v: (gv[v] if gv[v] is not None else Fraction(0)) for v in VARS}
+        _, new_val = _primary_bound(disp, prim, gvals)
+        gp = INV.properties_of(g)
+        best = None
+        for eprops, enum, ed in comps:
+            if not _graph_matches(g, gp, eprops, enum):
+                continue
+            _, ev = _primary_bound(ed, prim, gvals)
+            best = ev if best is None else (max(best, ev) if disp["rel"] == ">=" else min(best, ev))
+        if best is None:
+            return "significant"
+        if disp["rel"] == ">=" and new_val > best:
+            return "significant"
+        if disp["rel"] == "<=" and new_val < best:
+            return "significant"
+    return "not_significant"
+
+
 # ── the per-premise-set pipeline ──────────────────────────────────────────────
 _W_LEMMA_META = {}
+_W_SNAPSHOT_RECORDS = []
 
 
 def set_lemma_meta(m):
     global _W_LEMMA_META
     _W_LEMMA_META = m or {}
+
+
+def set_snapshot_records(recs):
+    global _W_SNAPSHOT_RECORDS
+    _W_SNAPSHOT_RECORDS = recs or []
 
 
 def process_premise_set(rng, pool, existing_hashes, stats, seed, accept="split_needed"):
@@ -883,19 +1094,16 @@ def _main_var(coeffs):
     return best[0] if best else None
 
 
-def _display_orient(conclusion):
-    """Display-only: orient so the main variable has a positive coefficient.  The
-    internal conclusion is always kept as a ``>=`` fact (coeffs = the direction);
-    this just produces the nice ``main_var rel rhs`` form for formula/goal text.
-    The oriented form is linearly equivalent, so the Lean goal stated this way is
-    closed by `linarith` from the internal ``>=`` fact."""
-    coeffs = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
-    main = _main_var(coeffs)
-    if main is None or coeffs[main] > 0:
-        return {"coeffs": coeffs, "rel": conclusion["rel"], "rhs": int(conclusion["rhs"])}
-    return {"coeffs": {v: -c for v, c in coeffs.items()},
-            "rel": "<=" if conclusion["rel"] == ">=" else ">=",
-            "rhs": -int(conclusion["rhs"])}
+def _coeff1_var(coeffs):
+    """§VII fallback primary: a remaining variable with coefficient 1 (then ±1,
+    then largest |coeff|)."""
+    for v in VARS:
+        if int(coeffs.get(v, 0)) == 1:
+            return v
+    for v in VARS:
+        if abs(int(coeffs.get(v, 0))) == 1:
+            return v
+    return _main_var(coeffs)
 
 
 def _impl(rng, pool, existing_hashes, stats, seed, accept):
@@ -907,47 +1115,61 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
     params = _prop_params(props)
     usable = finite_vars(pset)
     DED.set_active_inventory(pset, params)
-    D.set_lemmas(D.LEMMAS)  # already set globally; keep
 
     covered = pool_covered(props, numeric)
     if covered and not dataset_subset(pool, props, numeric):
         stats["empty_premises"] += 1
         return None
 
-    candidates = enumerate_candidates(numeric, usable, stats, rng, accept)
+    primary = choose_primary(seed, usable)                      # §III rotation
+    if primary is None:
+        return None
+    candidates = enumerate_candidates(numeric, usable, primary, stats, rng, accept)
     if not candidates:
         stats["no_candidate"] += 1
         return None
     rng.shuffle(candidates)
 
     for cand in candidates:
+        # §VIII order (performance-adjusted, see note): linear → premise-minimise →
+        # strengthen & drop terms (proof already over the minimized premises, so no
+        # re-derivation is needed) → trivial/linear → decomposability (expensive, so
+        # after the cheap filters) → skeleton → redundancy pre-check → counter-model.
         if linearly_derivable(numeric, cand):
             stats["linear_only"] += 1
             continue
+        # premise minimisation first (cheap, cached) so the strengthened proof uses
+        # exactly the minimized premises — avoids a separate re-proof step.
         pruned = minimize_premises_num(numeric, cand)
         pruned = minimize_numeric_redundant(pruned)
-        main = _main_var(cand["coeffs"])
-        if main is None:
-            continue
-        res = strengthen_and_simplify(cand, pruned, main)
+        res = strengthen_and_simplify(cand, pruned, primary)
         if res is None:
             stats["proof_reconstruct_failed"] += 1
             continue
         conclusion, ctx_m, fact = res
-        main = _main_var(conclusion["coeffs"])
-        if main is None:
-            continue
         ccoeffs = {v: int(c) for v, c in conclusion["coeffs"].items()}
-        # at most 3 terms besides main
-        n_terms = len([v for v in ccoeffs if v != main and ccoeffs[v] != 0])
+        prim = primary if ccoeffs.get(primary, 0) != 0 else _coeff1_var(ccoeffs)
+        if prim is None:
+            continue
+        n_terms = len([v for v in ccoeffs if v != prim and ccoeffs[v] != 0])
         if n_terms > MAX_CONCLUSION_TERMS:
             stats["too_many_terms"] += 1
             continue
+        # trivial / linear (cheap)
         if _is_trivial(ccoeffs, int(conclusion["rhs"])):
             stats["trivial"] += 1
             continue
         if linearly_derivable(pruned, conclusion):
             stats["linear_only"] += 1
+            continue
+        # §IV decomposability filter (full deduction power)
+        if is_decomposable(pruned, conclusion):
+            stats["decomposable"] += 1
+            continue
+        skel = conjecture_skeleton(props, pruned, conclusion)
+        # §V logical-redundancy pre-check against the run-start snapshot
+        if is_redundant_vs_records(pset, pruned, conclusion, _W_SNAPSHOT_RECORDS):
+            stats["redundant_vs_record"] += 1
             continue
         tb = traceback(ctx_m, fact)
         if _count_derivation_steps(tb) < 1:
@@ -1010,18 +1232,18 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         if h in existing_hashes:
             stats["duplicate"] += 1
             continue
-        skel = conjecture_skeleton(props, pruned, conclusion)
         new_metrics = {"attained": attained, "touch": touch_val, "hardness": hard}
         all_inv = set()
         _used_inventory(tb, all_inv)
         inv_used = sorted(all_inv)
         renumber_steps(tb)
         proof_stats = _pstats(tb)
+        disp, prim = display_conclusion(conclusion, prim)
         return {
             "seed": seed, "props": props, "numeric": pruned, "conclusion": conclusion,
             # aliases consumed by the generic run.py driver:
-            "premises": {"props": props, "numeric": pruned}, "disp": conclusion,
-            "main_var": main, "tb": tb, "inv_used": inv_used,
+            "premises": {"props": props, "numeric": pruned, "primary": prim}, "disp": conclusion,
+            "main_var": prim, "tb": tb, "inv_used": inv_used,
             "iris": {k: iris[k] for k in ("T", "R", "L", "score")},
             "attained": attained, "touch": touch_val, "hardness": hard,
             "depth_type": depth_type, "proof_stats": proof_stats,
@@ -1030,7 +1252,8 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             "generation": generation, "lemma_refs": [f"C{c}" for c in lemma_cnums],
             "hash": h, "skeleton": skel, "metrics": new_metrics,
             "properties": _prop_names(props),
-            "conclusion_property": conclusion_property(props, _display_orient(conclusion)),
+            "conclusion_property": conclusion_property(props, disp),
+            "dalmatian": "unknown",   # finalised in the main process at commit (§VI.4)
         }
     return None
 
@@ -1067,24 +1290,48 @@ def _iris_from_feats(feats, feat_vars, ccoeffs, rhs):
     return {"T": T, "R": R, "L": L, "score": T + R + L}
 
 
+# ── main-process commit checks (§V re-check + §VI Dalmatian) ──────────────────
+def main_commit_check(prop, committed, snapshot, pool):
+    """Run at commit (main process, in index order).  ``committed`` is a list of
+    ``{"skeleton", "data"}`` for records already written this run.  Returns
+    ``(ok, reason)``; also finalises ``prop["dalmatian"]``."""
+    pset = property_closure(set(prop["properties"]))
+    # §V main re-check: redundancy vs this-run records (excluding a same-skeleton one)
+    recs = [c["data"] for c in committed if c["skeleton"] != prop["skeleton"]]
+    if is_redundant_vs_records(pset, prop["numeric"], prop["conclusion"], recs):
+        return False, "redundant_vs_record_main"
+    # §VI Dalmatian significance vs all existing (snapshot + this-run)
+    existing = list(snapshot) + [c["data"] for c in committed]
+    dj = dalmatian(prop["props"], prop["numeric"], prop["conclusion"], prop["main_var"],
+                   existing, pool)
+    prop["dalmatian"] = dj
+    if DALMATIAN_FILTER and dj == "not_significant":
+        return False, "not_significant"
+    return True, None
+
+
 # ── record assembly ───────────────────────────────────────────────────────────
 def assemble_data(proposal, target, supersedes):
     props, numeric, conclusion = proposal["props"], proposal["numeric"], proposal["conclusion"]
+    primary = proposal["main_var"]
+    disp, prim = display_conclusion(conclusion, primary)
     return {
         "id": target,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "generator": {"version": GENERATOR_VERSION, "seed": proposal["seed"]},
         "conjecture": {
-            "formula": formula_string(props, numeric, conclusion),
+            "formula": formula_string(props, numeric, conclusion, primary),
             "properties_premises": [{"name": p["name"], **({"param": p["param"]} if "param" in p else {})} for p in props],
             "numeric_premises": [{"text": pr.get("text", ""),
                                   "coeffs": {k: int(v) for k, v in pr["coeffs"].items()},
                                   "rel": pr["rel"], "rhs": int(pr["rhs"])} for pr in numeric],
-            "conclusion": (lambda d: {"text": _render_ineq(d["coeffs"], d["rel"], int(d["rhs"])),
-                                      "coeffs": {k: int(v) for k, v in d["coeffs"].items()},
-                                      "rel": d["rel"], "rhs": int(d["rhs"])})(_display_orient(conclusion)),
-            "natural_language": natural_language(props, numeric, conclusion),
+            "conclusion": {"text": _render_isolated(disp, prim),
+                           "coeffs": {k: int(v) for k, v in disp["coeffs"].items()},
+                           "rel": disp["rel"], "rhs": int(disp["rhs"])},
+            "natural_language": natural_language(props, numeric, conclusion, primary),
         },
+        "primary_var": prim,
+        "dalmatian": proposal.get("dalmatian", "unknown"),
         "properties": proposal["properties"],
         "conclusion_property": proposal["conclusion_property"],
         "proof": {"inventory_used": proposal["inv_used"], "lemmas_used": proposal["lemma_refs"],
@@ -1104,6 +1351,18 @@ def assemble_data(proposal, target, supersedes):
 def load_pool():
     pool = json.load(open(DATA))["graphs"]
     return (pool, pool, pool)   # (objs, features-placeholder, obj_vars-placeholder)
+
+
+def load_records(record_dir):
+    """Parse all record JSONs (for the §V redundancy and §VI Dalmatian checks)."""
+    out = []
+    if not record_dir.exists():
+        return out
+    for d in sorted(record_dir.iterdir()):
+        j = d / f"{d.name}.json"
+        if j.exists():
+            out.append(json.load(open(j)))
+    return out
 
 
 def load_existing_hashes(record_dir):

@@ -251,6 +251,57 @@ theorem not_bipartite_chi_int (h : ¬ G.IsBipartite) : (3 : ℤ) ≤ (G.chromati
   have h4 : 2 < G.chromaticNumber.toNat := by exact_mod_cast h3
   omega
 
+/-! ### v1.1.1 elementary facts -/
+
+-- connected + nontrivial ⟹ diam ≥ 1
+theorem one_le_diam_of_connected (h : G.Connected) (hn : 2 ≤ Fintype.card V) :
+    1 ≤ G.diam := by
+  haveI : Nontrivial V := Fintype.one_lt_card_iff_nontrivial.mp (by omega)
+  haveI := h.nonempty
+  have hne : G.ediam ≠ ⊤ := SimpleGraph.connected_iff_ediam_ne_top.mp h
+  have h1 : 1 ≤ G.ediam := Order.one_le_iff_ne_zero.mpr G.ediam_ne_zero
+  have := ENat.toNat_le_toNat h1 hne
+  simpa [SimpleGraph.diam] using this
+
+-- connected + nontrivial ⟹ radius ≥ 1
+theorem one_le_radius_of_connected (h : G.Connected) (hn : 2 ≤ Fintype.card V) :
+    1 ≤ G.radius.toNat := by
+  haveI : Nontrivial V := Fintype.one_lt_card_iff_nontrivial.mp (by omega)
+  haveI := h.nonempty
+  have hne : G.ediam ≠ ⊤ := SimpleGraph.connected_iff_ediam_ne_top.mp h
+  have hrne : G.radius ≠ ⊤ :=
+    fun hr => hne (SimpleGraph.ediam_eq_top_iff_radius_eq_top.mpr hr)
+  have hz : G.radius ≠ 0 := by
+    intro heq
+    rw [SimpleGraph.radius_eq_zero_iff] at heq
+    exact (not_subsingleton_iff_nontrivial.mpr ‹Nontrivial V›) heq.2
+  have h1 : 1 ≤ G.radius := Order.one_le_iff_ne_zero.mpr hz
+  have := ENat.toNat_le_toNat h1 hrne
+  simpa using this
+
+-- connected ⟹ m ≥ n − 1
+theorem card_edgeFinset_ge_card_sub_one (h : G.Connected) :
+    Fintype.card V ≤ G.edgeFinset.card + 1 := by
+  have h1 := h.card_vert_le_card_edgeSet_add_one
+  rw [Nat.card_eq_fintype_card] at h1
+  have hE : Nat.card (↑G.edgeSet) = G.edgeFinset.card := by
+    rw [Nat.card_eq_fintype_card, ← Set.toFinset_card]; rfl
+  rw [hE] at h1; exact h1
+
+/-! ### v1.1.1 ℤ wrappers -/
+
+theorem diam_ge_one_int (h : G.Connected) (hn : 2 ≤ Fintype.card V) :
+    (1 : ℤ) ≤ (G.diam : ℤ) := by
+  have := one_le_diam_of_connected G h hn; omega
+
+theorem radius_ge_one_int (h : G.Connected) (hn : 2 ≤ Fintype.card V) :
+    (1 : ℤ) ≤ (G.radius.toNat : ℤ) := by
+  have := one_le_radius_of_connected G h hn; omega
+
+theorem connected_edges_int (h : G.Connected) :
+    (Fintype.card V : ℤ) - 1 ≤ (G.edgeFinset.card : ℤ) := by
+  have := card_edgeFinset_ge_card_sub_one G h; omega
+
 /-! ### property-implication discharge (§II.2, used by the formalizer) -/
 
 theorem isTree_connected (h : G.IsTree) : G.Connected := h.connected

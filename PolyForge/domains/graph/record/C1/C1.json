@@ -1,34 +1,36 @@
 {
   "id": "C1",
-  "created_at": "2026-10-08T07:36:36.279291+00:00",
+  "created_at": "2026-10-09T02:19:08.760434+00:00",
   "generator": {
-    "version": "1.1",
-    "seed": 2024006075
+    "version": "1.1.1",
+    "seed": 2024006117
   },
   "conjecture": {
-    "formula": "if ((omega <= 3)), then (omega - alpha <= 2)",
+    "formula": "if ((n <= 5)), then (omega <= alpha + 4)",
     "properties_premises": [],
     "numeric_premises": [
       {
-        "text": "omega <= 3",
+        "text": "n <= 5",
         "coeffs": {
-          "omega": 1
+          "n": 1
         },
         "rel": "<=",
-        "rhs": 3
+        "rhs": 5
       }
     ],
     "conclusion": {
-      "text": "omega - alpha <= 2",
+      "text": "omega <= alpha + 4",
       "coeffs": {
-        "alpha": -1,
-        "omega": 1
+        "omega": 1,
+        "alpha": -1
       },
       "rel": "<=",
-      "rhs": 2
+      "rhs": 4
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose omega <= 3. Then omega - alpha <= 2."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose n <= 5. Then omega <= alpha + 4."
   },
+  "primary_var": "omega",
+  "dalmatian": "significant",
   "properties": [],
   "conclusion_property": null,
   "proof": {
@@ -44,12 +46,12 @@
       {
         "fid": 1,
         "rule": "case_split",
-        "text": "-1*omega + 1*alpha + 2 >= 0",
+        "text": "-1*omega + 1*alpha + 4 >= 0",
         "coeffs": {
-          "alpha": "1",
-          "omega": "-1"
+          "omega": "-1",
+          "alpha": "1"
         },
-        "const": "2",
+        "const": "4",
         "rel": ">=",
         "tactic": "by_cases",
         "split_var": "chi",
@@ -64,14 +66,15 @@
             "steps": [
               {
                 "fid": 2,
-                "rule": "premise",
-                "text": "-1*omega + 3 >= 0",
+                "rule": "inventory",
+                "text": "1*chi + -1*omega >= 0",
                 "coeffs": {
-                  "omega": "-1"
+                  "omega": "-1",
+                  "chi": "1"
                 },
-                "const": "3",
+                "const": "0",
                 "rel": ">=",
-                "note": "omega <= 3"
+                "inventory": "omega_le_chi"
               },
               {
                 "fid": 3,
@@ -87,23 +90,23 @@
               },
               {
                 "fid": 4,
-                "rule": "assumption",
-                "text": "1*chi + -3 >= 0",
+                "rule": "premise",
+                "text": "-1*n + 5 >= 0",
                 "coeffs": {
-                  "chi": "1"
+                  "n": "-1"
                 },
-                "const": "-3",
+                "const": "5",
                 "rel": ">=",
-                "note": "1*chi >= 3"
+                "note": "n <= 5"
               },
               {
                 "fid": 5,
                 "rule": "combination",
-                "text": "1*n + -3 >= 0",
+                "text": "-1*chi + 5 >= 0",
                 "coeffs": {
-                  "n": "1"
+                  "chi": "-1"
                 },
-                "const": "-3",
+                "const": "5",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
@@ -117,6 +120,36 @@
               },
               {
                 "fid": 6,
+                "rule": "assumption",
+                "text": "1*chi + -3 >= 0",
+                "coeffs": {
+                  "chi": "1"
+                },
+                "const": "-3",
+                "rel": ">=",
+                "note": "1*chi >= 3"
+              },
+              {
+                "fid": 7,
+                "rule": "combination",
+                "text": "1*n + -3 >= 0",
+                "coeffs": {
+                  "n": "1"
+                },
+                "const": "-3",
+                "rel": ">=",
+                "tactic": "linarith",
+                "deps": [
+                  3,
+                  6
+                ],
+                "mults": [
+                  "1",
+                  "1"
+                ]
+              },
+              {
+                "fid": 8,
                 "rule": "conditional",
                 "text": "1*n + -1*tau + -1 >= 0",
                 "coeffs": {
@@ -128,11 +161,11 @@
                 "inventory": "tau_le_card_sub_one",
                 "tactic": "linarith",
                 "deps": [
-                  5
+                  7
                 ]
               },
               {
-                "fid": 7,
+                "fid": 9,
                 "rule": "inventory",
                 "text": "-1*n + 1*alpha + 1*tau == 0",
                 "coeffs": {
@@ -145,22 +178,24 @@
                 "inventory": "gallai"
               },
               {
-                "fid": 8,
+                "fid": 10,
                 "rule": "combination",
-                "text": "-2*omega + 2*alpha + 4 >= 0",
+                "text": "-2*omega + 2*alpha + 8 >= 0",
                 "coeffs": {
-                  "alpha": "2",
-                  "omega": "-2"
+                  "omega": "-2",
+                  "alpha": "2"
                 },
-                "const": "4",
+                "const": "8",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
                   2,
-                  6,
-                  7
+                  5,
+                  8,
+                  9
                 ],
                 "mults": [
+                  "2",
                   "2",
                   "2",
                   "2"
@@ -172,7 +207,7 @@
             "assume": "1*chi <= 2",
             "steps": [
               {
-                "fid": 9,
+                "fid": 11,
                 "rule": "inventory",
                 "text": "1*chi + -1*omega >= 0",
                 "coeffs": {
@@ -184,7 +219,7 @@
                 "inventory": "omega_le_chi"
               },
               {
-                "fid": 10,
+                "fid": 12,
                 "rule": "inventory",
                 "text": "1*alpha >= 0",
                 "coeffs": {
@@ -195,7 +230,7 @@
                 "inventory": "nonneg_alpha"
               },
               {
-                "fid": 11,
+                "fid": 13,
                 "rule": "assumption",
                 "text": "-1*chi + 2 >= 0",
                 "coeffs": {
@@ -206,20 +241,20 @@
                 "note": "1*chi <= 2"
               },
               {
-                "fid": 12,
+                "fid": 14,
                 "rule": "combination",
                 "text": "-2*omega + 2*alpha + 4 >= 0",
                 "coeffs": {
-                  "alpha": "2",
-                  "omega": "-2"
+                  "omega": "-2",
+                  "alpha": "2"
                 },
                 "const": "4",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
-                  9,
-                  10,
-                  11
+                  11,
+                  12,
+                  13
                 ],
                 "mults": [
                   "2",
@@ -234,10 +269,10 @@
     ]
   },
   "iris": {
-    "T": 0.0011737089201877935,
+    "T": 0.018867924528301886,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.0011737089201878
+    "score": 1.0188679245283019
   },
   "attained": "yes",
   "touch": 1,
@@ -248,15 +283,15 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 1,
     "roundings": 0,
-    "inventory_theorems": 4
+    "inventory_theorems": 5
   },
-  "proof_cost_initial": 14.5,
-  "proof_cost": 14.5,
-  "proof_cost_expanded": 14.5,
+  "proof_cost_initial": 17.0,
+  "proof_cost": 17.0,
+  "proof_cost_expanded": 17.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 3.625,
+  "hardness": 4.25,
   "lean": {
     "theorem_name": "C1",
     "status": "compiled"

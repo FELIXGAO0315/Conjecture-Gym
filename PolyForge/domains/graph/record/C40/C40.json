@@ -1,97 +1,91 @@
 {
   "id": "C40",
-  "created_at": "2026-10-08T07:48:12.671963+00:00",
+  "created_at": "2026-10-09T02:33:50.142482+00:00",
   "generator": {
-    "version": "1.1",
-    "seed": 2024006722
+    "version": "1.1.1",
+    "seed": 2024008031
   },
   "conjecture": {
-    "formula": "if ((is_tree) and (is_regular(0)) and (diam <= 1) and (-2*m + tau >= 0)), then (-alpha + 2*diam - 2*radius <= -1)",
+    "formula": "if ((is_connected) and (-alpha + tau <= 0) and (n >= 3)), then (m >= -2*alpha + 6)",
     "properties_premises": [
       {
-        "name": "is_tree"
-      },
-      {
-        "name": "is_regular",
-        "param": 0
+        "name": "is_connected"
       }
     ],
     "numeric_premises": [
       {
-        "text": "diam <= 1",
-        "coeffs": {
-          "diam": 1
-        },
-        "rel": "<=",
-        "rhs": 1
-      },
-      {
-        "text": "1*tau >= 2*m",
+        "text": "tau <= alpha",
         "coeffs": {
           "tau": 1,
-          "m": -2
+          "alpha": -1
+        },
+        "rel": "<=",
+        "rhs": 0
+      },
+      {
+        "text": "n >= 3",
+        "coeffs": {
+          "n": 1
         },
         "rel": ">=",
-        "rhs": 0
+        "rhs": 3
       }
     ],
     "conclusion": {
-      "text": "-alpha + 2*diam - 2*radius <= -1",
+      "text": "m >= -2*alpha + 6",
       "coeffs": {
-        "alpha": -1,
-        "diam": 2,
-        "radius": -2
+        "m": 1,
+        "alpha": 2
       },
-      "rel": "<=",
-      "rhs": -1
+      "rel": ">=",
+      "rhs": 6
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, is_regular(0), diam <= 1, -2*m + tau >= 0. Then -alpha + 2*diam - 2*radius <= -1."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_connected, -alpha + tau <= 0, n >= 3. Then m >= -2*alpha + 6."
   },
+  "primary_var": "m",
+  "dalmatian": "significant",
   "properties": [
-    "is_tree",
-    "is_regular"
+    "is_connected"
   ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
-      "alpha_ge_one",
-      "diam_le_two_radius",
-      "nonneg_m",
-      "tree_edges"
+      "connected_edges",
+      "gallai"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
         "rule": "inventory",
-        "text": "1*m >= 0",
-        "coeffs": {
-          "m": "1"
-        },
-        "const": "0",
-        "rel": ">=",
-        "inventory": "nonneg_m"
-      },
-      {
-        "fid": 2,
-        "rule": "inventory",
-        "text": "-1*n + 1*m + 1 == 0",
+        "text": "-1*n + 1*m + 1 >= 0",
         "coeffs": {
           "m": "1",
           "n": "-1"
         },
         "const": "1",
-        "rel": "==",
-        "inventory": "tree_edges"
+        "rel": ">=",
+        "inventory": "connected_edges"
+      },
+      {
+        "fid": 2,
+        "rule": "premise",
+        "text": "1*n + -3 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "note": "n >= 3"
       },
       {
         "fid": 3,
         "rule": "combination",
-        "text": "1*n + -1 >= 0",
+        "text": "1*m + -2 >= 0",
         "coeffs": {
-          "n": "1"
+          "m": "1"
         },
-        "const": "-1",
+        "const": "-2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
@@ -100,97 +94,83 @@
         ],
         "mults": [
           "1",
-          "-1"
-        ]
-      },
-      {
-        "fid": 4,
-        "rule": "conditional",
-        "text": "1*alpha + -1 >= 0",
-        "coeffs": {
-          "alpha": "1"
-        },
-        "const": "-1",
-        "rel": ">=",
-        "inventory": "alpha_ge_one",
-        "tactic": "linarith",
-        "deps": [
-          3
-        ]
-      },
-      {
-        "fid": 5,
-        "rule": "inventory",
-        "text": "-1*diam + 2*radius >= 0",
-        "coeffs": {
-          "diam": "-1",
-          "radius": "2"
-        },
-        "const": "0",
-        "rel": ">=",
-        "inventory": "diam_le_two_radius"
-      },
-      {
-        "fid": 6,
-        "rule": "premise",
-        "text": "-1*diam + 1 >= 0",
-        "coeffs": {
-          "diam": "-1"
-        },
-        "const": "1",
-        "rel": ">=",
-        "note": "diam <= 1"
-      },
-      {
-        "fid": 7,
-        "rule": "combination",
-        "text": "-2*diam + 2*radius + 1 >= 0",
-        "coeffs": {
-          "diam": "-2",
-          "radius": "2"
-        },
-        "const": "1",
-        "rel": ">=",
-        "tactic": "linarith",
-        "deps": [
-          5,
-          6
-        ],
-        "mults": [
-          "1",
           "1"
         ]
       },
       {
-        "fid": 8,
-        "rule": "rounding",
-        "text": "-1*diam + 1*radius >= 0",
+        "fid": 4,
+        "rule": "premise",
+        "text": "1*alpha + -1*tau >= 0",
         "coeffs": {
-          "diam": "-1",
-          "radius": "1"
+          "tau": "-1",
+          "alpha": "1"
         },
         "const": "0",
         "rel": ">=",
-        "tactic": "omega",
-        "deps": [
-          7
-        ]
+        "note": "tau <= alpha"
       },
       {
-        "fid": 9,
-        "rule": "combination",
-        "text": "1*alpha + -2*diam + 2*radius + -1 >= 0",
+        "fid": 5,
+        "rule": "inventory",
+        "text": "-1*n + 1*alpha + 1*tau == 0",
         "coeffs": {
           "alpha": "1",
-          "diam": "-2",
-          "radius": "2"
+          "tau": "1",
+          "n": "-1"
         },
-        "const": "-1",
+        "const": "0",
+        "rel": "==",
+        "inventory": "gallai"
+      },
+      {
+        "fid": 6,
+        "rule": "combination",
+        "text": "1*alpha + -3/2 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-3/2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
+          2,
           4,
-          8
+          5
+        ],
+        "mults": [
+          "1/2",
+          "1/2",
+          "1/2"
+        ]
+      },
+      {
+        "fid": 7,
+        "rule": "rounding",
+        "text": "1*alpha + -2 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          6
+        ]
+      },
+      {
+        "fid": 8,
+        "rule": "combination",
+        "text": "1*m + 2*alpha + -6 >= 0",
+        "coeffs": {
+          "m": "1",
+          "alpha": "2"
+        },
+        "const": "-6",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          3,
+          7
         ],
         "mults": [
           "1",
@@ -200,10 +180,10 @@
     ]
   },
   "iris": {
-    "T": 1.0,
+    "T": 0.0031545741324921135,
     "R": 1.0,
     "L": 0.0,
-    "score": 2.0
+    "score": 1.003154574132492
   },
   "attained": "yes",
   "touch": 1,
@@ -214,15 +194,15 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 1,
-    "inventory_theorems": 3
+    "inventory_theorems": 2
   },
-  "proof_cost_initial": 10.5,
-  "proof_cost": 10.5,
-  "proof_cost_expanded": 10.5,
+  "proof_cost_initial": 8.5,
+  "proof_cost": 8.5,
+  "proof_cost_expanded": 8.5,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.3125,
+  "hardness": 1.2142857142857142,
   "lean": {
     "theorem_name": "C40",
     "status": "compiled"

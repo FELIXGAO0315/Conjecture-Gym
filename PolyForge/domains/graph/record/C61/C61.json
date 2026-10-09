@@ -1,57 +1,71 @@
 {
   "id": "C61",
-  "created_at": "2026-10-08T07:53:37.374964+00:00",
+  "created_at": "2026-10-09T02:40:41.570161+00:00",
   "generator": {
-    "version": "1.1",
-    "seed": 2024007011
+    "version": "1.1.1",
+    "seed": 2024009302
   },
   "conjecture": {
-    "formula": "if ((nontrivial) and (is_tree) and (diam >= 3)), then (-chi + 2*omega - 2*radius <= -2)",
+    "formula": "if ((is_connected) and (diam >= 1) and (max_deg >= 1)), then (max_deg >= -2*radius + 3)",
     "properties_premises": [
       {
-        "name": "nontrivial"
-      },
-      {
-        "name": "is_tree"
+        "name": "is_connected"
       }
     ],
     "numeric_premises": [
       {
-        "text": "diam >= 3",
+        "text": "diam >= 1",
         "coeffs": {
           "diam": 1
         },
         "rel": ">=",
-        "rhs": 3
+        "rhs": 1
+      },
+      {
+        "text": "max_deg >= 1",
+        "coeffs": {
+          "max_deg": 1
+        },
+        "rel": ">=",
+        "rhs": 1
       }
     ],
     "conclusion": {
-      "text": "-chi + 2*omega - 2*radius <= -2",
+      "text": "max_deg >= -2*radius + 3",
       "coeffs": {
-        "chi": -1,
-        "omega": 2,
-        "radius": -2
+        "max_deg": 1,
+        "radius": 2
       },
-      "rel": "<=",
-      "rhs": -2
+      "rel": ">=",
+      "rhs": 3
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose nontrivial, is_tree, diam >= 3. Then -chi + 2*omega - 2*radius <= -2."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_connected, diam >= 1, max_deg >= 1. Then max_deg >= -2*radius + 3."
   },
+  "primary_var": "max_deg",
+  "dalmatian": "significant",
   "properties": [
-    "nontrivial",
-    "is_tree"
+    "is_connected"
   ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
-      "acyclic_chi",
-      "diam_le_two_radius",
-      "omega_le_chi"
+      "diam_le_two_radius"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
+        "rule": "premise",
+        "text": "1*max_deg + -1 >= 0",
+        "coeffs": {
+          "max_deg": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "note": "max_deg >= 1"
+      },
+      {
+        "fid": 2,
         "rule": "inventory",
         "text": "-1*diam + 2*radius >= 0",
         "coeffs": {
@@ -63,29 +77,29 @@
         "inventory": "diam_le_two_radius"
       },
       {
-        "fid": 2,
+        "fid": 3,
         "rule": "premise",
-        "text": "1*diam + -3 >= 0",
+        "text": "1*diam + -1 >= 0",
         "coeffs": {
           "diam": "1"
         },
-        "const": "-3",
+        "const": "-1",
         "rel": ">=",
-        "note": "diam >= 3"
+        "note": "diam >= 1"
       },
       {
-        "fid": 3,
+        "fid": 4,
         "rule": "combination",
-        "text": "1*radius + -3/2 >= 0",
+        "text": "1*radius + -1/2 >= 0",
         "coeffs": {
           "radius": "1"
         },
-        "const": "-3/2",
+        "const": "-1/2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
-          1,
-          2
+          2,
+          3
         ],
         "mults": [
           "1/2",
@@ -93,93 +107,49 @@
         ]
       },
       {
-        "fid": 4,
+        "fid": 5,
         "rule": "rounding",
-        "text": "1*radius + -2 >= 0",
+        "text": "1*radius + -1 >= 0",
         "coeffs": {
           "radius": "1"
         },
-        "const": "-2",
+        "const": "-1",
         "rel": ">=",
         "tactic": "omega",
         "deps": [
-          3
+          4
         ]
-      },
-      {
-        "fid": 5,
-        "rule": "inventory",
-        "text": "1*chi + -1*omega >= 0",
-        "coeffs": {
-          "omega": "-1",
-          "chi": "1"
-        },
-        "const": "0",
-        "rel": ">=",
-        "inventory": "omega_le_chi"
       },
       {
         "fid": 6,
-        "rule": "inventory",
-        "text": "-1*chi + 2 >= 0",
-        "coeffs": {
-          "chi": "-1"
-        },
-        "const": "2",
-        "rel": ">=",
-        "inventory": "acyclic_chi"
-      },
-      {
-        "fid": 7,
         "rule": "combination",
-        "text": "1*chi + -2*omega + 2 >= 0",
+        "text": "1*max_deg + 2*radius + -3 >= 0",
         "coeffs": {
-          "chi": "1",
-          "omega": "-2"
-        },
-        "const": "2",
-        "rel": ">=",
-        "tactic": "linarith",
-        "deps": [
-          5,
-          6
-        ],
-        "mults": [
-          "2",
-          "1"
-        ]
-      },
-      {
-        "fid": 8,
-        "rule": "combination",
-        "text": "1*chi + -2*omega + 2*radius + -2 >= 0",
-        "coeffs": {
-          "chi": "1",
-          "omega": "-2",
+          "max_deg": "1",
           "radius": "2"
         },
-        "const": "-2",
+        "const": "-3",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
-          4,
-          7
+          1,
+          5
         ],
         "mults": [
-          "2",
-          "1"
+          "1",
+          "2"
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.7777777777777778,
-    "R": 0.14285714285714285,
-    "L": 0.31622776601683794,
-    "score": 1.2368626866517587
+    "T": 0.0010050251256281408,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0010050251256282
   },
   "attained": "yes",
-  "touch": 14,
+  "touch": 1,
   "depth_type": "split_needed",
   "proof_stats": {
     "case_splits": 0,
@@ -187,15 +157,15 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 1,
-    "inventory_theorems": 3
+    "inventory_theorems": 1
   },
-  "proof_cost_initial": 10.0,
-  "proof_cost": 10.0,
-  "proof_cost_expanded": 10.0,
+  "proof_cost_initial": 6.0,
+  "proof_cost": 6.0,
+  "proof_cost_expanded": 6.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.0,
+  "hardness": 1.0,
   "lean": {
     "theorem_name": "C61",
     "status": "compiled"

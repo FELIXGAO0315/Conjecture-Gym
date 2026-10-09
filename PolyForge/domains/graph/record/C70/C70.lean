@@ -4,19 +4,21 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C70 {V : Type} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] (hp1 : ¬ G.IsAcyclic) (hp2 : G.Connected) (hn1 : 2 * (G.maxDegree : ℤ) - (G.vertexCoverNum.toNat : ℤ) ≥ 0) :
-    (G.diam : ℤ) + 2 * (G.radius.toNat : ℤ) + 2 * (G.girth : ℤ) ≥ 9 := by
-  have s1 : (G.girth : ℤ) ≥ 3 := by
-    have hw := girth_ge_three_int G hp1
+theorem C70 {V : Type} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.chromaticNumber.toNat : ℤ) ≥ 3) (hn2 : (Fintype.card V : ℤ) - 2 * (G.maxDegree : ℤ) ≤ 0) :
+    2 * (G.vertexCoverNum.toNat : ℤ) ≤ 2 * (Fintype.card V : ℤ) + (G.maxDegree : ℤ) - 4 := by
+  have s1 : (Fintype.card V : ℤ) - (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
+    have hw := chi_le_n_int G
     linarith [hw]
-  have s2 : 2 * (G.diam : ℤ) - (G.girth : ℤ) ≥ -1 := by
-    have hw := girth_le_diam_int G hp2 hp1
+  have s2 : (G.chromaticNumber.toNat : ℤ) ≥ 3 := by linarith [hn1]
+  have s3 : -(Fintype.card V : ℤ) + 2 * (G.maxDegree : ℤ) ≥ 0 := by linarith [hn2]
+  have s4 : 2 * (G.maxDegree : ℤ) ≥ 3 := by linarith [s1, s2, s3]
+  have s5 : (G.maxDegree : ℤ) ≥ 2 := by have hr := s4; omega
+  have s6 : (Fintype.card V : ℤ) ≥ 3 := by linarith [s1, s2]
+  have s7 : (G.indepNum : ℤ) ≥ 1 := by
+    have hw := alpha_ge_one_int G (by omega)
     linarith [hw]
-  have s3 : (G.diam : ℤ) ≥ 1 := by linarith [s2, s1]
-  have s4 : -(G.diam : ℤ) + 2 * (G.radius.toNat : ℤ) ≥ 0 := by
-    have hw := diam_le_two_radius_int G hp2
+  have s8 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) + (G.vertexCoverNum.toNat : ℤ) = 0 := by
+    have hw := gallai_int G
     linarith [hw]
-  have s5 : 2 * (G.radius.toNat : ℤ) ≥ 1 := by linarith [s4, s2, s1]
-  have s6 : (G.radius.toNat : ℤ) ≥ 1 := by have hr := s5; omega
-  have s7 : (G.diam : ℤ) + 2 * (G.radius.toNat : ℤ) + 2 * (G.girth : ℤ) ≥ 9 := by linarith [s1, s3, s6]
-  linarith [s7]
+  have s9 : 2 * (Fintype.card V : ℤ) + (G.maxDegree : ℤ) - 2 * (G.vertexCoverNum.toNat : ℤ) ≥ 4 := by linarith [s5, s7, s8]
+  linarith [s9]

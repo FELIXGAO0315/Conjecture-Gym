@@ -4,29 +4,19 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C11 {V : Type} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] (hp1 : G.Connected) (hp2 : G.IsEdgeConnected 1) (hn1 : (Fintype.card V : ℤ) ≤ 3) :
-    (G.chromaticNumber.toNat : ℤ) - (G.indepNum : ℤ) ≤ 2 := by
-  have s1 : -(G.chromaticNumber.toNat : ℤ) + (G.indepNum : ℤ) ≥ -2 := by
-    by_cases hc1 : (3 : ℤ) ≤ (G.chromaticNumber.toNat : ℤ)
-    · -- 1*chi >= 3
-      have s2 : (Fintype.card V : ℤ) - (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
-        have hw := chi_le_n_int G
-        linarith [hw]
-      have s3 : -(Fintype.card V : ℤ) ≥ -3 := by linarith [hn1]
-      have s4 : -(G.chromaticNumber.toNat : ℤ) ≥ -3 := by linarith [s2, s3]
-      have s5 : (G.chromaticNumber.toNat : ℤ) ≥ 3 := by have hcc := hc1; omega
-      have s6 : (Fintype.card V : ℤ) ≥ 3 := by linarith [s2, s5]
-      have s7 : (Fintype.card V : ℤ) - (G.vertexCoverNum.toNat : ℤ) ≥ 1 := by
-        have hw := tau_le_card_sub_one_int G (by omega)
-        linarith [hw]
-      have s8 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) + (G.vertexCoverNum.toNat : ℤ) = 0 := by
-        have hw := gallai_int G
-        linarith [hw]
-      have s9 : -2 * (G.chromaticNumber.toNat : ℤ) + 2 * (G.indepNum : ℤ) ≥ -4 := by linarith [s4, s7, s8]
-      linarith [s9]
-    · -- 1*chi <= 2
-      have s10 : (G.indepNum : ℤ) ≥ 0 := by positivity
-      have s11 : -(G.chromaticNumber.toNat : ℤ) ≥ -2 := by have hcc := hc1; omega
-      have s12 : -2 * (G.chromaticNumber.toNat : ℤ) + 2 * (G.indepNum : ℤ) ≥ -4 := by linarith [s10, s11]
-      linarith [s12]
-  linarith [s1]
+theorem C11 {V : Type} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] (hp1 : G.Connected) (hp2 : ¬ G.IsAcyclic) (hn1 : -2 * (G.minDegree : ℤ) + (G.diam : ℤ) ≤ 0) :
+    (G.diam : ℤ) ≤ 2 * (G.minDegree : ℤ) + 2 * (G.radius.toNat : ℤ) - 2 := by
+  have s1 : -(G.diam : ℤ) + 2 * (G.radius.toNat : ℤ) ≥ 0 := by
+    have hw := diam_le_two_radius_int G hp1
+    linarith [hw]
+  have s2 : 2 * (G.diam : ℤ) - (G.girth : ℤ) ≥ -1 := by
+    have hw := girth_le_diam_int G hp1 hp2
+    linarith [hw]
+  have s3 : (G.girth : ℤ) ≥ 3 := by
+    have hw := girth_ge_three_int G hp2
+    linarith [hw]
+  have s4 : 2 * (G.minDegree : ℤ) - (G.diam : ℤ) ≥ 0 := by linarith [hn1]
+  have s5 : 2 * (G.minDegree : ℤ) ≥ 1 := by linarith [s2, s3, s4]
+  have s6 : (G.minDegree : ℤ) ≥ 1 := by have hr := s5; omega
+  have s7 : 2 * (G.minDegree : ℤ) - (G.diam : ℤ) + 2 * (G.radius.toNat : ℤ) ≥ 2 := by linarith [s1, s6]
+  linarith [s7]

@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## PolyForge (v1.1)
+## PolyForge (v1.1.1)
 
 PolyForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about a mathematical subject, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -98,7 +98,7 @@ A graph conjecture is `if (<premises>), then (<conclusion>)`, where every premis
 
 **Finiteness restrictions.** `diam`/`radius` are in ℕ∞ and finite only for connected graphs, so they may appear (in premises, conclusion, or proof) only when `is_connected` is a premise; `girth` is in ℕ∞ and finite only when the graph has a cycle, so it needs `has_cycle`. `chi` and `tau` are ℕ∞ but always finite for a finite graph (used via `toNat`).
 
-**Format rules.** Premises: 0–2 property premises and 1–2 numeric premises (an upper/lower bound on a variable, or a simple relation between two variables). Conclusion: a linear (in)equality with a main variable (coefficient 1 or 2) and at most 3 other terms (coefficients |·| ≤ 2); both upper and lower bounds are mined. Conclusions equivalent to a known property are tagged in the JSON for stage-3 retrieval: `properties` lists the property premises, and `conclusion_property` names the equivalent property when the conclusion is one of `chi ≤ 2 → is_bipartite`, `chi ≤ 1 → edgeless`, `chi ≥ 3 → not_bipartite`, `max_deg = min_deg → is_regular`, or (under `is_connected`) `m = n − 1 → is_tree`; otherwise it is `null`. These tags are metadata only (no Lean proof required).
+**Format rules.** Premises: 0–2 property premises and 1–2 numeric premises (an upper/lower bound on a variable, or a two-variable relation restricted to `x ≤ y`, `x ≥ y`, `x ≤ 2·y`, `x ≥ 2·y`). Conclusion: a linear (in)equality with a **primary variable** (coefficient 1 or 2) and at most 3 other terms (coefficients |·| ≤ 2); both upper and lower bounds are mined. The primary variable rotates deterministically across premise sets (over the finiteness-valid invariants) for balance. The conclusion is displayed with the primary variable alone on one side with a positive coefficient (e.g. `chi >= 2*omega - 2*alpha - 2` rather than `-chi + 2*omega - 2*alpha <= 2`), and the Lean statement matches this form. Conclusions equivalent to a known property are tagged in the JSON for stage-3 retrieval: `properties` lists the property premises, and `conclusion_property` names the equivalent property when the conclusion is one of `chi ≤ 2 → is_bipartite`, `chi ≤ 1 → edgeless`, `chi ≥ 3 → not_bipartite`, `max_deg = min_deg → is_regular`, or (under `is_connected`) `m = n − 1 → is_tree`; otherwise it is `null`. These tags are metadata only (no Lean proof required).
 
 **Examples.**
 
@@ -114,6 +114,7 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v1.1.1** — Graph domain quality: elementary facts added to the inventory, simpler premises, rotating primary invariant, decomposability filter, redundancy check against existing records, Dalmatian significance (IRIS), primary invariant displayed on its own side.
 - **v1.1** — Graph domain, stage 1: linear inventory from Mathlib plus self-proved lemmas (Gallai identity, max degree ≤ edges, …), property premises, conclusions on any invariant, property tags for future structural conjectures.
 - **v1.0** — Renamed to PolyForge; domain-specific code moved into domains/; hex (p6) kept unchanged as the first domain; graph domain skeleton with its own Lean project (recent Mathlib) and a graph dataset.
 - **v0.7** — Proved conjectures become lemmas: a lemma library selected from the record is used as conditional theorems; generation tracks how many layers of lemmas a proof builds on; hardness uses the expanded proof cost including lemmas; lemma proofs are inlined so every Lean file compiles on its own.

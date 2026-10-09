@@ -1,49 +1,58 @@
 {
   "id": "C2",
-  "created_at": "2026-10-08T07:36:36.281685+00:00",
+  "created_at": "2026-10-09T02:19:08.795841+00:00",
   "generator": {
-    "version": "1.1",
-    "seed": 2024006079
+    "version": "1.1.1",
+    "seed": 2024006229
   },
   "conjecture": {
-    "formula": "if ((-2*alpha + tau >= 0) and (n <= 5)), then (omega - alpha <= 4)",
-    "properties_premises": [],
+    "formula": "if ((nontrivial) and (tau <= 4) and (omega - 2*tau <= 0)), then (omega <= 2*alpha + 3)",
+    "properties_premises": [
+      {
+        "name": "nontrivial"
+      }
+    ],
     "numeric_premises": [
       {
-        "text": "1*tau >= 2*alpha",
+        "text": "tau <= 4",
         "coeffs": {
-          "tau": 1,
-          "alpha": -2
-        },
-        "rel": ">=",
-        "rhs": 0
-      },
-      {
-        "text": "n <= 5",
-        "coeffs": {
-          "n": 1
+          "tau": 1
         },
         "rel": "<=",
-        "rhs": 5
+        "rhs": 4
+      },
+      {
+        "text": "omega <= 2*tau",
+        "coeffs": {
+          "omega": 1,
+          "tau": -2
+        },
+        "rel": "<=",
+        "rhs": 0
       }
     ],
     "conclusion": {
-      "text": "omega - alpha <= 4",
+      "text": "omega <= 2*alpha + 3",
       "coeffs": {
-        "alpha": -1,
-        "omega": 1
+        "omega": 1,
+        "alpha": -2
       },
       "rel": "<=",
-      "rhs": 4
+      "rhs": 3
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose -2*alpha + tau >= 0, n <= 5. Then omega - alpha <= 4."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose nontrivial, tau <= 4, omega - 2*tau <= 0. Then omega <= 2*alpha + 3."
   },
-  "properties": [],
+  "primary_var": "omega",
+  "dalmatian": "significant",
+  "properties": [
+    "nontrivial"
+  ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
       "alpha_ge_one",
       "chi_le_n",
+      "gallai",
       "nonneg_alpha",
       "omega_le_chi"
     ],
@@ -52,12 +61,12 @@
       {
         "fid": 1,
         "rule": "case_split",
-        "text": "-1*omega + 1*alpha + 4 >= 0",
+        "text": "-1*omega + 2*alpha + 3 >= 0",
         "coeffs": {
-          "alpha": "1",
-          "omega": "-1"
+          "omega": "-1",
+          "alpha": "2"
         },
-        "const": "4",
+        "const": "3",
         "rel": ">=",
         "tactic": "by_cases",
         "split_var": "chi",
@@ -73,63 +82,6 @@
               {
                 "fid": 2,
                 "rule": "inventory",
-                "text": "1*n + -1*chi >= 0",
-                "coeffs": {
-                  "chi": "-1",
-                  "n": "1"
-                },
-                "const": "0",
-                "rel": ">=",
-                "inventory": "chi_le_n"
-              },
-              {
-                "fid": 3,
-                "rule": "assumption",
-                "text": "1*chi + -3 >= 0",
-                "coeffs": {
-                  "chi": "1"
-                },
-                "const": "-3",
-                "rel": ">=",
-                "note": "1*chi >= 3"
-              },
-              {
-                "fid": 4,
-                "rule": "combination",
-                "text": "1*n + -3 >= 0",
-                "coeffs": {
-                  "n": "1"
-                },
-                "const": "-3",
-                "rel": ">=",
-                "tactic": "linarith",
-                "deps": [
-                  2,
-                  3
-                ],
-                "mults": [
-                  "1",
-                  "1"
-                ]
-              },
-              {
-                "fid": 5,
-                "rule": "conditional",
-                "text": "1*alpha + -1 >= 0",
-                "coeffs": {
-                  "alpha": "1"
-                },
-                "const": "-1",
-                "rel": ">=",
-                "inventory": "alpha_ge_one",
-                "tactic": "linarith",
-                "deps": [
-                  4
-                ]
-              },
-              {
-                "fid": 6,
-                "rule": "inventory",
                 "text": "1*chi + -1*omega >= 0",
                 "coeffs": {
                   "omega": "-1",
@@ -140,53 +92,108 @@
                 "inventory": "omega_le_chi"
               },
               {
-                "fid": 7,
-                "rule": "premise",
-                "text": "-1*n + 5 >= 0",
+                "fid": 3,
+                "rule": "inventory",
+                "text": "1*n + -1*chi >= 0",
                 "coeffs": {
-                  "n": "-1"
+                  "chi": "-1",
+                  "n": "1"
                 },
-                "const": "5",
+                "const": "0",
                 "rel": ">=",
-                "note": "n <= 5"
+                "inventory": "chi_le_n"
               },
               {
-                "fid": 8,
-                "rule": "combination",
-                "text": "-1*omega + 5 >= 0",
+                "fid": 4,
+                "rule": "assumption",
+                "text": "1*chi + -3 >= 0",
                 "coeffs": {
-                  "omega": "-1"
+                  "chi": "1"
                 },
-                "const": "5",
+                "const": "-3",
+                "rel": ">=",
+                "note": "1*chi >= 3"
+              },
+              {
+                "fid": 5,
+                "rule": "combination",
+                "text": "1*n + -3 >= 0",
+                "coeffs": {
+                  "n": "1"
+                },
+                "const": "-3",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
-                  6,
-                  2,
-                  7
+                  3,
+                  4
                 ],
                 "mults": [
-                  "1",
                   "1",
                   "1"
                 ]
               },
               {
-                "fid": 9,
-                "rule": "combination",
-                "text": "-1*omega + 1*alpha + 4 >= 0",
+                "fid": 6,
+                "rule": "conditional",
+                "text": "1*alpha + -1 >= 0",
                 "coeffs": {
-                  "alpha": "1",
-                  "omega": "-1"
+                  "alpha": "1"
+                },
+                "const": "-1",
+                "rel": ">=",
+                "inventory": "alpha_ge_one",
+                "tactic": "linarith",
+                "deps": [
+                  5
+                ]
+              },
+              {
+                "fid": 7,
+                "rule": "premise",
+                "text": "-1*tau + 4 >= 0",
+                "coeffs": {
+                  "tau": "-1"
                 },
                 "const": "4",
                 "rel": ">=",
+                "note": "tau <= 4"
+              },
+              {
+                "fid": 8,
+                "rule": "inventory",
+                "text": "-1*n + 1*alpha + 1*tau == 0",
+                "coeffs": {
+                  "alpha": "1",
+                  "tau": "1",
+                  "n": "-1"
+                },
+                "const": "0",
+                "rel": "==",
+                "inventory": "gallai"
+              },
+              {
+                "fid": 9,
+                "rule": "combination",
+                "text": "-1*omega + 2*alpha + 3 >= 0",
+                "coeffs": {
+                  "omega": "-1",
+                  "alpha": "2"
+                },
+                "const": "3",
+                "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
-                  5,
+                  2,
+                  3,
+                  6,
+                  7,
                   8
                 ],
                 "mults": [
+                  "1",
+                  "1",
+                  "1",
                   "1",
                   "1"
                 ]
@@ -233,10 +240,10 @@
               {
                 "fid": 13,
                 "rule": "combination",
-                "text": "-1*omega + 1*alpha + 2 >= 0",
+                "text": "-1*omega + 2*alpha + 2 >= 0",
                 "coeffs": {
-                  "alpha": "1",
-                  "omega": "-1"
+                  "omega": "-1",
+                  "alpha": "2"
                 },
                 "const": "2",
                 "rel": ">=",
@@ -248,7 +255,7 @@
                 ],
                 "mults": [
                   "1",
-                  "1",
+                  "2",
                   "1"
                 ]
               }
@@ -259,10 +266,10 @@
     ]
   },
   "iris": {
-    "T": 0.25,
+    "T": 0.0008795074758135445,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.25
+    "score": 1.0008795074758134
   },
   "attained": "yes",
   "touch": 1,
@@ -273,15 +280,15 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 1,
     "roundings": 0,
-    "inventory_theorems": 4
+    "inventory_theorems": 5
   },
-  "proof_cost_initial": 15.0,
-  "proof_cost": 15.0,
-  "proof_cost_expanded": 15.0,
+  "proof_cost_initial": 16.5,
+  "proof_cost": 16.5,
+  "proof_cost_expanded": 16.5,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.142857142857143,
+  "hardness": 2.357142857142857,
   "lean": {
     "theorem_name": "C2",
     "status": "compiled"

@@ -1,249 +1,152 @@
 {
   "id": "C12",
-  "created_at": "2026-10-08T07:40:07.181136+00:00",
+  "created_at": "2026-10-09T02:22:08.945754+00:00",
   "generator": {
-    "version": "1.1",
-    "seed": 2024006173
+    "version": "1.1.1",
+    "seed": 2024006749
   },
   "conjecture": {
-    "formula": "if ((is_tree) and (n >= 1) and (alpha - 2*diam >= 0)), then (-n - alpha + 2*diam <= -2)",
+    "formula": "if ((is_connected) and (diam >= 3)), then (2*radius >= -diam + 7)",
     "properties_premises": [
       {
-        "name": "is_tree"
+        "name": "is_connected"
       }
     ],
     "numeric_premises": [
       {
-        "text": "n >= 1",
+        "text": "diam >= 3",
         "coeffs": {
-          "n": 1
+          "diam": 1
         },
         "rel": ">=",
-        "rhs": 1
-      },
-      {
-        "text": "1*alpha >= 2*diam",
-        "coeffs": {
-          "alpha": 1,
-          "diam": -2
-        },
-        "rel": ">=",
-        "rhs": 0
+        "rhs": 3
       }
     ],
     "conclusion": {
-      "text": "-n - alpha + 2*diam <= -2",
+      "text": "2*radius >= -diam + 7",
       "coeffs": {
-        "alpha": -1,
-        "diam": 2,
-        "n": -1
+        "radius": 2,
+        "diam": 1
       },
-      "rel": "<=",
-      "rhs": -2
+      "rel": ">=",
+      "rhs": 7
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, n >= 1, alpha - 2*diam >= 0. Then -n - alpha + 2*diam <= -2."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_connected, diam >= 3. Then 2*radius >= -diam + 7."
   },
+  "primary_var": "radius",
+  "dalmatian": "significant",
   "properties": [
-    "is_tree"
+    "is_connected"
   ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
-      "alpha_ge_one",
-      "gallai",
-      "nonneg_tau"
+      "diam_le_two_radius"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
-        "rule": "case_split",
-        "text": "1*n + 1*alpha + -2*diam + -2 >= 0",
+        "rule": "premise",
+        "text": "1*diam + -3 >= 0",
         "coeffs": {
-          "alpha": "1",
-          "diam": "-2",
-          "n": "1"
+          "diam": "1"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "note": "diam >= 3"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "-1*diam + 2*radius >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "radius": "2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "diam_le_two_radius"
+      },
+      {
+        "fid": 3,
+        "rule": "combination",
+        "text": "1*radius + -3/2 >= 0",
+        "coeffs": {
+          "radius": "1"
+        },
+        "const": "-3/2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          2,
+          1
+        ],
+        "mults": [
+          "1/2",
+          "1/2"
+        ]
+      },
+      {
+        "fid": 4,
+        "rule": "rounding",
+        "text": "1*radius + -2 >= 0",
+        "coeffs": {
+          "radius": "1"
         },
         "const": "-2",
         "rel": ">=",
-        "tactic": "by_cases",
-        "split_var": "bnb:diam",
-        "split_threshold": 1,
-        "split_coeffs": {
+        "tactic": "omega",
+        "deps": [
+          3
+        ]
+      },
+      {
+        "fid": 5,
+        "rule": "combination",
+        "text": "1*diam + 2*radius + -7 >= 0",
+        "coeffs": {
+          "radius": "2",
           "diam": "1"
         },
-        "split_kind": "bnb",
-        "cases": [
-          {
-            "assume": "1*diam >= 1",
-            "steps": [
-              {
-                "fid": 2,
-                "rule": "inventory",
-                "text": "1*tau >= 0",
-                "coeffs": {
-                  "tau": "1"
-                },
-                "const": "0",
-                "rel": ">=",
-                "inventory": "nonneg_tau"
-              },
-              {
-                "fid": 3,
-                "rule": "assumption",
-                "text": "1*diam + -1 >= 0",
-                "coeffs": {
-                  "diam": "1"
-                },
-                "const": "-1",
-                "rel": ">=",
-                "note": "1*diam >= 1"
-              },
-              {
-                "fid": 4,
-                "rule": "premise",
-                "text": "1*alpha + -2*diam >= 0",
-                "coeffs": {
-                  "alpha": "1",
-                  "diam": "-2"
-                },
-                "const": "0",
-                "rel": ">=",
-                "note": "1*alpha >= 2*diam"
-              },
-              {
-                "fid": 5,
-                "rule": "inventory",
-                "text": "-1*n + 1*alpha + 1*tau == 0",
-                "coeffs": {
-                  "alpha": "1",
-                  "tau": "1",
-                  "n": "-1"
-                },
-                "const": "0",
-                "rel": "==",
-                "inventory": "gallai"
-              },
-              {
-                "fid": 6,
-                "rule": "combination",
-                "text": "1*n + 1*alpha + -2*diam + -2 >= 0",
-                "coeffs": {
-                  "alpha": "1",
-                  "diam": "-2",
-                  "n": "1"
-                },
-                "const": "-2",
-                "rel": ">=",
-                "tactic": "linarith",
-                "deps": [
-                  2,
-                  3,
-                  4,
-                  5
-                ],
-                "mults": [
-                  "1",
-                  "2",
-                  "2",
-                  "-1"
-                ]
-              }
-            ]
-          },
-          {
-            "assume": "1*diam <= 0",
-            "steps": [
-              {
-                "fid": 7,
-                "rule": "premise",
-                "text": "1*n + -1 >= 0",
-                "coeffs": {
-                  "n": "1"
-                },
-                "const": "-1",
-                "rel": ">=",
-                "note": "n >= 1"
-              },
-              {
-                "fid": 8,
-                "rule": "conditional",
-                "text": "1*alpha + -1 >= 0",
-                "coeffs": {
-                  "alpha": "1"
-                },
-                "const": "-1",
-                "rel": ">=",
-                "inventory": "alpha_ge_one",
-                "tactic": "linarith",
-                "deps": [
-                  7
-                ]
-              },
-              {
-                "fid": 9,
-                "rule": "assumption",
-                "text": "-1*diam >= 0",
-                "coeffs": {
-                  "diam": "-1"
-                },
-                "const": "0",
-                "rel": ">=",
-                "note": "1*diam <= 0"
-              },
-              {
-                "fid": 10,
-                "rule": "combination",
-                "text": "1*n + 1*alpha + -2*diam + -2 >= 0",
-                "coeffs": {
-                  "alpha": "1",
-                  "diam": "-2",
-                  "n": "1"
-                },
-                "const": "-2",
-                "rel": ">=",
-                "tactic": "linarith",
-                "deps": [
-                  7,
-                  8,
-                  9
-                ],
-                "mults": [
-                  "1",
-                  "1",
-                  "2"
-                ]
-              }
-            ]
-          }
+        "const": "-7",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          4
+        ],
+        "mults": [
+          "1",
+          "2"
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.25,
-    "R": 1.0,
+    "T": 0.8011152416356877,
+    "R": 0.002320185614849188,
     "L": 0.0,
-    "score": 1.25
+    "score": 0.8034354272505368
   },
   "attained": "yes",
-  "touch": 1,
+  "touch": 431,
   "depth_type": "split_needed",
   "proof_stats": {
-    "case_splits": 1,
+    "case_splits": 0,
     "case_splits_conditional": 0,
-    "case_splits_bnb": 1,
-    "max_nest_depth": 1,
-    "roundings": 0,
-    "inventory_theorems": 2
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 1
   },
-  "proof_cost_initial": 10.5,
-  "proof_cost": 10.5,
-  "proof_cost_expanded": 10.5,
+  "proof_cost_initial": 5.5,
+  "proof_cost": 5.5,
+  "proof_cost_expanded": 5.5,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.3125,
+  "hardness": 1.375,
   "lean": {
     "theorem_name": "C12",
     "status": "compiled"

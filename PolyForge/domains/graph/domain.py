@@ -69,10 +69,16 @@ class GraphDomain(Domain):
         self.pool = pool[0] if isinstance(pool, tuple) else pool
         self.hashes = hashes_snapshot
         self.base_seed = base_seed
+        self.snapshot_records = G.load_records(self.record_dir)   # run-start snapshot (§V/§VI)
+        G.set_snapshot_records(self.snapshot_records)
         D.configure(self)
         D.set_lemmas(lemmas or {})
         G.set_lemma_meta(lemma_meta)
         CG.set_domain(self)
+
+    # ── main-process commit checks (§V re-check + §VI Dalmatian) ───────────────
+    def main_commit_check(self, prop, committed):
+        return G.main_commit_check(prop, committed, self.snapshot_records, self.pool)
 
     # ── per-premise-set pipeline ───────────────────────────────────────────────
     def process_premise_set(self, rng, stats, seed, accept):

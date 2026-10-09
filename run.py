@@ -270,6 +270,8 @@ def main(argv):
     queue_start = {"t": None}
     disp = {"next": 1, "collect": 1}         # dispatch/collect indices (shared)
     write_index_log = []                     # (name, idx, depth_type, mode) in commit order
+    committed = []                           # {"skeleton","data"} for records written this run
+    _main_commit_check = getattr(domain, "main_commit_check", None)
     compile_failed_idx = []                  # premise indices whose Lean compile failed
     protected = set()                        # §6 (v0.7): C-names cited in some lemmas_used
 
@@ -318,6 +320,13 @@ def main(argv):
             if h in existing_hashes:
                 stats["premise_minimized_duplicate" if not prop["premises"] else "duplicate"] += 1
                 return False
+            # domain main-process commit checks (graph §V re-check / §VI Dalmatian);
+            # done here in strict index order so the record stays reproducible.
+            if _main_commit_check is not None:
+                okk, reason = _main_commit_check(prop, committed)
+                if not okk:
+                    stats[reason] += 1
+                    return False
             skel, metrics, dt = prop["skeleton"], prop["metrics"], prop["depth_type"]
             mode, target_name, supersedes, old_entry = "new", None, [], None
             if skel in skel_index:
@@ -344,6 +353,7 @@ def main(argv):
                                 "formula": data["conjecture"]["formula"],
                                 "supersedes": supersedes, **metrics}
             CG.write_record(data, lean_full, domain.record_dir, domain.lean_dir)
+            committed.append({"skeleton": skel, "data": data})
             for r in prop["lemma_refs"]:             # §6: protect the lemmas it depends on
                 protected.add(r)
             if mode == "replace":
@@ -611,7 +621,10 @@ def _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time
                    "same_skeleton_worse", "lemma_protected", "recheck_failed",
                    "depth_mismatch", "rounding_only_skipped", "split_needed_skipped",
                    "too_slow", "lemma_bound_helped", "lemma_dropped_dependency",
-                   "compile_failed"):
+                   "compile_failed",
+                   # graph-domain reasons (v1.1 / v1.1.1)
+                   "no_candidate", "trivial", "decomposable", "redundant_vs_record",
+                   "redundant_vs_record_main", "not_significant", "skipped_pool_checks"):
         print(f"  {reason:28s}: {stats.get(reason, 0)}")
 
     # §6.6 memory + Lean batches
