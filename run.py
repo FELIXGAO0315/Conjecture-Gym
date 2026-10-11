@@ -581,8 +581,8 @@ def _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time
         print("  suppl phase (rounding_only): skipped")
     if mins > 0:
         print(f"  writes/min (overall)    : {added / mins:.2f}")
-        for dtp in ("split_needed", "rounding_only"):
-            print(f"  writes/min ({dtp:13s}): {writes_by_depth.get(dtp, 0) / mins:.2f}  "
+        for dtp in ("split_needed", "product_needed", "rounding_only"):
+            print(f"  writes/min ({dtp:14s}): {writes_by_depth.get(dtp, 0) / mins:.2f}  "
                   f"(total {writes_by_depth.get(dtp, 0)})")
     if sampled:
         print(f"  avg worker time / group : {sample_time_total / sampled:.2f}s "
@@ -590,7 +590,7 @@ def _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time
 
     # §6.2 difficulty distribution
     print("difficulty (hardness) distribution over the record:")
-    for dtp in ("split_needed", "rounding_only"):
+    for dtp in ("split_needed", "product_needed", "rounding_only"):
         q = _quantiles(by_depth.get(dtp, []))
         cnt = len(by_depth.get(dtp, []))
         if q:
@@ -624,7 +624,9 @@ def _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time
                    "compile_failed",
                    # graph-domain reasons (v1.1 / v1.1.1)
                    "no_candidate", "trivial", "decomposable", "redundant_vs_record",
-                   "redundant_vs_record_main", "not_significant", "skipped_pool_checks"):
+                   "redundant_vs_record_main", "not_significant", "skipped_pool_checks",
+                   # v1.2 graph product reasons
+                   "degenerate_premises", "product_needed_skipped", "relaxed_counter_model"):
         print(f"  {reason:28s}: {stats.get(reason, 0)}")
 
     # §6.6 memory + Lean batches

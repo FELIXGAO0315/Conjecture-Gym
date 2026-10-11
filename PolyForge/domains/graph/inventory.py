@@ -216,6 +216,53 @@ INVENTORY = [
 
 INVENTORY_BY_NAME = {e["name"]: e for e in INVENTORY}
 
+# ── v1.2 §II/§III: product (handshake / edge-count) facts ─────────────────────
+# PolyForge v1.2 stage 2a introduces facts that pass through a *product* of two
+# invariants.  Each product is carried by a proof-only auxiliary variable (never
+# part of a proposition statement, like the hex domain's W_tail / J_tail):
+#
+#     P_n_mindeg = n · min_deg      P_n_maxdeg = n · max_deg      N2 = n · n
+#
+# A PRODUCT_INVENTORY entry is a linear (in)equality over the invariant variables
+# AND these product variables.  The engine connects a product variable to its
+# factors via McCormick envelope inequalities generated per context (the product
+# inference step, §III).  Each entry carries the same fields as an INVENTORY entry
+# plus nothing extra; the ℤ wrapper is a self-proved GraphLemmas lemma.
+PRODUCT_VARS = {
+    "P_n_mindeg": ("n", "min_deg"),
+    "P_n_maxdeg": ("n", "max_deg"),
+    "N2": ("n", "n"),
+}
+
+PRODUCT_INVENTORY = [
+    # P1 — n·min_deg ≤ 2m        (handshake lower:  P_n_mindeg − 2m ≤ 0)
+    {"name": "handshake_min", "lean_name": "PolyForge.Graph.handshake_min_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(P_n_mindeg=1, m=-2), "rel": "<=", "rhs": 0}},
+    # P2 — 2m ≤ n·max_deg        (handshake upper:  2m − P_n_maxdeg ≤ 0)
+    {"name": "handshake_max", "lean_name": "PolyForge.Graph.handshake_max_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(m=2, P_n_maxdeg=-1), "rel": "<=", "rhs": 0}},
+    # P4 — 2m ≤ n² − n           (edge bound:  2m + n − N2 ≤ 0)
+    {"name": "edge_card_bound", "lean_name": "PolyForge.Graph.two_mul_edges_le_card_sq_sub_card_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(m=2, n=1, N2=-1), "rel": "<=", "rhs": 0}},
+    # P5 — is_bipartite : 4m ≤ n²  (bipartite edge bound:  4m − N2 ≤ 0)
+    {"name": "bipartite_edges", "lean_name": "PolyForge.Graph.bipartite_four_mul_edges_int",
+     "source": "GraphLemmas", "properties": ["is_bipartite"], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(m=4, N2=-1), "rel": "<=", "rhs": 0}},
+]
+PRODUCT_INVENTORY_BY_NAME = {e["name"]: e for e in PRODUCT_INVENTORY}
+
+# P3 — is_regular(d) : 2m = d·n is LINEAR (d a constant), so it is an ordinary
+# (parametric) INVENTORY-style entry rather than a product entry.  Its coefficient
+# on n is the parameter d; the active-inventory builder substitutes d.
+REGULAR_EDGES = {
+    "name": "regular_edges", "lean_name": "PolyForge.Graph.regular_edges_int",
+    "source": "GraphLemmas", "properties": ["is_regular"], "finite": [], "guards": [], "param": "d",
+    # conclusion built per premise set (2m − d·n = 0) by set_active_inventory
+}
+
 
 # ── numerical verification against a pool graph (checkpoint 1) ────────────────
 def properties_of(g: dict) -> dict:
@@ -235,12 +282,17 @@ def properties_of(g: dict) -> dict:
 
 
 def _values_of(g: dict) -> dict:
-    return {
+    vals = {
         "n": g["n"], "m": g["m"], "max_deg": g["max_degree"], "min_deg": g["min_degree"],
         "chi": g["chromatic_number"], "omega": g["clique_number"],
         "alpha": g["independence_number"], "tau": g["vertex_cover_number"],
         "diam": g["diameter"], "radius": g["radius"], "girth": g["girth"],
     }
+    # v1.2: exact product-variable values (real products; §VI.3 regression)
+    for pv, (a, b) in PRODUCT_VARS.items():
+        va, vb = vals.get(a), vals.get(b)
+        vals[pv] = None if (va is None or vb is None) else va * vb
+    return vals
 
 
 def _holds(coeffs: dict, rel: str, rhs, vals: dict) -> bool:
@@ -286,11 +338,27 @@ def entry_holds(entry: dict, g: dict) -> bool:
     return _holds(concl["coeffs"], concl["rel"], rhs, vals)
 
 
+def _regular_edges_entry(g: dict):
+    """Build the concrete 2m = d·n fact for a regular graph (d = its degree)."""
+    d = g["regular_degree"]
+    if d is None:
+        return None
+    return {**REGULAR_EDGES,
+            "conclusion": {"coeffs": {"m": Fraction(2), "n": Fraction(-d)}, "rel": "=", "rhs": 0}}
+
+
 def verify_against_pool(pool: list) -> list:
-    """Return a list of (entry_name, atlas_index) failures (empty = all hold)."""
+    """Return a list of (entry_name, atlas_index) failures (empty = all hold).
+    Covers the linear INVENTORY, the product PRODUCT_INVENTORY, and the parametric
+    regular-edges fact — all checked with exact real values (products included)."""
     fails = []
     for g in pool:
-        for entry in INVENTORY:
+        entries = list(INVENTORY) + list(PRODUCT_INVENTORY)
+        if g.get("regular"):
+            re = _regular_edges_entry(g)
+            if re is not None:
+                entries.append(re)
+        for entry in entries:
             if entry_applicable(entry, g) and not entry_holds(entry, g):
                 fails.append((entry["name"], g.get("atlas_index")))
     return fails

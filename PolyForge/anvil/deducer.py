@@ -39,6 +39,10 @@ PROP_VARS = None            # proposition (non-auxiliary) variables
 BASE_DIRECTIONS = None      # directed objectives explored every round
 SPLIT_SPECS = None          # conditional-theorem case-split specs
 BNB_VARS = None             # branch-and-bound split variables
+# v1.2 §III: product (auxiliary) variables — {P_name: (x_var, y_var)} with
+# P_name = x_var · y_var.  Empty for domains without products (e.g. hex).  The
+# McCormick envelope / product inference step below reads this.
+PRODUCT_VARS = {}
 
 
 def configure(domain) -> None:
@@ -47,12 +51,14 @@ def configure(domain) -> None:
     :class:`Fact`.  Must be called before any deduction (and before forking
     workers, so the configuration is inherited copy-on-write)."""
     global inventory, ALL_VARS, PROP_VARS, BASE_DIRECTIONS, SPLIT_SPECS, BNB_VARS
+    global PRODUCT_VARS
     inventory = domain.inventory
     ALL_VARS = domain.inventory.ALL_VARS
     PROP_VARS = domain.inventory.PROP_VARS
     BASE_DIRECTIONS = domain.base_directions
     SPLIT_SPECS = domain.split_specs
     BNB_VARS = domain.bnb_vars
+    PRODUCT_VARS = dict(getattr(domain.inventory, "PRODUCT_VARS", {}) or {})
 
 # ── deterministic per-group work budget (v0.6.5 §2) ─────────────────────────
 # A group's cost is measured by the number of LP/MILP solves it triggers (a
@@ -82,11 +88,18 @@ def work_tick(k: int = 1):
 ACTION_LINEAR_COMBINATION = "linear_combination"  # Lean tactic: linarith
 ACTION_INTEGER_ROUNDING = "integer_rounding"      # Lean tactic: omega
 ACTION_CASE_SPLIT = "case_split"                  # Lean tactic: by_cases
+# v1.2 §III.3: the product inference step.  From two sign facts on the factors
+# (x − a ≥ 0 / A − x ≥ 0 and y − b ≥ 0 / B − y ≥ 0) it asserts the McCormick
+# envelope for P = x·y, e.g. (x−a)(y−b) ≥ 0 expanded to P ≥ b·x + a·y − a·b.
+# Lean: `mul_nonneg` on the two nonnegative factors, then `ring_nf` to normalise
+# the product and `linarith` to close (no `nlinarith` search).
+ACTION_PRODUCT = "product"                        # Lean tactic: mul_nonneg + ring_nf + linarith
 
 ACTION_TACTIC = {
     ACTION_LINEAR_COMBINATION: "linarith",
     ACTION_INTEGER_ROUNDING: "omega",
     ACTION_CASE_SPLIT: "by_cases",
+    ACTION_PRODUCT: "mul_nonneg",
 }
 
 _TOL = 1e-7
@@ -157,6 +170,9 @@ class Fact:
     branches: list = field(default_factory=list)  # case_split: [(label, Context, fid)]
     lemma_cnum: Optional[int] = None              # v0.7: C-number of the lemma applied
     lemma_premises: Optional[list] = None         # v0.7: the lemma's premises (for Lean)
+    # v1.2 §III.3: product (McCormick envelope) step bookkeeping
+    prod_var: Optional[str] = None                # the product variable P = x·y
+    prod_factors: Optional[list] = None           # [(var, "lower"/"upper", bound:int, dep_fid), …]
     note: str = ""
 
     def value_at(self, vals: dict) -> Fraction:
@@ -189,6 +205,20 @@ class Fact:
         prim = _primitive(self.coeffs, self.const)
         _, nc = prim
         return -nc
+
+
+def product_envelope_form(P: str, x: str, y: str, kx: str, bx: int, ky: str, by_: int):
+    """McCormick envelope coefficients for ``P = x·y`` (v1.2 §III.2).  ``kx``/``ky``
+    are "lower"/"upper"; ``bx``/``by_`` the (integer) bound of the matching factor.
+    Returns ``(coeffs, const)`` for the inequality ``coeffs·vars + const >= 0`` got
+    by expanding ``(±(x∓bx))·(±(y∓by_)) >= 0`` with ``x·y`` replaced by ``P``.
+    Handles ``x == y`` (N2) by accumulating the two single-variable terms."""
+    s1, c1 = (1, -int(bx)) if kx == "lower" else (-1, int(bx))
+    s2, c2 = (1, -int(by_)) if ky == "lower" else (-1, int(by_))
+    coeffs: dict = {P: Fraction(s1 * s2)}
+    coeffs[x] = coeffs.get(x, Fraction(0)) + Fraction(s1 * c2)
+    coeffs[y] = coeffs.get(y, Fraction(0)) + Fraction(s2 * c1)
+    return _clean(coeffs), Fraction(c1 * c2)
 
 
 def _fmt_form(coeffs: dict, const: Fraction) -> str:
@@ -335,12 +365,25 @@ class Context:
         self.use_lemmas = use_lemmas            # v0.7: may apply library lemmas
         self.children: dict = {}    # (var, c, "ge"/"le") -> Context
 
+        # v1.2 §III.1: product variables carried by the currently-active product
+        # facts (so envelopes are only generated for products the context uses).
+        self._active_products: set = set()
+
         # 1. Unconditional inventory facts.
         for e in inventory.INVENTORY:
             if e["kind"] in ("equality", "inequality"):
                 coeffs, const, rel = _conc_to_form(e["conclusion"])
                 self._add(Fact(next(self._counter), coeffs, const, rel,
                                rule="inventory", inv_name=e["name"]))
+        # 1b. Product inventory facts (handshake / edge bounds); each introduces
+        # its product variable(s) into the context.  (§III.1)
+        for e in getattr(inventory, "PRODUCT_FACTS", []):
+            coeffs, const, rel = _conc_to_form(e["conclusion"])
+            self._add(Fact(next(self._counter), coeffs, const, rel,
+                           rule="inventory", inv_name=e["name"]))
+            for v in coeffs:
+                if v in PRODUCT_VARS:
+                    self._active_products.add(v)
         # 2. Premises supplied by the generator.
         for pr in (premises or []):
             coeffs, const, rel = _conc_to_form(pr)
@@ -581,12 +624,65 @@ class Context:
                 changed = True
         return changed
 
+    # ── action: McCormick envelopes / product step (v1.2 §III) ──────────────
+    def _best_bound_fact(self, var: str, lower: bool):
+        """Strongest integral single-variable bound in the pool: ``x >= a``
+        (lower) or ``x <= A`` (upper).  Returns ``(fact, int_bound)`` or None."""
+        d = {var: Fraction(1 if lower else -1)}
+        prim = _primitive(d, Fraction(0))
+        if prim is None:
+            return None
+        ic, _ = prim
+        key = tuple(sorted((v, int(c)) for v, c in ic.items()))
+        f = self._by_lhs.get((">=", key))
+        if f is None:
+            return None
+        b = f.bound()
+        if b.denominator != 1:
+            return None
+        # lower:  x >= b ;  upper:  -x >= b  ⟹  x <= -b
+        return (f, int(b)) if lower else (f, int(-b))
+
+    def _emit_envelope(self, P: str, x: str, y: str, xb, yb) -> bool:
+        """Emit the McCormick envelope for ``P = x·y`` from a bound on x (``xb =
+        (kind, bound, fact)``) and a bound on y (``yb`` similarly).  ``kind`` is
+        "lower" (factor x−a) or "upper" (factor A−x)."""
+        kx, bx, fx = xb
+        ky, by_, fy = yb
+        coeffs, const = product_envelope_form(P, x, y, kx, bx, ky, by_)
+        if P not in coeffs:                       # degenerate (shouldn't happen)
+            return False
+        factors = [(x, kx, bx, fx.fid), (y, ky, by_, fy.fid)]
+        f = Fact(next(self._counter), coeffs, const, ">=",
+                 rule="product", prod_var=P, prod_factors=factors,
+                 deps=sorted({fx.fid, fy.fid}))
+        return self._add(f)
+
+    def _products(self) -> bool:
+        if not PRODUCT_VARS or not self._active_products:
+            return False
+        changed = False
+        for P in sorted(self._active_products):
+            x, y = PRODUCT_VARS[P]
+            lo_x, up_x = self._best_bound_fact(x, True), self._best_bound_fact(x, False)
+            lo_y, up_y = self._best_bound_fact(y, True), self._best_bound_fact(y, False)
+            lo_x = ("lower", lo_x[1], lo_x[0]) if lo_x else None
+            up_x = ("upper", up_x[1], up_x[0]) if up_x else None
+            lo_y = ("lower", lo_y[1], lo_y[0]) if lo_y else None
+            up_y = ("upper", up_y[1], up_y[0]) if up_y else None
+            for xb, yb in ((lo_x, lo_y), (up_x, up_y), (lo_x, up_y), (up_x, lo_y)):
+                if xb is not None and yb is not None:
+                    if self._emit_envelope(P, x, y, xb, yb):
+                        changed = True
+        return changed
+
     # ── one closure pass (no splitting) ─────────────────────────────────────
     def _saturate(self) -> None:
         for rnd in range(self.max_rounds):
             changed = False
             changed |= self._trigger_conditionals()
             changed |= self._trigger_lemmas()
+            changed |= self._products()
             # bounded pairwise elimination only on the first pass (supplementary
             # to the LP-directed bounds, which are the main engine).  Skipped once
             # the pool is large: with the expanded v0.6.1 variable set it is
@@ -827,6 +923,10 @@ def traceback(ctx: Context, fact: Fact) -> list:
             for d in f.deps:
                 if d in fact_by_id:
                     visit(fact_by_id[d])
+        elif f.rule == "product":                  # v1.2 §III.3: factor bound facts
+            for d in f.deps:
+                if d in fact_by_id:
+                    visit(fact_by_id[d])
         elif f.rule == "case_split":
             pass  # branch sub-proofs handled in emit
         _emit(f)
@@ -862,6 +962,11 @@ def traceback(ctx: Context, fact: Fact) -> list:
         elif f.rule == "rounding":
             step["tactic"] = ACTION_TACTIC[ACTION_INTEGER_ROUNDING]
             step["deps"] = f.deps
+        elif f.rule == "product":                  # v1.2 §III.3
+            step["tactic"] = ACTION_TACTIC[ACTION_PRODUCT]
+            step["deps"] = f.deps
+            step["prod_var"] = f.prod_var
+            step["prod_factors"] = [list(t) for t in (f.prod_factors or [])]
         elif f.rule == "case_split":
             step["tactic"] = ACTION_TACTIC[ACTION_CASE_SPLIT]
             step["split_var"] = f.split_var
@@ -995,6 +1100,47 @@ def recheck(ctx: Context, fact: Fact, premises: list) -> tuple:
             if g != 1:
                 return False
             return same_form(ic, floored, f.coeffs, f.const)
+        if f.rule == "product":                    # v1.2 §III.3 exact re-check
+            P = f.prod_var
+            factors = f.prod_factors or []
+            if P not in PRODUCT_VARS or len(factors) != 2:
+                return False
+            (xv, kx, bx, dfx), (yv, ky, by_, dfy) = factors
+            # the factors must be exactly the whitelisted pair for P
+            if tuple(PRODUCT_VARS[P]) != (xv, yv):
+                return False
+            # recompute the envelope expansion exactly and compare
+            s1, c1 = (1, -int(bx)) if kx == "lower" else (-1, int(bx))
+            s2, c2 = (1, -int(by_)) if ky == "lower" else (-1, int(by_))
+            exp = {P: Fraction(s1 * s2)}
+            exp[xv] = exp.get(xv, Fraction(0)) + Fraction(s1 * c2)
+            exp[yv] = exp.get(yv, Fraction(0)) + Fraction(s2 * c1)
+            K = Fraction(c1 * c2)
+            if not same_form(exp, K, f.coeffs, f.const):
+                return False
+
+            def _factor_ok(vv, kind, bnd, dfid):
+                dep = fid_map.get(dfid)
+                if dep is None or not check(dep, local_ctx, local_asm):
+                    return False
+                if kind == "lower":                 # need  vv >= bnd
+                    tc, tk = {vv: Fraction(1)}, Fraction(-int(bnd))
+                else:                                # need  vv <= bnd
+                    tc, tk = {vv: Fraction(-1)}, Fraction(int(bnd))
+                pt, pd = _primitive(tc, tk), _primitive(dep.coeffs, dep.const)
+                if pt is None or pd is None:
+                    return False
+                it, nt = pt
+                idd, nd = pd
+                if tuple(sorted(it.items())) == tuple(sorted(idd.items())):
+                    return dep.rel in (">=", "==") and -nd >= -nt
+                if dep.rel == "==":                  # equality with the opposite sign LHS
+                    neg = tuple(sorted((v, -c) for v, c in idd.items()))
+                    if tuple(sorted(it.items())) == neg:
+                        return nd >= -nt
+                return False
+
+            return _factor_ok(xv, kx, bx, dfx) and _factor_ok(yv, ky, by_, dfy)
         if f.rule == "case_split":
             for (label, child, cfid) in f.branches:
                 cfact = next((x for x in child.facts if x.fid == cfid), None)

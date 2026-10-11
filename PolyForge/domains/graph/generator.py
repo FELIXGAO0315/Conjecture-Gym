@@ -43,11 +43,18 @@ DATA = ROOT / "data" / "graph_pool.json"
 RECORD = ROOT / "record"
 LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "1.1.2"
+GENERATOR_VERSION = "1.2"
 MAIN_COEFFS = (1, 2)          # main-variable coefficient
-OTHER_COEFFS = (-2, -1, 1, 2)  # other-term coefficients
+# v1.2 §III.5: other-term coefficients widened to |·| ≤ 3 so conclusions like
+# 2m ≥ 3n (handshake under min_deg ≥ 3) can be expressed.
+OTHER_COEFFS = (-3, -2, -1, 1, 2, 3)  # other-term coefficients
 MAX_COEFF = 6                 # guard on display coefficients
 MAX_CONCLUSION_TERMS = 3      # terms besides the main variable
+# v1.2: products make far more directions bounded, so a premise set can yield
+# ~1000 candidates.  Processing every one (each with the full filter stack) would
+# blow the per-group work budget; cap how many are tried per set (the strongest
+# per skeleton are kept first by enumerate_candidates' de-dup).
+MAX_CANDIDATES_PER_SET = 40
 GROUP_WORK_BUDGET = 120000
 RO_MAX_RATIO = CG.RO_MAX_RATIO
 MAX_SHORTEN_ROUNDS = 1
@@ -56,8 +63,12 @@ POOL_N_MAX = 7                # dataset covers n ≤ 7
 _LP_TOL = 1e-7
 
 VARS = list(DED.VARS)
-_ALL_IDX = {v: i for i, v in enumerate(VARS)}
-_NVARS = len(VARS)
+# v1.2: the LP/MILP works over ALL_VARS (invariants + product variables), so the
+# product facts and McCormick envelopes (which mention P_n_mindeg / P_n_maxdeg /
+# N2) have columns.  ``VARS`` stays the proposition variables used everywhere else.
+_LP_VARS = list(DED.ALL_VARS)
+_ALL_IDX = {v: i for i, v in enumerate(_LP_VARS)}
+_NVARS = len(_LP_VARS)
 
 # hardness parameters: which inventory names are "theorems" (heavier weight).
 _HARD_INV_THEOREMS = tuple(e["name"] for e in INV.INVENTORY)
@@ -245,9 +256,74 @@ def _conc_form(conc):
 
 
 def _unconditional_forms():
+    """Linear inventory facts only (NO product variables) — the basis for v_lin
+    (§IV.1) and for the split tree's linear layer."""
     forms = []
     for e in DED.INVENTORY:
         forms.append(_conc_form(e["conclusion"]))
+    return forms
+
+
+def _product_forms():
+    """Active product (handshake / edge-count) facts — §III."""
+    return [_conc_form(e["conclusion"]) for e in DED.PRODUCT_FACTS]
+
+
+def _active_product_vars():
+    """Product variables carried by the active product facts (§III.1)."""
+    act = set()
+    for e in DED.PRODUCT_FACTS:
+        for v in e["conclusion"]["coeffs"]:
+            if v in DED.PRODUCT_VARS:
+                act.add(v)
+    return act
+
+
+def _factor_bounds(linbase):
+    """Integer bounds (a = ⌈min⌉, A = ⌊max⌋; None if unbounded/infeasible) of each
+    product-factor variable over the LINEAR constraints ``linbase``.  These are the
+    provable bounds the deducer rounds to, so the generated envelopes match."""
+    mats = _prep(linbase)
+    bnd = {}
+    fvars = set()
+    for (x, y) in DED.PRODUCT_VARS.values():
+        fvars.add(x); fvars.add(y)
+    for v in sorted(fvars):
+        stlo, lo, _ = _lp(_cvec({v: 1}), mats)
+        sthi, neg, _ = _lp(_cvec({v: -1}), mats)
+        a = _ceil(lo - _LP_TOL) if stlo == "opt" else None
+        A = -_ceil(neg - _LP_TOL) if sthi == "opt" else None   # max = −(min −v)
+        bnd[v] = (a, A)
+    return bnd
+
+
+def _envelope_forms(linbase):
+    """McCormick envelope constraints for the active products, from the integer
+    factor bounds provable over ``linbase`` (§III.2).  Returns (coeffs,const,'>=')
+    tuples — the same envelopes the deducer's product step emits."""
+    active = _active_product_vars()
+    if not active:
+        return []
+    bnd = _factor_bounds(linbase)
+    forms = []
+    for P, (x, y) in DED.PRODUCT_VARS.items():
+        if P not in active:
+            continue
+        ax, Ax = bnd.get(x, (None, None))
+        ay, Ay = bnd.get(y, (None, None))
+        combos = []
+        if ax is not None and ay is not None:
+            combos.append((("lower", ax), ("lower", ay)))
+        if Ax is not None and Ay is not None:
+            combos.append((("upper", Ax), ("upper", Ay)))
+        if ax is not None and Ay is not None:
+            combos.append((("lower", ax), ("upper", Ay)))
+        if Ax is not None and ay is not None:
+            combos.append((("upper", Ax), ("lower", ay)))
+        for (kx, bx), (ky, by_) in combos:
+            coeffs, const = D.product_envelope_form(P, x, y, kx, bx, ky, by_)
+            if P in coeffs:
+                forms.append((coeffs, const, ">="))
     return forms
 
 
@@ -302,10 +378,21 @@ def _triggerable_conditionals(constraints):
     return out
 
 
-def _build_split_tree(prem_forms, assum_forms, depth):
+def _node_mats(linbase, products):
+    """Build the LP matrices for a node: the linear constraints plus (if
+    ``products``) the active product facts and the McCormick envelopes derived
+    from this node's bounds (§III.2 / §III.4: envelopes regenerate per node)."""
+    full = list(linbase)
+    if products:
+        full = full + _product_forms() + _envelope_forms(linbase)
+    return _prep(full)
+
+
+def _build_split_tree(prem_forms, assum_forms, depth, products=True):
     base = prem_forms + assum_forms + _unconditional_forms()
-    leaf = base + _triggerable_conditionals(base)
-    node = {"mats": _prep(leaf), "splits": []}
+    linbase = base + _triggerable_conditionals(base)
+    node = {"linbase": linbase, "mats": _node_mats(linbase, products),
+            "products": products, "splits": []}
     if depth > 0:
         for _label, expr, ths in [(l, {v: Fraction(c) for v, c in e.items()}, t)
                                   for l, e, t in DED.SPLIT_SPECS]:
@@ -317,8 +404,8 @@ def _build_split_tree(prem_forms, assum_forms, depth):
                 st2, v2, _ = _lp(_cvec(neg), _prep(base))
                 if st2 == "opt" and v2 - float(-(c - 1)) >= -_LP_TOL:
                     continue
-                ge = _build_split_tree(prem_forms, assum_forms + [(dict(expr), Fraction(-c), ">=")], depth - 1)
-                le = _build_split_tree(prem_forms, assum_forms + [({v: -x for v, x in expr.items()}, Fraction(c - 1), ">=")], depth - 1)
+                ge = _build_split_tree(prem_forms, assum_forms + [(dict(expr), Fraction(-c), ">=")], depth - 1, products)
+                le = _build_split_tree(prem_forms, assum_forms + [({v: -x for v, x in expr.items()}, Fraction(c - 1), ">=")], depth - 1, products)
                 node["splits"].append((ge, le))
     return node
 
@@ -330,7 +417,7 @@ def _merge(rge, rle):
     return min(feas) if feas else None
 
 
-def _vint(node, cvec, depth):
+def _vint(node, cvec, depth, use_bnb=True):
     st, val, xstar = _lp(cvec, node["mats"])
     if st == "unbounded":
         return ("unbounded", None)
@@ -339,18 +426,23 @@ def _vint(node, cvec, depth):
     best = _ceil(val - _LP_TOL)
     if depth > 0:
         for ge, le in node["splits"]:
-            rge = _vint(ge, cvec, depth - 1)
-            rle = _vint(le, cvec, depth - 1)
+            rge = _vint(ge, cvec, depth - 1, use_bnb)
+            rle = _vint(le, cvec, depth - 1, use_bnb)
             mv = _merge(rge, rle)
             if mv is not None and mv > best:
                 best = mv
-        pick = D._bnb_pick_var(xstar)
+        pick = D._bnb_pick_var(xstar) if use_bnb else None
         if pick is not None:
             var, fl = pick
-            ge = {"mats": _add_bound(node["mats"], var, ">=", fl + 1), "splits": []}
-            le = {"mats": _add_bound(node["mats"], var, "<=", fl), "splits": []}
-            rge = _vint(ge, cvec, depth - 1)
-            rle = _vint(le, cvec, depth - 1)
+            # v1.2 §III.4: a B&B bound changes the factor bounds, so regenerate the
+            # node (products + envelopes) from the tightened linear base.
+            prod = node.get("products", True)
+            lb_ge = node["linbase"] + [({var: Fraction(1)}, Fraction(-(fl + 1)), ">=")]
+            lb_le = node["linbase"] + [({var: Fraction(-1)}, Fraction(fl), ">=")]
+            ge = {"linbase": lb_ge, "mats": _node_mats(lb_ge, prod), "products": prod, "splits": []}
+            le = {"linbase": lb_le, "mats": _node_mats(lb_le, prod), "products": prod, "splits": []}
+            rge = _vint(ge, cvec, depth - 1, use_bnb)
+            rle = _vint(le, cvec, depth - 1, use_bnb)
             mv = _merge(rge, rle)
             if mv is not None and mv > best:
                 best = mv
@@ -379,17 +471,42 @@ def linearly_derivable(premises, conclusion):
     return v - float(conclusion["rhs"]) >= -_LP_TOL
 
 
+_NEG_INF = float("-inf")
+
+
+def _accepts(accept, dtype):
+    """§IV.5: product_needed and split_needed belong to the MAIN phase; the
+    supplement phase takes only rounding_only."""
+    if accept == "rounding_only":
+        return dtype == "rounding_only"
+    return dtype in ("split_needed", "product_needed")
+
+
+def _classify(slin, vlin, s_np, v_np, s_p, v_p):
+    """Decide the depth_type from the three bounds (linear / full-power-without-
+    products / full-power-with-products).  Values are integer lifts; ``s_*`` are
+    'opt'/'unbounded'/'infeasible'."""
+    vnp = v_np if s_np == "opt" else _NEG_INF
+    if vnp < v_p:                                   # products gave extra lift
+        return "product_needed"
+    if slin == "opt" and v_np == _ceil(vlin - _LP_TOL):
+        return "rounding_only"                      # pure integer rounding
+    return "split_needed"
+
+
 def classify_depth(premises, direction):
     pf = _premise_forms(premises)
     lin = pf + _unconditional_forms()
     lin += _triggerable_conditionals(lin)
     cvec = _cvec({v: int(c) for v, c in direction.items()})
     slin, vlin, _ = _lp(cvec, _prep(lin))
-    tree = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH)
-    sint, vint = _vint(tree, cvec, D.DEFAULT_SPLIT_DEPTH)
-    if sint != "opt" or slin != "opt":
+    tree_np = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH, products=False)
+    tree_p = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH, products=True)
+    s_np, v_np = _vint(tree_np, cvec, D.DEFAULT_SPLIT_DEPTH)
+    s_p, v_p = _vint(tree_p, cvec, D.DEFAULT_SPLIT_DEPTH)
+    if s_p != "opt":
         return "split_needed"
-    return "rounding_only" if vint == _ceil(vlin - _LP_TOL) else "split_needed"
+    return _classify(slin, vlin, s_np, v_np, s_p, v_p)
 
 
 # ── direction / candidate enumeration (§III.4) ────────────────────────────────
@@ -449,7 +566,8 @@ def enumerate_candidates(premises, usable, main, stats, rng, accept):
     lin = pf + _unconditional_forms()
     lin += _triggerable_conditionals(lin)
     lin_mats = _prep(lin)
-    tree = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH)
+    tree_np = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH, products=False)
+    tree_p = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH, products=True)
     directions = enumerate_directions(usable, main)
     rng.shuffle(directions)
     stats["directions_total"] += len(directions)
@@ -457,20 +575,23 @@ def enumerate_candidates(premises, usable, main, stats, rng, accept):
     for d in directions:
         cvec = _cvec(d)
         slin, vlin, _ = _lp(cvec, lin_mats)
-        if slin != "opt":
+        if slin == "infeasible":                    # premises have no model
             continue
-        sint, vint = _vint(tree, cvec, D.DEFAULT_SPLIT_DEPTH)
-        if sint != "opt":
+        # screening uses the split tree WITHOUT B&B (cheap); B&B is applied in the
+        # per-candidate classify_depth only (products already make most lifts here).
+        s_p, v_p = _vint(tree_p, cvec, D.DEFAULT_SPLIT_DEPTH, use_bnb=False)
+        if s_p != "opt":
             continue
-        if vint > vlin + _LP_TOL:
-            dtype = "rounding_only" if vint == _ceil(vlin - _LP_TOL) else "split_needed"
-            if dtype != accept:
-                stats["rounding_only_skipped" if dtype == "rounding_only"
-                      else "split_needed_skipped"] += 1
-                continue
-            out.append({"coeffs": dict(d), "rel": ">=", "rhs": int(vint)})
-        else:
+        vlin_f = vlin if slin == "opt" else _NEG_INF
+        if not (v_p > vlin_f + _LP_TOL):            # no lift beyond the linear bound
             stats["linear_only"] += 1
+            continue
+        s_np, v_np = _vint(tree_np, cvec, D.DEFAULT_SPLIT_DEPTH, use_bnb=False)
+        dtype = _classify(slin, vlin, s_np, v_np, s_p, v_p)
+        if not _accepts(accept, dtype):
+            stats[dtype + "_skipped"] += 1
+            continue
+        out.append({"coeffs": dict(d), "rel": ">=", "rhs": int(v_p)})
     # dedup to best bound per primitive LHS, apply coeff guard
     best = {}
     for cand in out:
@@ -616,10 +737,26 @@ _CM_N = _NVARS + len(DED.VARS)  # placeholder; rebuilt per set below
 
 
 def counter_model(premises, conclusion):
-    """Integer point satisfying premises + active inventory + ¬conclusion ⇒ bug."""
+    """§III.6 / §VI.1 counter-model gate, relaxed for products.
+
+    Search for an integer point satisfying premises + active inventory (linear AND
+    product facts) + the McCormick envelopes + ¬conclusion.  Product variables are
+    free integers in the relaxation (no ``P = x·y`` constraint — that is nonlinear).
+    Returns ``None`` if infeasible (no counter-model), else ``(model, is_real)``
+    where ``is_real`` is True iff the found point, taking the TRUE products
+    ``x·y``, still satisfies everything and violates the conclusion (a genuine
+    counter-model ⇒ a soundness bug, halt).  A point that only works in the relaxed
+    sense (some ``P ≠ x·y``) is a ``relaxed_counter_model`` — reported, not fatal."""
+    active_p = sorted(_active_product_vars())
+    linbase = _premise_forms(premises) + _unconditional_forms()
+    linbase = linbase + _triggerable_conditionals(linbase)
+    env = _envelope_forms(linbase)
+    prod_forms = _product_forms()
     ncond = len(DED.CONDITIONAL_THEOREMS)
-    n = _NVARS + ncond
-    idx = dict(_ALL_IDX)
+    allvars = list(VARS) + active_p
+    nv = len(allvars)
+    n = nv + ncond
+    idx = {v: i for i, v in enumerate(allvars)}
     bigM = 10 ** 7
     cons = []
 
@@ -629,23 +766,30 @@ def counter_model(premises, conclusion):
             r[idx[k]] += float(v)
         return r
 
+    def add_form(coeffs, const, rel):                 # coeffs·x + const  rel  0
+        rr = row(coeffs)
+        if rel == "==":
+            cons.append((rr, -float(const), -float(const)))
+        else:                                         # >= 0
+            cons.append(([-x for x in rr], None, float(const)))
+
     for e in DED.INVENTORY:
         co, k, rel = _conc_form(e["conclusion"])
-        rr = row(co)
-        if rel == "==":
-            cons.append((rr, -float(k), -float(k)))
-        else:
-            cons.append(([-x for x in rr], None, float(k)))
+        add_form(co, k, rel)
+    for (co, k, rel) in prod_forms:                   # product facts (relaxed)
+        add_form(co, k, rel)
+    for (co, k, rel) in env:                          # envelopes (relaxed)
+        add_form(co, k, rel)
     for bi, e in enumerate(DED.CONDITIONAL_THEOREMS):
-        b = _NVARS + bi
+        b = nv + bi
         hyp_rhs = float(e["hypothesis"]["rhs"])
         hyp_lhs = {v: Fraction(c) for v, c in e["hypothesis"]["coeffs"].items()}
         rr = row(hyp_lhs); rr[b] = bigM
         cons.append((rr, None, (hyp_rhs - 1) + bigM))
         cco, cck, crel = _conc_form(e["conclusion"])
         rr = row(cco); rr[b] = bigM
-        cons.append((rr, -float(cck), None))          # conclusion ≥ (active when b=0)
-        if crel == "==":                               # equality conditional: model ≤ too
+        cons.append((rr, -float(cck), None))
+        if crel == "==":
             rr2 = row(cco); rr2[b] = -bigM
             cons.append((rr2, None, -float(cck)))
     for pr in premises:
@@ -666,7 +810,7 @@ def counter_model(premises, conclusion):
     lb = np.array([-np.inf if c[1] is None else c[1] for c in cons])
     ub = np.array([np.inf if c[2] is None else c[2] for c in cons])
     bl = np.array([0.0] * n)
-    bu = np.array([1.0 if i >= _NVARS else 10 ** 5 for i in range(n)])
+    bu = np.array([1.0 if i >= nv else 10 ** 5 for i in range(n)])
     D.work_tick()
     try:
         res = milp(c=np.zeros(n), constraints=[LinearConstraint(A, lb, ub)],
@@ -676,37 +820,42 @@ def counter_model(premises, conclusion):
     if not (res is not None and res.success and res.x is not None):
         return None
     model = {v: int(round(res.x[idx[v]])) for v in VARS}
+    # exact values with the TRUE products substituted (this is what a real graph
+    # point would satisfy); the relaxed P-values are ignored for the real check.
+    tvals = dict(model)
+    for P, (x, y) in DED.PRODUCT_VARS.items():
+        tvals[P] = model[x] * model[y]
 
-    # Exact verification (§III.6 gate must be precise): the big-M MILP can return a
-    # numerically-infeasible point.  Accept ``model`` as a genuine counter-model only
-    # if it exactly satisfies every premise and every active inventory fact (honouring
-    # the conditional-theorem implications) while violating the conclusion; otherwise
-    # it is a numerical artifact and there is no counter-model here.
-    def _sat(co, rel, rhs):
-        lhs = sum(Fraction(c) * model[v] for v, c in co.items())
-        rhs = Fraction(rhs)
+    def _sat(co, rel, r):
+        lhs = sum(Fraction(c) * tvals[v] for v, c in co.items())
+        r = Fraction(r)
         if rel in ("=", "=="):
-            return lhs == rhs
+            return lhs == r
         if rel == ">=":
-            return lhs >= rhs
-        return lhs <= rhs
+            return lhs >= r
+        return lhs <= r
+
+    real = True
     for pr in premises:
         if not _sat(pr["coeffs"], pr["rel"], pr["rhs"]):
-            return None
+            real = False
     for e in DED.INVENTORY:
         c = e["conclusion"]
         if not _sat(c["coeffs"], c["rel"], c["rhs"]):
-            return None
+            real = False
+    for e in DED.PRODUCT_FACTS:
+        c = e["conclusion"]
+        if not _sat(c["coeffs"], c["rel"], c["rhs"]):
+            real = False
     for e in DED.CONDITIONAL_THEOREMS:
         hyp = e["hypothesis"]
-        if _sat(hyp["coeffs"], hyp["rel"], hyp["rhs"]):      # hypothesis holds → conclusion must
+        if _sat(hyp["coeffs"], hyp["rel"], hyp["rhs"]):
             c = e["conclusion"]
             if not _sat(c["coeffs"], c["rel"], c["rhs"]):
-                return None
+                real = False
     if _sat(conclusion["coeffs"], conclusion["rel"], conclusion["rhs"]):
-        return None                                          # conclusion holds → not a counter-model
-    return model
-    return None
+        real = False                                  # conclusion actually holds here
+    return (model, real)
 
 
 # ── hashing / skeleton (§III.6) ───────────────────────────────────────────────
@@ -1021,6 +1170,25 @@ def is_decomposable(premises, conclusion):
     return False
 
 
+# ── degenerate-premise filter (v1.2 §V) ───────────────────────────────────────
+def premises_degenerate(premises):
+    """True if the premises force the graph into a degenerate small regime — the
+    engine (full power, incl. products) proves max_deg ≤ 1, m ≤ 1 or n ≤ 3.  Such
+    premises only admit tiny/edgeless graphs, so the conjecture is discarded."""
+    pf = _premise_forms(premises)
+    tree = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH, products=True)
+
+    def upper(var):
+        s, v = _vint(tree, _cvec({var: -1}), D.DEFAULT_SPLIT_DEPTH)
+        return None if s != "opt" else -v            # upper bound = −(min of −var)
+
+    for var, thr in (("max_deg", 1), ("m", 1), ("n", 3)):
+        u = upper(var)
+        if u is not None and u <= thr:
+            return True
+    return False
+
+
 # ── logical redundancy vs record (§V) ─────────────────────────────────────────
 def _entailed_prem(constraints, pr):
     cf = {v: Fraction(c) for v, c in pr["coeffs"].items()}
@@ -1172,6 +1340,12 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
     usable = finite_vars(pset)
     DED.set_active_inventory(pset, params)
 
+    # §V (v1.2) degenerate-premise filter: after premise minimisation, discard a
+    # premise set that forces a degenerate small graph (max_deg ≤ 1, m ≤ 1, n ≤ 3).
+    if premises_degenerate(numeric):
+        stats["degenerate_premises"] += 1
+        return None
+
     covered = pool_covered(props, numeric)
     if covered and not dataset_subset(pool, props, numeric):
         stats["empty_premises"] += 1
@@ -1185,6 +1359,9 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         stats["no_candidate"] += 1
         return None
     rng.shuffle(candidates)
+    if len(candidates) > MAX_CANDIDATES_PER_SET:
+        stats["candidates_capped"] += len(candidates) - MAX_CANDIDATES_PER_SET
+        candidates = candidates[:MAX_CANDIDATES_PER_SET]
 
     for cand in candidates:
         # §VIII order (performance-adjusted, see note): linear → premise-minimise →
@@ -1238,12 +1415,16 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         soundness_check(props, pruned, conclusion, pool)
         cm = counter_model(pruned, conclusion)
         if cm is not None:
-            raise AssertionError(
-                f"COUNTER-MODEL: not inventory-derivable.\n props={props}\n "
-                f"numeric={pruned}\n conclusion={conclusion}\n model={cm}")
-        # depth label
+            model, is_real = cm
+            if is_real:
+                raise AssertionError(
+                    f"COUNTER-MODEL: not inventory-derivable.\n props={props}\n "
+                    f"numeric={pruned}\n conclusion={conclusion}\n model={model}")
+            # §VI.1: a relaxed-only model (some P ≠ x·y) is a statistic, not fatal.
+            stats["relaxed_counter_model"] += 1
+        # depth label (product_needed / split_needed / rounding_only)
         depth_type = classify_depth(pruned, ccoeffs)
-        if depth_type != accept:
+        if not _accepts(accept, depth_type):
             stats["depth_mismatch"] += 1
             continue
         # shortest proof
@@ -1294,6 +1475,9 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         inv_used = sorted(all_inv)
         renumber_steps(tb)
         proof_stats = _pstats(tb)
+        # §VI.2: product conjectures are arithmetically sharp only in the relaxed
+        # (envelope) sense — the counter-model gate cannot certify true optimality.
+        arith_sharp = "relaxed" if proof_stats.get("product_steps", 0) > 0 else "exact"
         disp, prim = display_conclusion(conclusion, prim)
         return {
             "seed": seed, "props": props, "numeric": pruned, "conclusion": conclusion,
@@ -1302,6 +1486,7 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             "main_var": prim, "tb": tb, "inv_used": inv_used,
             "iris": {k: iris[k] for k in ("T", "R", "L", "score")},
             "attained": attained, "touch": touch_val, "hardness": hard,
+            "arith_sharp": arith_sharp,
             "depth_type": depth_type, "proof_stats": proof_stats,
             "proof_cost_initial": proof_cost_initial, "proof_cost": proof_cost,
             "proof_cost_expanded": proof_cost_expanded, "shorten_rounds": shorten_rounds,
@@ -1394,6 +1579,7 @@ def assemble_data(proposal, target, supersedes):
                   "steps": proposal["tb"]},
         "iris": proposal["iris"],
         "attained": proposal["attained"], "touch": proposal["touch"],
+        "arith_sharp": proposal.get("arith_sharp", "exact"),
         "depth_type": proposal["depth_type"], "proof_stats": proposal["proof_stats"],
         "proof_cost_initial": proposal["proof_cost_initial"], "proof_cost": proposal["proof_cost"],
         "proof_cost_expanded": proposal["proof_cost_expanded"], "shorten_rounds": proposal["shorten_rounds"],

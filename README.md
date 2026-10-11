@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## PolyForge (v1.1.2)
+## PolyForge (v1.2)
 
 PolyForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about a mathematical subject, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -17,7 +17,11 @@ PolyForge separates a **domain-agnostic engine** from the **domains** that plug 
 This version ships two domains:
 
 - **hex** — the original HexForge subject: p₆ of simple 3-connected planar maps (simple 3-polytopes). Fully wired and unchanged from v0.7; the 212-conjecture record is preserved and reproduced byte-for-byte.
-- **graph** — graph theory on top of Mathlib's proved graph theorems (stage 1, linear). It has its own Lean project (Mathlib v4.34.0), a graph dataset (all 1253 graphs with ≤ 7 vertices), a linear Inventory (Mathlib theorems plus self-proved `GraphLemmas` — the Gallai identity α+τ=n, max degree ≤ edges, ℕ∞→ℕ finiteness/conversions, …), and generates conjectures that are linear (in)equalities among graph invariants under property premises.
+- **graph** — graph theory on top of Mathlib's proved graph theorems. It has its own Lean project (Mathlib v4.34.0), a graph dataset (all 1253 graphs with ≤ 7 vertices), an Inventory (Mathlib theorems plus self-proved `GraphLemmas` — the Gallai identity α+τ=n, max degree ≤ edges, ℕ∞→ℕ finiteness/conversions, …), and generates conjectures that are linear (in)equalities among graph invariants under property premises. **Stage 2a (v1.2)** adds *product facts* whose proofs pass through a product of two invariants — the handshake degree bounds (n·min_deg ≤ 2m ≤ n·max_deg), the edge-count bounds (2m ≤ n²−n, and 4m ≤ n² for bipartite graphs) — while the conclusions stay linear.
+
+### Products and McCormick envelopes (graph, v1.2)
+
+Most classic graph facts are *linear in form but their proof passes through a product*: e.g. the handshake identity gives n·δ ≤ 2m, so δ ≥ 3 ⟹ 2m ≥ 3n. v1.2 carries each product as a proof-only **auxiliary variable** (`P_n_mindeg = n·min_deg`, `P_n_maxdeg = n·max_deg`, `N2 = n·n`) — like the hex domain's `W`/`J`, these never appear in a proposition. In each reasoning context the engine takes the already-proved lower/upper bounds `a ≤ x ≤ A`, `b ≤ y ≤ B` of the factors and emits the **McCormick envelope** of `P = x·y` (e.g. from `x ≥ a`, `y ≥ b` and `(x−a)(y−b) ≥ 0`: `P ≥ b·x + a·y − a·b`) as a new fact via the **product inference step** (`mul_nonneg` + `ring_nf` + `linarith` in Lean). Combined with a product fact (e.g. `P_n_mindeg ≤ 2m`) this yields a linear conclusion. **Linear derivability** is redefined so a conjecture is kept only when the full engine (products, envelopes, rounding, case split) beats what the *linear* facts alone prove: `depth_type` gains the value `product_needed` (the lift comes from a product), which — like `split_needed` — belongs to the main phase. A degenerate-premise filter discards premises that force `max_deg ≤ 1`, `m ≤ 1`, or `n ≤ 3`.
 
 ### Pipeline
 
@@ -26,7 +30,7 @@ premises → anvil (deduction) → generator (selection) → formalizer (Lean) �
 ```
 
 1. The domain samples premises that at least one dataset object satisfies.
-2. **anvil** derives new facts from the domain's axiom base using three inference actions: linear combination, integer rounding, and case split.
+2. **anvil** derives new facts from the domain's axiom base using four inference actions: linear combination, integer rounding, case split, and — for domains with product facts (graph, v1.2) — a product step (a McCormick envelope on an auxiliary product variable).
 3. The domain keeps the conclusions it cares about, removes trivial and duplicate ones, and extracts minimal proofs by traceback.
 4. Every candidate is checked exactly, regression-tested on the domain's dataset, and translated to Lean. Only conjectures whose Lean file compiles (no `sorry`) are written to the record.
 5. **scoring** attaches an IRIS score and a hardness score.
@@ -116,6 +120,7 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v1.2** — Graph domain stage 2a: products as auxiliary variables with McCormick envelopes and a new product inference step; handshake-based degree bounds, edge bounds, bipartite edge bound; linear derivability excludes products; degenerate-premise filter.
 - **v1.1.2** — Graphs assumed nonempty; elementary textbook facts added systematically to prevent spurious proof depth; decomposability filter fixed; implied property premises removed; premises displayed in natural form.
 - **v1.1.1** — Graph domain quality: elementary facts added to the inventory, simpler premises, rotating primary invariant, decomposability filter, redundancy check against existing records, Dalmatian significance (IRIS), primary invariant displayed on its own side.
 - **v1.1** — Graph domain, stage 1: linear inventory from Mathlib plus self-proved lemmas (Gallai identity, max degree ≤ edges, …), property premises, conclusions on any invariant, property tags for future structural conjectures.

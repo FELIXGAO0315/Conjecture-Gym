@@ -106,6 +106,9 @@ def renumber_steps(tb: list) -> list:
             s["fid"] = mapping[s["fid"]]
             if "deps" in s:
                 s["deps"] = [mapping[d] for d in s["deps"]]
+            if "prod_factors" in s:          # v1.2 §III.3: remap factor dep fids too
+                s["prod_factors"] = [[f[0], f[1], f[2], mapping[f[3]]]
+                                     for f in s["prod_factors"]]
             if s["rule"] == "case_split":
                 for cse in s["cases"]:
                     rewrite(cse["steps"])
@@ -205,6 +208,12 @@ def _steps_md(steps: list, depth: int) -> list:
             lines.append(f"{ind}- Linear combination (`linarith`): `{s['text']}`.")
         elif rule == "rounding":
             lines.append(f"{ind}- Integer rounding (`omega`): `{s['text']}`.")
+        elif rule == "product":
+            pv = s.get("prod_var", "?")
+            facs = ", ".join(f"{v} {'≥' if k == 'lower' else '≤'} {b}"
+                             for (v, k, b, _d) in s.get("prod_factors", []))
+            lines.append(f"{ind}- Product step (`mul_nonneg`) on {pv} "
+                         f"from ({facs}): `{s['text']}`.")
         elif rule == "case_split":
             lines.append(f"{ind}- Case split (`by_cases`) on "
                          f"`{s['split_var']}` at threshold {s['split_threshold']}: "

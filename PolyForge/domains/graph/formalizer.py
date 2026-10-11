@@ -38,6 +38,13 @@ _Z = {
     "radius": "(G.radius.toNat : ℤ)",
     "girth": "(G.girth : ℤ)",
 }
+# v1.2 §III.1: product (auxiliary) variables render as the literal product of
+# their factor atoms, in the SAME factor order the GraphLemmas ℤ wrappers use
+# (n → Fintype.card V first).  These appear only inside intermediate `have`
+# statements (product inventory facts / the product step), never in goals.
+for _p, (_x, _y) in DED.PRODUCT_VARS.items():
+    _Z[_p] = f"{_Z[_x]} * {_Z[_y]}"
+_RENDER_VARS = list(VARS) + list(DED.PRODUCT_VARS)
 _REL = {">=": "≥", "<=": "≤", "==": "=", "=": "="}
 
 # inventory entry name → (ℤ wrapper lemma, required properties, positivity need)
@@ -75,6 +82,12 @@ WRAPPER = {
     "omega_le_n": ("omega_le_card_int", [], None),
     "tau_le_m": ("tau_le_edges_int", [], None),
     "conn_cycle_edges": ("conn_cycle_edges_ge_card_int", ["is_connected", "has_cycle"], None),
+    # v1.2 §II/§III product (handshake / edge-count) facts
+    "handshake_min": ("handshake_min_int", [], None),
+    "handshake_max": ("handshake_max_int", [], None),
+    "edge_card_bound": ("two_mul_edges_le_card_sq_sub_card_int", [], None),
+    "bipartite_edges": ("bipartite_four_mul_edges_int", ["is_bipartite"], None),
+    "regular_edges": ("regular_edges_int", ["is_regular"], None),
 }
 
 
@@ -95,7 +108,7 @@ def _clear(coeffs, const):
 
 def _render_expr(ic):
     terms = []
-    for v in VARS:
+    for v in _RENDER_VARS:
         c = ic.get(v, 0)
         if c == 0:
             continue
@@ -153,6 +166,8 @@ def _prop_term(req, prop_hyps):
 
 def _wrapper_call(inv_name, prop_hyps):
     wname, req, pos = WRAPPER[inv_name]
+    if wname == "card_ge_one_int":            # n ≥ 1 does not mention G
+        return "card_ge_one_int (V := V)"
     args = ["G"] + [_prop_term(p, prop_hyps) for p in req]
     if pos == "n2":
         args.append(_prop_term("nontrivial", prop_hyps))
@@ -195,6 +210,10 @@ def _emit_step(step, lines, indent, text2hyp, prop_hyps, case_hyps):
         call = _wrapper_call(inv, prop_hyps)
         lines.append(f"{indent}have {hid} : {stmt} := by")
         lines.append(f"{indent}  have hw := {call}")
+        # normalise a parametric Nat-literal cast (↑k / ↑d from edge_conn / regular)
+        # so linarith equates e.g. (↑2 : ℤ) with the literal 2; a no-op (and so
+        # harmless) for the non-parametric facts, and it leaves product atoms intact.
+        lines.append(f"{indent}  try push_cast at hw")
         lines.append(f"{indent}  linarith [hw]")
         return
 
@@ -227,6 +246,22 @@ def _emit_step(step, lines, indent, text2hyp, prop_hyps, case_hyps):
     if rule == "rounding":
         dep = f"s{step['deps'][0]}"
         lines.append(f"{indent}have {hid} : {stmt} := by have hr := {dep}; omega")
+        return
+
+    if rule == "product":
+        # v1.2 §III.3: McCormick envelope from a nonnegative product of two factors.
+        # factor for (var,"lower",b): (Z[var] − b) ≥ 0 ;  for "upper": (b − Z[var]) ≥ 0.
+        def _factor(fac):
+            var, kind, bnd, dfid = fac
+            z = _Z[var]
+            return (f"({z} - {int(bnd)})" if kind == "lower" else f"({int(bnd)} - {z})"), dfid
+        f1, d1 = _factor(step["prod_factors"][0])
+        f2, d2 = _factor(step["prod_factors"][1])
+        lines.append(f"{indent}have {hid} : {stmt} := by")
+        lines.append(f"{indent}  have hmul : (0 : ℤ) ≤ {f1} * {f2} :=")
+        lines.append(f"{indent}    mul_nonneg (by linarith [s{d1}]) (by linarith [s{d2}])")
+        lines.append(f"{indent}  ring_nf at hmul ⊢")
+        lines.append(f"{indent}  linarith [hmul]")
         return
 
     if rule == "case_split":

@@ -1,0 +1,176 @@
+{
+  "id": "C52",
+  "created_at": "2026-10-11T07:03:42.090384+00:00",
+  "generator": {
+    "version": "1.2",
+    "seed": 2024006752
+  },
+  "conjecture": {
+    "formula": "if ((nontrivial) and (is_k_edge_connected(2)) and (n >= 5)), then (n <= 2*m - 5)",
+    "properties_premises": [
+      {
+        "name": "nontrivial"
+      },
+      {
+        "name": "is_k_edge_connected",
+        "param": 2
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "n >= 5",
+        "coeffs": {
+          "n": 1
+        },
+        "rel": ">=",
+        "rhs": 5
+      }
+    ],
+    "conclusion": {
+      "text": "n <= 2*m - 5",
+      "coeffs": {
+        "n": 1,
+        "m": -2
+      },
+      "rel": "<=",
+      "rhs": -5
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose nontrivial, is_k_edge_connected(2), n >= 5. Then n <= 2*m - 5."
+  },
+  "primary_var": "n",
+  "dalmatian": "significant",
+  "properties": [
+    "nontrivial",
+    "is_k_edge_connected"
+  ],
+  "conclusion_property": null,
+  "proof": {
+    "inventory_used": [
+      "edge_conn_min_deg",
+      "handshake_min"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*min_deg + -2 >= 0",
+        "coeffs": {
+          "min_deg": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "inventory": "edge_conn_min_deg"
+      },
+      {
+        "fid": 2,
+        "rule": "premise",
+        "text": "1*n + -5 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-5",
+        "rel": ">=",
+        "note": "n >= 5"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "2*m + -1*P_n_mindeg >= 0",
+        "coeffs": {
+          "P_n_mindeg": "-1",
+          "m": "2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "handshake_min"
+      },
+      {
+        "fid": 4,
+        "rule": "product",
+        "text": "-2*n + -5*min_deg + 1*P_n_mindeg + 10 >= 0",
+        "coeffs": {
+          "P_n_mindeg": "1",
+          "n": "-2",
+          "min_deg": "-5"
+        },
+        "const": "10",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          1,
+          2
+        ],
+        "prod_var": "P_n_mindeg",
+        "prod_factors": [
+          [
+            "n",
+            "lower",
+            5,
+            2
+          ],
+          [
+            "min_deg",
+            "lower",
+            2,
+            1
+          ]
+        ]
+      },
+      {
+        "fid": 5,
+        "rule": "combination",
+        "text": "-1*n + 2*m + -5 >= 0",
+        "coeffs": {
+          "n": "-1",
+          "m": "2"
+        },
+        "const": "-5",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "mults": [
+          "5",
+          "1",
+          "1",
+          "1"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.0017452006980802793,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0017452006980803
+  },
+  "attained": "yes",
+  "touch": 1,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 0,
+    "inventory_theorems": 1,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 5.5,
+  "proof_cost": 5.5,
+  "proof_cost_expanded": 5.5,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.375,
+  "lean": {
+    "theorem_name": "C52",
+    "status": "compiled"
+  }
+}

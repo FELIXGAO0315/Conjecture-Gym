@@ -391,6 +391,93 @@ theorem conn_cycle_edges_ge_card_int (hconn : G.Connected) (hcyc : ¬ G.IsAcycli
     (Fintype.card V : ℤ) ≤ (G.edgeFinset.card : ℤ) := by
   have := conn_cycle_card_le_edges G hconn hcyc; omega
 
+/-! ### v1.2 §II: product (handshake / edge-count) facts
+
+These relate the *products* n·min_deg, n·max_deg and n² (= n·n) to the edge count.
+The deduction engine carries the products as proof-only auxiliary variables
+(P_n_mindeg, P_n_maxdeg, N2) and connects them to the original invariants with
+McCormick envelope inequalities (the product inference step).  The ℤ wrappers
+state the products with the SAME factor order the formalizer renders
+(n → Fintype.card V first). -/
+
+-- n · min_deg ≤ 2m  :  ∑_v min_deg ≤ ∑_v deg v = 2m
+theorem card_mul_minDegree_le_two_mul_edges :
+    Fintype.card V * G.minDegree ≤ 2 * G.edgeFinset.card := by
+  have h2 : ∑ _v : V, G.minDegree ≤ ∑ v : V, G.degree v :=
+    Finset.sum_le_sum (fun v _ => G.minDegree_le_degree v)
+  have h1 : ∑ _v : V, G.minDegree = Fintype.card V * G.minDegree := by
+    rw [Finset.sum_const, Finset.card_univ, smul_eq_mul]
+  rw [h1] at h2
+  rwa [G.sum_degrees_eq_twice_card_edges] at h2
+
+-- 2m ≤ n · max_deg  :  2m = ∑_v deg v ≤ ∑_v max_deg
+theorem two_mul_edges_le_card_mul_maxDegree :
+    2 * G.edgeFinset.card ≤ Fintype.card V * G.maxDegree := by
+  have h2 : ∑ v : V, G.degree v ≤ ∑ _v : V, G.maxDegree :=
+    Finset.sum_le_sum (fun v _ => G.degree_le_maxDegree v)
+  have h1 : ∑ _v : V, G.maxDegree = Fintype.card V * G.maxDegree := by
+    rw [Finset.sum_const, Finset.card_univ, smul_eq_mul]
+  rw [h1, G.sum_degrees_eq_twice_card_edges] at h2
+  exact h2
+
+-- product fact 1 : n·min_deg ≤ 2m
+theorem handshake_min_int :
+    (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≤ 2 * (G.edgeFinset.card : ℤ) := by
+  have := card_mul_minDegree_le_two_mul_edges G
+  exact_mod_cast this
+
+-- product fact 2 : 2m ≤ n·max_deg
+theorem handshake_max_int :
+    2 * (G.edgeFinset.card : ℤ) ≤ (Fintype.card V : ℤ) * (G.maxDegree : ℤ) := by
+  have := two_mul_edges_le_card_mul_maxDegree G
+  exact_mod_cast this
+
+-- regular : 2m = n·d  (ℕ), then 2m = d·n  (ℤ) — linear (d a constant)
+theorem regular_two_mul_edges {d : ℕ} (h : G.IsRegularOfDegree d) :
+    2 * G.edgeFinset.card = Fintype.card V * d := by
+  rw [← G.sum_degrees_eq_twice_card_edges]
+  rw [Finset.sum_congr rfl (fun v _ => h v), Finset.sum_const, Finset.card_univ, smul_eq_mul]
+
+theorem regular_edges_int {d : ℕ} (h : G.IsRegularOfDegree d) :
+    2 * (G.edgeFinset.card : ℤ) = (d : ℤ) * (Fintype.card V : ℤ) := by
+  have h2 := regular_two_mul_edges G h
+  rw [mul_comm (d : ℤ) (Fintype.card V : ℤ)]
+  exact_mod_cast h2
+
+-- product fact 4 : 2m ≤ n² − n  (via m ≤ n.choose 2 and 2·(n.choose 2) = n·(n−1))
+theorem two_mul_edges_le_card_sq_sub_card_int [Nonempty V] :
+    2 * (G.edgeFinset.card : ℤ)
+      ≤ (Fintype.card V : ℤ) * (Fintype.card V : ℤ) - (Fintype.card V : ℤ) := by
+  have h := G.card_edgeFinset_le_card_choose_two
+  have hkey : 2 * (Fintype.card V).choose 2 = Fintype.card V * (Fintype.card V - 1) := by
+    rw [Nat.choose_two_right, Nat.mul_div_cancel']
+    exact (Nat.even_mul_pred_self _).two_dvd
+  have h2 : 2 * G.edgeFinset.card ≤ Fintype.card V * (Fintype.card V - 1) := by
+    calc 2 * G.edgeFinset.card ≤ 2 * (Fintype.card V).choose 2 := by omega
+      _ = Fintype.card V * (Fintype.card V - 1) := hkey
+  have hn : 1 ≤ Fintype.card V := Fintype.card_pos
+  zify [hn] at h2
+  have hexp : (Fintype.card V : ℤ) * ((Fintype.card V : ℤ) - 1)
+            = (Fintype.card V : ℤ) * (Fintype.card V : ℤ) - (Fintype.card V : ℤ) := by ring
+  linarith [h2, hexp]
+
+-- product fact 5 : is_bipartite ⟹ 4m ≤ n²
+theorem bipartite_four_mul_edges_int (h : G.IsBipartite) :
+    4 * (G.edgeFinset.card : ℤ) ≤ (Fintype.card V : ℤ) * (Fintype.card V : ℤ) := by
+  have hb := h.four_mul_encard_edgeSet_le
+  have henc : G.edgeSet.encard = (G.edgeFinset.card : ℕ∞) := by
+    rw [Set.encard_eq_coe_toFinset_card]; rfl
+  have hcard : ENat.card V = (Fintype.card V : ℕ∞) := by
+    rw [ENat.card_eq_coe_fintype_card]
+  rw [henc, hcard] at hb
+  have hb2 : (4 * G.edgeFinset.card : ℕ) ≤ (Fintype.card V) ^ 2 := by
+    have := hb
+    rw [← Nat.cast_ofNat (n := 4), ← Nat.cast_mul, ← Nat.cast_pow] at this
+    exact_mod_cast this
+  have hcast : (4 * G.edgeFinset.card : ℤ) ≤ ((Fintype.card V ^ 2 : ℕ) : ℤ) := by exact_mod_cast hb2
+  push_cast at hcast
+  nlinarith [hcast]
+
 /-! ### property-implication discharge (§II.2, used by the formalizer) -/
 
 theorem isTree_connected (h : G.IsTree) : G.Connected := h.connected
