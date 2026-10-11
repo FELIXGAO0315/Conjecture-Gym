@@ -25,4 +25,6 @@ theorem C88 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph
     ring_nf at hmul ⊢
     linarith [hmul]
   have s6 : (Fintype.card V : ℤ) + (G.edgeFinset.card : ℤ) - 3 * (G.chromaticNumber.toNat : ℤ) ≥ 0 := by linarith [s1, s2, s3, s5]
-  linarith [s6]
+  have heq_gallai := gallai_int G
+  try push_cast at heq_gallai
+  linarith [s6, heq_gallai]

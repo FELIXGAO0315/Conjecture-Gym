@@ -1,135 +1,197 @@
 {
   "id": "C3",
-  "created_at": "2026-10-11T18:36:12.473357+00:00",
+  "created_at": "2026-10-11T22:29:49.993209+00:00",
   "generator": {
-    "version": "1.2.1",
-    "seed": 2024006079
+    "version": "1.2.2",
+    "seed": 2024006083
   },
   "conjecture": {
-    "formula": "if ((tau >= 2*alpha) and (n <= 5)), then (tau >= 3*m - 26)",
-    "properties_premises": [],
+    "formula": "if ((has_cycle) and (omega >= 2*alpha)), then (2*min_deg <= m + tau - 1)",
+    "properties_premises": [
+      {
+        "name": "has_cycle"
+      }
+    ],
     "numeric_premises": [
       {
-        "text": "tau >= 2*alpha",
+        "text": "omega >= 2*alpha",
         "coeffs": {
-          "tau": 1,
+          "omega": 1,
           "alpha": -2
         },
         "rel": ">=",
         "rhs": 0
-      },
-      {
-        "text": "n <= 5",
-        "coeffs": {
-          "n": 1
-        },
-        "rel": "<=",
-        "rhs": 5
       }
     ],
     "conclusion": {
-      "text": "tau >= 3*m - 26",
+      "text": "2*min_deg <= m + tau - 1",
       "coeffs": {
-        "tau": 1,
-        "m": -3
+        "m": -1,
+        "min_deg": 2,
+        "tau": -1
+      },
+      "rel": "<=",
+      "rhs": -1
+    },
+    "canonical_form": {
+      "text": "n >= -m + 2*min_deg + alpha + 1",
+      "coeffs": {
+        "min_deg": -2,
+        "m": 1,
+        "alpha": -1,
+        "n": 1
       },
       "rel": ">=",
-      "rhs": -26
+      "rhs": 1
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose tau >= 2*alpha, n <= 5. Then tau >= 3*m - 26."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose has_cycle, omega >= 2*alpha. Then 2*min_deg <= m + tau - 1."
   },
-  "primary_var": "tau",
-  "dalmatian": "unknown",
-  "properties": [],
+  "primary_var": "min_deg",
+  "dalmatian": "significant",
+  "properties": [
+    "has_cycle"
+  ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
-      "edge_card_bound",
+      "chi_le_n",
+      "cycle_three_le_card",
       "gallai",
-      "n_ge_one"
+      "handshake_min",
+      "max_lt_card",
+      "min_le_max",
+      "nonneg_min_deg",
+      "omega_le_chi"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
         "rule": "inventory",
-        "text": "-1*n + -2*m + 1*N2 >= 0",
+        "text": "1*chi + -1*omega >= 0",
         "coeffs": {
-          "m": "-2",
-          "n": "-1",
-          "N2": "1"
+          "omega": "-1",
+          "chi": "1"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "edge_card_bound"
+        "inventory": "omega_le_chi"
       },
       {
         "fid": 2,
-        "rule": "premise",
-        "text": "-2*alpha + 1*tau >= 0",
+        "rule": "inventory",
+        "text": "1*n + -1*chi >= 0",
         "coeffs": {
-          "tau": "1",
-          "alpha": "-2"
+          "chi": "-1",
+          "n": "1"
         },
         "const": "0",
         "rel": ">=",
-        "note": "tau >= 2*alpha"
+        "inventory": "chi_le_n"
       },
       {
         "fid": 3,
-        "rule": "premise",
-        "text": "-1*n + 5 >= 0",
+        "rule": "inventory",
+        "text": "1*max_deg + -1*min_deg >= 0",
         "coeffs": {
-          "n": "-1"
+          "min_deg": "-1",
+          "max_deg": "1"
         },
-        "const": "5",
+        "const": "0",
         "rel": ">=",
-        "note": "n <= 5"
+        "inventory": "min_le_max"
       },
       {
         "fid": 4,
         "rule": "inventory",
-        "text": "1*n + -1 >= 0",
+        "text": "1*n + -1*max_deg + -1 >= 0",
         "coeffs": {
+          "max_deg": "-1",
           "n": "1"
         },
         "const": "-1",
         "rel": ">=",
-        "inventory": "n_ge_one"
+        "inventory": "max_lt_card"
       },
       {
         "fid": 5,
-        "rule": "product",
-        "text": "6*n + -1*N2 + -5 >= 0",
+        "rule": "inventory",
+        "text": "2*m + -1*P_n_mindeg >= 0",
         "coeffs": {
-          "N2": "-1",
-          "n": "6"
+          "P_n_mindeg": "-1",
+          "m": "2"
         },
-        "const": "-5",
+        "const": "0",
+        "rel": ">=",
+        "inventory": "handshake_min"
+      },
+      {
+        "fid": 6,
+        "rule": "premise",
+        "text": "1*omega + -2*alpha >= 0",
+        "coeffs": {
+          "omega": "1",
+          "alpha": "-2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "omega >= 2*alpha"
+      },
+      {
+        "fid": 7,
+        "rule": "inventory",
+        "text": "1*n + -3 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "inventory": "cycle_three_le_card"
+      },
+      {
+        "fid": 8,
+        "rule": "inventory",
+        "text": "1*min_deg >= 0",
+        "coeffs": {
+          "min_deg": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_min_deg"
+      },
+      {
+        "fid": 9,
+        "rule": "product",
+        "text": "-3*min_deg + 1*P_n_mindeg >= 0",
+        "coeffs": {
+          "P_n_mindeg": "1",
+          "min_deg": "-3"
+        },
+        "const": "0",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
-          4,
-          3
+          7,
+          8
         ],
-        "prod_var": "N2",
+        "prod_var": "P_n_mindeg",
         "prod_factors": [
           [
             "n",
             "lower",
-            1,
-            4
+            3,
+            7
           ],
           [
-            "n",
-            "upper",
-            5,
-            3
+            "min_deg",
+            "lower",
+            0,
+            8
           ]
         ]
       },
       {
-        "fid": 6,
+        "fid": 10,
         "rule": "inventory",
         "text": "-1*n + 1*alpha + 1*tau == 0",
         "coeffs": {
@@ -142,53 +204,61 @@
         "inventory": "gallai"
       },
       {
-        "fid": 7,
+        "fid": 11,
         "rule": "combination",
-        "text": "-3*m + 1*tau + 80/3 >= 0",
+        "text": "1*m + -2*min_deg + 1*tau + -1/2 >= 0",
         "coeffs": {
-          "tau": "1",
-          "m": "-3"
+          "min_deg": "-2",
+          "m": "1",
+          "tau": "1"
         },
-        "const": "80/3",
+        "const": "-1/2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
           2,
           3,
+          4,
           5,
-          6
+          6,
+          9,
+          10
         ],
         "mults": [
-          "3/2",
-          "1/3",
-          "41/6",
-          "3/2",
-          "2/3"
+          "1/2",
+          "1/2",
+          "1/2",
+          "1/2",
+          "1/2",
+          "1/2",
+          "1/2",
+          "1"
         ]
       },
       {
-        "fid": 8,
+        "fid": 12,
         "rule": "rounding",
-        "text": "-3*m + 1*tau + 26 >= 0",
+        "text": "1*m + -2*min_deg + 1*tau + -1 >= 0",
         "coeffs": {
-          "tau": "1",
-          "m": "-3"
+          "min_deg": "-2",
+          "m": "1",
+          "tau": "1"
         },
-        "const": "26",
+        "const": "-1",
         "rel": ">=",
         "tactic": "omega",
         "deps": [
-          7
+          11
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.3333333333333333,
+    "T": 0.0078125,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.3333333333333333
+    "score": 1.0078125
   },
   "attained": "yes",
   "touch": 1,
@@ -200,16 +270,16 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 1,
-    "inventory_theorems": 2,
+    "inventory_theorems": 6,
     "product_steps": 1
   },
-  "proof_cost_initial": 10.0,
-  "proof_cost": 10.0,
-  "proof_cost_expanded": 10.0,
+  "proof_cost_initial": 18.0,
+  "proof_cost": 18.0,
+  "proof_cost_expanded": 18.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.4285714285714286,
+  "hardness": 3.0,
   "lean": {
     "theorem_name": "C3",
     "status": "compiled"

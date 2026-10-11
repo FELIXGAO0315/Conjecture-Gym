@@ -4,46 +4,37 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C92 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.maxDegree : ℤ) ≥ 6) :
-    (G.maxDegree : ℤ) ≤ 3 * (G.edgeFinset.card : ℤ) - 3 * (G.minDegree : ℤ) - 9 := by
-  have s1 : 3 * (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) - 3 * (G.minDegree : ℤ) ≥ 9 := by
-    by_cases hc1 : (2 : ℤ) ≤ (G.minDegree : ℤ)
-    · -- 1*min_deg >= 2
-      have s2 : (Fintype.card V : ℤ) - (G.maxDegree : ℤ) ≥ 1 := by
-        have hw := max_lt_card_int' G
-        try push_cast at hw
-        linarith [hw]
-      have s3 : (G.maxDegree : ℤ) ≥ 6 := by linarith [hn1]
-      have s4 : (G.minDegree : ℤ) ≥ 2 := by have hcc := hc1; omega
-      have s5 : 2 * (G.edgeFinset.card : ℤ) - (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ 0 := by
-        have hw := handshake_min_int G
-        try push_cast at hw
-        linarith [hw]
-      have s6 : (Fintype.card V : ℤ) ≥ 1 := by
-        have hw := card_ge_one_int (V := V)
-        try push_cast at hw
-        linarith [hw]
-      have s7 : -2 * (Fintype.card V : ℤ) - (G.minDegree : ℤ) + (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ -2 := by
-        have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 1) * ((G.minDegree : ℤ) - 2) :=
-          mul_nonneg (by linarith [s6]) (by linarith [s4])
-        ring_nf at hmul ⊢
-        linarith [hmul]
-      have s8 : (G.edgeFinset.card : ℤ) ≥ 7 := by linarith [s2, s3, s4, s5, s7]
-      have s9 : (Fintype.card V : ℤ) ≥ 7 := by linarith [s2, s3]
-      have s10 : -2 * (Fintype.card V : ℤ) - 7 * (G.minDegree : ℤ) + (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ -14 := by
-        have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 7) * ((G.minDegree : ℤ) - 2) :=
-          mul_nonneg (by linarith [s9]) (by linarith [s4])
-        ring_nf at hmul ⊢
-        linarith [hmul]
-      have s11 : 3 * (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) - 3 * (G.minDegree : ℤ) ≥ 9 := by linarith [s2, s8, s5, s7, s10]
-      linarith [s11]
-    · -- 1*min_deg <= 1
-      have s12 : (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) ≥ 0 := by
-        have hw := max_le_edges_int G
-        try push_cast at hw
-        linarith [hw]
-      have s13 : (G.maxDegree : ℤ) ≥ 6 := by linarith [hn1]
-      have s14 : -(G.minDegree : ℤ) ≥ -1 := by have hcc := hc1; omega
-      have s15 : 3 * (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) - 3 * (G.minDegree : ℤ) ≥ 9 := by linarith [s12, s13, s14]
-      linarith [s15]
-  linarith [s1]
+theorem C92 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hp1 : G.IsAcyclic) (hn1 : (Fintype.card V : ℤ) ≥ 5) :
+    (G.cliqueNum : ℤ) ≤ 2 * (G.edgeFinset.card : ℤ) - 3 * (G.minDegree : ℤ) + 1 := by
+  have s1 : (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by
+    have hw := omega_le_chi_int G
+    try push_cast at hw
+    linarith [hw]
+  have s2 : (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) ≥ 0 := by
+    have hw := max_le_edges_int G
+    try push_cast at hw
+    linarith [hw]
+  have s3 : -(G.chromaticNumber.toNat : ℤ) ≥ -2 := by
+    have hw := acyclic_chi_int G hp1
+    try push_cast at hw
+    linarith [hw]
+  have s4 : (G.maxDegree : ℤ) - (G.cliqueNum : ℤ) ≥ -1 := by
+    have hw := omega_le_maxdeg_add_one_int G
+    try push_cast at hw
+    linarith [hw]
+  have s5 : 2 * (G.edgeFinset.card : ℤ) - (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ 0 := by
+    have hw := handshake_min_int G
+    try push_cast at hw
+    linarith [hw]
+  have s6 : (G.minDegree : ℤ) ≥ 0 := by positivity
+  have s7 : (Fintype.card V : ℤ) ≥ 5 := by linarith [hn1]
+  have s8 : -5 * (G.minDegree : ℤ) + (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ 0 := by
+    have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 5) * ((G.minDegree : ℤ) - 0) :=
+      mul_nonneg (by linarith [s7]) (by linarith [s6])
+    ring_nf at hmul ⊢
+    linarith [hmul]
+  have s9 : 10 * (G.edgeFinset.card : ℤ) - 15 * (G.minDegree : ℤ) - 5 * (G.cliqueNum : ℤ) ≥ -6 := by linarith [s1, s2, s3, s4, s5, s8]
+  have s10 : 2 * (G.edgeFinset.card : ℤ) - 3 * (G.minDegree : ℤ) - (G.cliqueNum : ℤ) ≥ -1 := by have hr := s9; omega
+  have heq_gallai := gallai_int G
+  try push_cast at heq_gallai
+  linarith [s10, heq_gallai]

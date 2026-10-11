@@ -1,57 +1,70 @@
 {
   "id": "C24",
-  "created_at": "2026-10-11T18:41:43.749805+00:00",
+  "created_at": "2026-10-11T22:32:52.198874+00:00",
   "generator": {
-    "version": "1.2.1",
-    "seed": 2024006148
+    "version": "1.2.2",
+    "seed": 2024006140
   },
   "conjecture": {
-    "formula": "if ((alpha <= 1)), then (chi >= max_deg + 1)",
-    "properties_premises": [],
-    "numeric_premises": [
+    "formula": "if ((has_cycle) and (is_bipartite)), then (chi >= -2*alpha + girth + 2)",
+    "properties_premises": [
       {
-        "text": "alpha <= 1",
-        "coeffs": {
-          "alpha": 1
-        },
-        "rel": "<=",
-        "rhs": 1
+        "name": "has_cycle"
+      },
+      {
+        "name": "is_bipartite"
       }
     ],
+    "numeric_premises": [],
     "conclusion": {
-      "text": "chi >= max_deg + 1",
+      "text": "chi >= -2*alpha + girth + 2",
       "coeffs": {
+        "alpha": 2,
         "chi": 1,
-        "max_deg": -1
+        "girth": -1
       },
       "rel": ">=",
-      "rhs": 1
+      "rhs": 2
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose alpha <= 1. Then chi >= max_deg + 1."
+    "canonical_form": {
+      "text": "chi >= -2*alpha + girth + 2",
+      "coeffs": {
+        "chi": 1,
+        "alpha": 2,
+        "girth": -1
+      },
+      "rel": ">=",
+      "rhs": 2
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose has_cycle, is_bipartite. Then chi >= -2*alpha + girth + 2."
   },
   "primary_var": "chi",
-  "dalmatian": "unknown",
-  "properties": [],
+  "dalmatian": "significant",
+  "properties": [
+    "has_cycle",
+    "is_bipartite"
+  ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
+      "alpha_ge_one",
+      "bipartite_chi",
       "card_le_alpha_chi",
-      "chi_ge_one",
-      "max_lt_card"
+      "girth_le_card"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
         "rule": "inventory",
-        "text": "1*n + -1*max_deg + -1 >= 0",
+        "text": "1*n + -1*girth >= 0",
         "coeffs": {
-          "max_deg": "-1",
+          "girth": "-1",
           "n": "1"
         },
-        "const": "-1",
+        "const": "0",
         "rel": ">=",
-        "inventory": "max_lt_card"
+        "inventory": "girth_le_card"
       },
       {
         "fid": 2,
@@ -67,54 +80,54 @@
       },
       {
         "fid": 3,
-        "rule": "premise",
-        "text": "-1*alpha + 1 >= 0",
+        "rule": "inventory",
+        "text": "1*alpha + -1 >= 0",
         "coeffs": {
-          "alpha": "-1"
+          "alpha": "1"
         },
-        "const": "1",
+        "const": "-1",
         "rel": ">=",
-        "note": "alpha <= 1"
+        "inventory": "alpha_ge_one"
       },
       {
         "fid": 4,
         "rule": "inventory",
-        "text": "1*chi + -1 >= 0",
+        "text": "-1*chi + 2 >= 0",
         "coeffs": {
-          "chi": "1"
+          "chi": "-1"
         },
-        "const": "-1",
+        "const": "2",
         "rel": ">=",
-        "inventory": "chi_ge_one"
+        "inventory": "bipartite_chi"
       },
       {
         "fid": 5,
         "rule": "product",
-        "text": "1*chi + 1*alpha + -1*P_alpha_chi + -1 >= 0",
+        "text": "1*chi + 2*alpha + -1*P_alpha_chi + -2 >= 0",
         "coeffs": {
           "P_alpha_chi": "-1",
-          "alpha": "1",
+          "alpha": "2",
           "chi": "1"
         },
-        "const": "-1",
+        "const": "-2",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
-          4,
-          3
+          3,
+          4
         ],
         "prod_var": "P_alpha_chi",
         "prod_factors": [
           [
             "alpha",
-            "upper",
+            "lower",
             1,
             3
           ],
           [
             "chi",
-            "lower",
-            1,
+            "upper",
+            2,
             4
           ]
         ]
@@ -122,22 +135,21 @@
       {
         "fid": 6,
         "rule": "combination",
-        "text": "-1*max_deg + 1*chi + -1 >= 0",
+        "text": "1*chi + 2*alpha + -1*girth + -2 >= 0",
         "coeffs": {
           "chi": "1",
-          "max_deg": "-1"
+          "alpha": "2",
+          "girth": "-1"
         },
-        "const": "-1",
+        "const": "-2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
           2,
-          3,
           5
         ],
         "mults": [
-          "1",
           "1",
           "1",
           "1"
@@ -146,13 +158,13 @@
     ]
   },
   "iris": {
-    "T": 1.0,
-    "R": 0.2857142857142857,
-    "L": 1.0,
-    "score": 2.2857142857142856
+    "T": 0.02857142857142857,
+    "R": 1.0,
+    "L": 0.7453559924999299,
+    "score": 1.7739274210713583
   },
   "attained": "yes",
-  "touch": 7,
+  "touch": 2,
   "arith_sharp": "relaxed",
   "depth_type": "product_needed",
   "proof_stats": {
@@ -170,7 +182,7 @@
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.875,
+  "hardness": 2.5,
   "lean": {
     "theorem_name": "C24",
     "status": "compiled"

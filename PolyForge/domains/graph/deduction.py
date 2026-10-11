@@ -132,9 +132,10 @@ def set_active_inventory(properties: set, params: dict):
                      "conclusion": {"coeffs": dict(e["conclusion"]["coeffs"]),
                                     "rel": e["conclusion"]["rel"],
                                     "rhs": int(e["conclusion"]["rhs"])}})
-    # v1.2.1 §VI.2: Turán-type conditional theorems (hypothesis omega ≤ r, numeric
-    # — always available; they fire when the context entails the cap).
-    for e in INV.TURAN:
+    # v1.2.1 §VI.2 / v1.2.2 §II: conditional theorems with numeric hypotheses
+    # (Turán omega ≤ r; complete-graph chi ≥ n ⟹ alpha ≤ 1) — always available;
+    # they fire when the context entails the hypothesis.
+    for e in INV.CONDITIONALS:
         cond.append({"name": e["name"], "lean_name": e["lean_name"],
                      "hypothesis": {"coeffs": dict(e["hypothesis"]["coeffs"]),
                                     "rel": e["hypothesis"]["rel"], "rhs": int(e["hypothesis"]["rhs"])},

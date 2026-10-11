@@ -36,4 +36,6 @@ theorem C12 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph
     ring_nf at hmul ⊢
     linarith [hmul]
   have s8 : 3 * (G.edgeFinset.card : ℤ) - (G.chromaticNumber.toNat : ℤ) ≥ 6 := by linarith [s1, s2, s3, s4, s5, s7]
-  linarith [s8]
+  have heq_gallai := gallai_int G
+  try push_cast at heq_gallai
+  linarith [s8, heq_gallai]

@@ -1,59 +1,84 @@
 {
   "id": "C71",
-  "created_at": "2026-10-11T18:52:00.434985+00:00",
+  "created_at": "2026-10-11T22:46:44.285914+00:00",
   "generator": {
-    "version": "1.2.1",
-    "seed": 2024006300
+    "version": "1.2.2",
+    "seed": 2024006301
   },
   "conjecture": {
-    "formula": "if ((is_regular(3)) and (omega >= chi)), then (n >= m - 2*alpha)",
-    "properties_premises": [
-      {
-        "name": "is_regular",
-        "param": 3
-      }
-    ],
+    "formula": "if ((chi <= 1)), then (max_deg >= 2*min_deg - alpha + 1)",
+    "properties_premises": [],
     "numeric_premises": [
       {
-        "text": "omega >= chi",
+        "text": "chi <= 1",
         "coeffs": {
-          "omega": 1,
-          "chi": -1
+          "chi": 1
         },
-        "rel": ">=",
-        "rhs": 0
+        "rel": "<=",
+        "rhs": 1
       }
     ],
     "conclusion": {
-      "text": "n >= m - 2*alpha",
+      "text": "max_deg >= 2*min_deg - alpha + 1",
       "coeffs": {
-        "n": 1,
-        "alpha": 2,
-        "m": -1
+        "alpha": 1,
+        "max_deg": 1,
+        "min_deg": -2
       },
       "rel": ">=",
-      "rhs": 0
+      "rhs": 1
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_regular(3), omega >= chi. Then n >= m - 2*alpha."
+    "canonical_form": {
+      "text": "max_deg >= 2*min_deg - alpha + 1",
+      "coeffs": {
+        "max_deg": 1,
+        "alpha": 1,
+        "min_deg": -2
+      },
+      "rel": ">=",
+      "rhs": 1
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose chi <= 1. Then max_deg >= 2*min_deg - alpha + 1."
   },
-  "primary_var": "n",
+  "primary_var": "max_deg",
   "dalmatian": "unknown",
-  "properties": [
-    "is_regular"
-  ],
+  "properties": [],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
       "alpha_ge_one",
       "card_le_alpha_chi",
-      "omega_le_maxdeg",
-      "regular_edges",
-      "regular_max"
+      "max_lt_card",
+      "min_le_max"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
+        "rule": "inventory",
+        "text": "1*max_deg + -1*min_deg >= 0",
+        "coeffs": {
+          "min_deg": "-1",
+          "max_deg": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "min_le_max"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "1*n + -1*max_deg + -1 >= 0",
+        "coeffs": {
+          "max_deg": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "max_lt_card"
+      },
+      {
+        "fid": 3,
         "rule": "inventory",
         "text": "-1*n + 1*P_alpha_chi >= 0",
         "coeffs": {
@@ -65,63 +90,18 @@
         "inventory": "card_le_alpha_chi"
       },
       {
-        "fid": 2,
-        "rule": "inventory",
-        "text": "1*max_deg + -1*omega + 1 >= 0",
+        "fid": 4,
+        "rule": "premise",
+        "text": "-1*chi + 1 >= 0",
         "coeffs": {
-          "omega": "-1",
-          "max_deg": "1"
+          "chi": "-1"
         },
         "const": "1",
         "rel": ">=",
-        "inventory": "omega_le_maxdeg"
-      },
-      {
-        "fid": 3,
-        "rule": "premise",
-        "text": "-1*chi + 1*omega >= 0",
-        "coeffs": {
-          "omega": "1",
-          "chi": "-1"
-        },
-        "const": "0",
-        "rel": ">=",
-        "note": "omega >= chi"
-      },
-      {
-        "fid": 4,
-        "rule": "inventory",
-        "text": "1*max_deg + -3 == 0",
-        "coeffs": {
-          "max_deg": "1"
-        },
-        "const": "-3",
-        "rel": "==",
-        "inventory": "regular_max"
+        "note": "chi <= 1"
       },
       {
         "fid": 5,
-        "rule": "combination",
-        "text": "-1*chi + 4 >= 0",
-        "coeffs": {
-          "chi": "-1"
-        },
-        "const": "4",
-        "rel": ">=",
-        "tactic": "linarith",
-        "deps": [
-          2,
-          3,
-          4
-        ],
-        "mults": [
-          "1",
-          "1",
-          "-1"
-        ]
-      },
-      {
-        "fid": 6,
         "rule": "inventory",
         "text": "1*alpha + -1 >= 0",
         "coeffs": {
@@ -132,20 +112,20 @@
         "inventory": "alpha_ge_one"
       },
       {
-        "fid": 7,
+        "fid": 6,
         "rule": "product",
-        "text": "1*chi + 4*alpha + -1*P_alpha_chi + -4 >= 0",
+        "text": "1*chi + 1*alpha + -1*P_alpha_chi + -1 >= 0",
         "coeffs": {
           "P_alpha_chi": "-1",
-          "alpha": "4",
+          "alpha": "1",
           "chi": "1"
         },
-        "const": "-4",
+        "const": "-1",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
-          6,
-          5
+          5,
+          4
         ],
         "prod_var": "P_alpha_chi",
         "prod_factors": [
@@ -153,60 +133,50 @@
             "alpha",
             "lower",
             1,
-            6
+            5
           ],
           [
             "chi",
             "upper",
-            4,
-            5
+            1,
+            4
           ]
         ]
       },
       {
-        "fid": 8,
-        "rule": "inventory",
-        "text": "-3*n + 2*m == 0",
-        "coeffs": {
-          "m": "2",
-          "n": "-3"
-        },
-        "const": "0",
-        "rel": "==",
-        "inventory": "regular_edges"
-      },
-      {
-        "fid": 9,
+        "fid": 7,
         "rule": "combination",
-        "text": "1*n + -1*m + 2*alpha >= 0",
+        "text": "1*max_deg + -2*min_deg + 1*alpha + -1 >= 0",
         "coeffs": {
-          "n": "1",
-          "alpha": "2",
-          "m": "-1"
+          "max_deg": "1",
+          "alpha": "1",
+          "min_deg": "-2"
         },
-        "const": "0",
+        "const": "-1",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
-          5,
-          7,
-          8
+          2,
+          3,
+          4,
+          6
         ],
         "mults": [
-          "1/2",
-          "1/2",
-          "1/2",
-          "-1/2"
+          "2",
+          "1",
+          "1",
+          "1",
+          "1"
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.3333333333333333,
+    "T": 0.14285714285714285,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.3333333333333333
+    "score": 1.1428571428571428
   },
   "attained": "yes",
   "touch": 1,
@@ -221,13 +191,13 @@
     "inventory_theorems": 3,
     "product_steps": 1
   },
-  "proof_cost_initial": 10.5,
-  "proof_cost": 10.5,
-  "proof_cost_expanded": 10.5,
+  "proof_cost_initial": 9.5,
+  "proof_cost": 9.5,
+  "proof_cost_expanded": 9.5,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.75,
+  "hardness": 1.9,
   "lean": {
     "theorem_name": "C71",
     "status": "compiled"

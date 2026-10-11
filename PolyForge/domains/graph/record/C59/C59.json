@@ -1,219 +1,199 @@
 {
   "id": "C59",
-  "created_at": "2026-10-11T18:47:26.601066+00:00",
+  "created_at": "2026-10-11T22:44:02.722159+00:00",
   "generator": {
-    "version": "1.2.1",
-    "seed": 2024006261
+    "version": "1.2.2",
+    "seed": 2024006273
   },
   "conjecture": {
-    "formula": "if ((alpha >= 3)), then (omega <= 3*m - 3*min_deg + 1)",
-    "properties_premises": [],
-    "numeric_premises": [
+    "formula": "if ((is_tree)), then (radius >= -alpha + diam + 1)",
+    "properties_premises": [
       {
-        "text": "alpha >= 3",
-        "coeffs": {
-          "alpha": 1
-        },
-        "rel": ">=",
-        "rhs": 3
+        "name": "is_tree"
       }
     ],
+    "numeric_premises": [],
     "conclusion": {
-      "text": "omega <= 3*m - 3*min_deg + 1",
+      "text": "radius >= -alpha + diam + 1",
       "coeffs": {
-        "omega": 1,
-        "m": -3,
-        "min_deg": 3
+        "alpha": 1,
+        "diam": -1,
+        "radius": 1
       },
-      "rel": "<=",
+      "rel": ">=",
       "rhs": 1
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose alpha >= 3. Then omega <= 3*m - 3*min_deg + 1."
+    "canonical_form": {
+      "text": "alpha >= diam - radius + 1",
+      "coeffs": {
+        "radius": 1,
+        "alpha": 1,
+        "diam": -1
+      },
+      "rel": ">=",
+      "rhs": 1
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree. Then radius >= -alpha + diam + 1."
   },
-  "primary_var": "omega",
+  "primary_var": "radius",
   "dalmatian": "significant",
-  "properties": [],
+  "properties": [
+    "is_tree"
+  ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
-      "gallai",
-      "handshake_min",
-      "max_le_edges",
-      "nonneg_min_deg",
-      "nonneg_tau",
-      "omega_le_maxdeg"
+      "acyclic_chi",
+      "alpha_ge_one",
+      "card_le_alpha_chi",
+      "diam_le_card_sub_one",
+      "diam_le_two_radius"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
         "rule": "inventory",
-        "text": "1*m + -1*max_deg >= 0",
+        "text": "-1*diam + 2*radius >= 0",
         "coeffs": {
-          "max_deg": "-1",
-          "m": "1"
+          "diam": "-1",
+          "radius": "2"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "max_le_edges"
+        "inventory": "diam_le_two_radius"
       },
       {
         "fid": 2,
         "rule": "inventory",
-        "text": "1*max_deg + -1*omega + 1 >= 0",
+        "text": "-1*chi + 2 >= 0",
         "coeffs": {
-          "omega": "-1",
-          "max_deg": "1"
+          "chi": "-1"
         },
-        "const": "1",
+        "const": "2",
         "rel": ">=",
-        "inventory": "omega_le_maxdeg"
+        "inventory": "acyclic_chi"
       },
       {
         "fid": 3,
         "rule": "inventory",
-        "text": "2*m + -1*P_n_mindeg >= 0",
+        "text": "1*n + -1*diam + -1 >= 0",
         "coeffs": {
-          "P_n_mindeg": "-1",
-          "m": "2"
+          "diam": "-1",
+          "n": "1"
         },
-        "const": "0",
+        "const": "-1",
         "rel": ">=",
-        "inventory": "handshake_min"
+        "inventory": "diam_le_card_sub_one"
       },
       {
         "fid": 4,
         "rule": "inventory",
-        "text": "1*min_deg >= 0",
+        "text": "-1*n + 1*P_alpha_chi >= 0",
         "coeffs": {
-          "min_deg": "1"
+          "n": "-1",
+          "P_alpha_chi": "1"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "nonneg_min_deg"
+        "inventory": "card_le_alpha_chi"
       },
       {
         "fid": 5,
-        "rule": "premise",
-        "text": "1*alpha + -3 >= 0",
+        "rule": "inventory",
+        "text": "1*alpha + -1 >= 0",
         "coeffs": {
           "alpha": "1"
         },
-        "const": "-3",
+        "const": "-1",
         "rel": ">=",
-        "note": "alpha >= 3"
+        "inventory": "alpha_ge_one"
       },
       {
         "fid": 6,
-        "rule": "inventory",
-        "text": "1*tau >= 0",
-        "coeffs": {
-          "tau": "1"
-        },
-        "const": "0",
-        "rel": ">=",
-        "inventory": "nonneg_tau"
-      },
-      {
-        "fid": 7,
-        "rule": "inventory",
-        "text": "-1*n + 1*alpha + 1*tau == 0",
-        "coeffs": {
-          "alpha": "1",
-          "tau": "1",
-          "n": "-1"
-        },
-        "const": "0",
-        "rel": "==",
-        "inventory": "gallai"
-      },
-      {
-        "fid": 8,
-        "rule": "combination",
-        "text": "1*n + -3 >= 0",
-        "coeffs": {
-          "n": "1"
-        },
-        "const": "-3",
-        "rel": ">=",
-        "tactic": "linarith",
-        "deps": [
-          5,
-          6,
-          7
-        ],
-        "mults": [
-          "1",
-          "1",
-          "-1"
-        ]
-      },
-      {
-        "fid": 9,
         "rule": "product",
-        "text": "-3*min_deg + 1*P_n_mindeg >= 0",
+        "text": "1*chi + 2*alpha + -1*P_alpha_chi + -2 >= 0",
         "coeffs": {
-          "P_n_mindeg": "1",
-          "min_deg": "-3"
+          "P_alpha_chi": "-1",
+          "alpha": "2",
+          "chi": "1"
         },
-        "const": "0",
+        "const": "-2",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
-          4,
-          8
+          5,
+          2
         ],
-        "prod_var": "P_n_mindeg",
+        "prod_var": "P_alpha_chi",
         "prod_factors": [
           [
-            "n",
+            "alpha",
             "lower",
-            3,
-            8
+            1,
+            5
           ],
           [
-            "min_deg",
-            "lower",
-            0,
-            4
+            "chi",
+            "upper",
+            2,
+            2
           ]
         ]
       },
       {
-        "fid": 10,
+        "fid": 7,
         "rule": "combination",
-        "text": "3*m + -3*min_deg + -1*omega + 1 >= 0",
+        "text": "1*alpha + -1*diam + 1*radius + -1/2 >= 0",
         "coeffs": {
-          "omega": "-1",
-          "m": "3",
-          "min_deg": "-3"
+          "radius": "1",
+          "alpha": "1",
+          "diam": "-1"
         },
-        "const": "1",
+        "const": "-1/2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
           2,
           3,
-          9
+          4,
+          6
         ],
         "mults": [
-          "1",
-          "1",
-          "1",
-          "1"
+          "1/2",
+          "1/2",
+          "1/2",
+          "1/2",
+          "1/2"
+        ]
+      },
+      {
+        "fid": 8,
+        "rule": "rounding",
+        "text": "1*alpha + -1*diam + 1*radius + -1 >= 0",
+        "coeffs": {
+          "radius": "1",
+          "alpha": "1",
+          "diam": "-1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          7
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.004629629629629629,
-    "R": 0.4,
-    "L": 0.20739033894608505,
-    "score": 0.6120199685757147
+    "T": 0.32,
+    "R": 0.375,
+    "L": 1.0,
+    "score": 1.695
   },
   "attained": "yes",
-  "touch": 5,
+  "touch": 8,
   "arith_sharp": "relaxed",
   "depth_type": "product_needed",
   "proof_stats": {
@@ -221,17 +201,17 @@
     "case_splits_conditional": 0,
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
-    "roundings": 0,
-    "inventory_theorems": 3,
+    "roundings": 1,
+    "inventory_theorems": 4,
     "product_steps": 1
   },
-  "proof_cost_initial": 11.0,
-  "proof_cost": 11.0,
-  "proof_cost_expanded": 11.0,
+  "proof_cost_initial": 13.0,
+  "proof_cost": 13.0,
+  "proof_cost_expanded": 13.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.2,
+  "hardness": 4.333333333333333,
   "lean": {
     "theorem_name": "C59",
     "status": "compiled"

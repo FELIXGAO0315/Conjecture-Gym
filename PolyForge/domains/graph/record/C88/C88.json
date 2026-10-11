@@ -1,8 +1,8 @@
 {
   "id": "C88",
-  "created_at": "2026-10-11T18:57:24.336622+00:00",
+  "created_at": "2026-10-11T22:50:52.669152+00:00",
   "generator": {
-    "version": "1.2.1",
+    "version": "1.2.2",
     "seed": 2024006376
   },
   "conjecture": {
@@ -19,6 +19,16 @@
       }
     ],
     "conclusion": {
+      "text": "n >= -m + 3*chi",
+      "coeffs": {
+        "chi": -3,
+        "m": 1,
+        "n": 1
+      },
+      "rel": ">=",
+      "rhs": 0
+    },
+    "canonical_form": {
       "text": "n >= -m + 3*chi",
       "coeffs": {
         "n": 1,

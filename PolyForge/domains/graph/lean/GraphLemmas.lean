@@ -574,6 +574,83 @@ theorem cliqueNum_le_maxDegree_add_one : G.cliqueNum ≤ G.maxDegree + 1 := by
 theorem omega_le_maxdeg_add_one_int : (G.cliqueNum : ℤ) ≤ (G.maxDegree : ℤ) + 1 := by
   have := cliqueNum_le_maxDegree_add_one G; omega
 
+/-! ### v1.2.2 §IV: diameter and cycle bounds -/
+
+-- is_connected ⟹ diam ≤ n − 1  (shortest u–v walk is a path, length < n)
+theorem diam_le_card_sub_one (h : G.Connected) : G.diam ≤ Fintype.card V - 1 := by
+  have hb : G.ediam ≤ ((Fintype.card V - 1 : ℕ) : ℕ∞) := by
+    apply SimpleGraph.ediam_le_of_edist_le
+    intro u v
+    obtain ⟨w⟩ := h.preconnected u v
+    have hlt : (w.toPath : G.Walk u v).length < Fintype.card V := w.toPath.2.length_lt
+    have hle : (w.toPath : G.Walk u v).length ≤ Fintype.card V - 1 := by omega
+    calc G.edist u v ≤ ((w.toPath : G.Walk u v).length : ℕ∞) := SimpleGraph.edist_le _
+      _ ≤ ((Fintype.card V - 1 : ℕ) : ℕ∞) := Nat.cast_le.mpr hle
+  have ht := ENat.toNat_le_toNat hb (ENat.natCast_ne_top (Fintype.card V - 1))
+  rw [ENat.toNat_coe] at ht
+  simpa [SimpleGraph.diam] using ht
+
+theorem diam_le_card_sub_one_int (h : G.Connected) :
+    (G.diam : ℤ) ≤ (Fintype.card V : ℤ) - 1 := by
+  haveI := h.nonempty
+  have h1 : 1 ≤ Fintype.card V := Fintype.card_pos
+  have := diam_le_card_sub_one G h; omega
+
+-- has_cycle ⟹ girth ≤ n  (the shortest cycle has distinct vertices)
+theorem girth_le_card (h : ¬ G.IsAcyclic) : G.girth ≤ Fintype.card V := by
+  obtain ⟨a, w, hw, hwl⟩ := SimpleGraph.exists_egirth_eq_length.mpr h
+  have hlen : w.length ≤ Fintype.card V := by
+    have hnd : (w.support.tail).Nodup := hw.support_nodup
+    have hle := hnd.length_le_card
+    simpa [SimpleGraph.Walk.length_support] using hle
+  have hle : G.egirth ≤ (Fintype.card V : ℕ∞) := by rw [hwl]; exact_mod_cast hlen
+  have ht := ENat.toNat_le_toNat hle (ENat.natCast_ne_top _)
+  simpa [SimpleGraph.girth] using ht
+
+theorem girth_le_card_int (h : ¬ G.IsAcyclic) :
+    (G.girth : ℤ) ≤ (Fintype.card V : ℤ) := by
+  have := girth_le_card G h; omega
+
+-- has_cycle ⟹ m ≥ 3  (a cycle is a trail of length ≥ 3)
+theorem three_le_edges (h : ¬ G.IsAcyclic) : 3 ≤ G.edgeFinset.card := by
+  obtain ⟨a, w, hw, _⟩ := SimpleGraph.exists_egirth_eq_length.mpr h
+  have h3 := hw.isCircuit.three_le_length
+  have hle := hw.isCircuit.isTrail.length_le_card_edgeFinset
+  omega
+
+theorem three_le_edges_int (h : ¬ G.IsAcyclic) : (3 : ℤ) ≤ (G.edgeFinset.card : ℤ) := by
+  have := three_le_edges G h; omega
+
+-- has_cycle ⟹ n ≥ 3  (from 3 ≤ girth ≤ n)
+theorem three_le_card_of_cycle (h : ¬ G.IsAcyclic) : 3 ≤ Fintype.card V := by
+  have h1 := girth_le_card G h
+  have h2 := G.three_le_girth h
+  omega
+
+theorem three_le_card_of_cycle_int (h : ¬ G.IsAcyclic) : (3 : ℤ) ≤ (Fintype.card V : ℤ) := by
+  have := three_le_card_of_cycle G h; omega
+
+/-! ### v1.2.2 §II: complete graph ⟹ α ≤ 1 (chi ≥ n ⟺ chi = n ⟺ G = ⊤) -/
+
+theorem complete_indep_le_one (hle : Fintype.card V ≤ G.chromaticNumber.toNat) :
+    G.indepNum ≤ 1 := by
+  have hc := chromaticNumber_toNat_le_card G
+  have heqn : G.chromaticNumber.toNat = Fintype.card V := le_antisymm hc hle
+  have hne : G.chromaticNumber ≠ ⊤ := chromaticNumber_ne_top G
+  have heq : G.chromaticNumber = (Fintype.card V : ℕ∞) := by
+    rw [← ENat.natCast_toNat hne, heqn]
+  have htop : G = ⊤ := chromaticNumber_eq_card_iff.mp heq
+  subst htop
+  rw [← SimpleGraph.cliqueNum_compl, compl_top]
+  rcases isEmpty_or_nonempty V with he | hne2
+  · simp [SimpleGraph.cliqueNum_of_isEmpty]
+  · rw [SimpleGraph.cliqueNum_bot]
+
+theorem complete_indep_le_one_int (h : (Fintype.card V : ℤ) ≤ (G.chromaticNumber.toNat : ℤ)) :
+    (G.indepNum : ℤ) ≤ 1 := by
+  have hn : Fintype.card V ≤ G.chromaticNumber.toNat := by exact_mod_cast h
+  have := complete_indep_le_one G hn; omega
+
 /-! ### property-implication discharge (§II.2, used by the formalizer) -/
 
 theorem isTree_connected (h : G.IsTree) : G.Connected := h.connected

@@ -216,6 +216,24 @@ INVENTORY = [
     {"name": "omega_le_maxdeg", "lean_name": "PolyForge.Graph.omega_le_maxdeg_add_one_int",
      "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
      "conclusion": {"coeffs": _lin(omega=1, max_deg=-1), "rel": "<=", "rhs": 1}},
+    # 27 — is_connected : diam ≤ n − 1  (v1.2.2 §IV)
+    {"name": "diam_le_card_sub_one", "lean_name": "PolyForge.Graph.diam_le_card_sub_one_int",
+     "source": "GraphLemmas", "properties": ["is_connected"], "finite": ["diam"],
+     "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(diam=1, n=-1), "rel": "<=", "rhs": -1}},
+    # 28 — has_cycle : girth ≤ n  (v1.2.2 §IV)
+    {"name": "girth_le_card", "lean_name": "PolyForge.Graph.girth_le_card_int",
+     "source": "GraphLemmas", "properties": ["has_cycle"], "finite": ["girth"],
+     "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(girth=1, n=-1), "rel": "<=", "rhs": 0}},
+    # 29 — has_cycle : m ≥ 3  (v1.2.2 §IV)
+    {"name": "cycle_three_le_edges", "lean_name": "PolyForge.Graph.three_le_edges_int",
+     "source": "GraphLemmas", "properties": ["has_cycle"], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(m=1), "rel": ">=", "rhs": 3}},
+    # 30 — has_cycle : n ≥ 3  (v1.2.2 §IV.5)
+    {"name": "cycle_three_le_card", "lean_name": "PolyForge.Graph.three_le_card_of_cycle_int",
+     "source": "GraphLemmas", "properties": ["has_cycle"], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(n=1), "rel": ">=", "rhs": 3}},
 ]
 
 INVENTORY_BY_NAME = {e["name"]: e for e in INVENTORY}
@@ -275,6 +293,18 @@ TURAN = [
     for r in (2, 3, 4, 5, 6)
 ]
 TURAN_BY_NAME = {e["name"]: e for e in TURAN}
+
+# ── v1.2.2 §II: complete graph (chi ≥ n ⟺ chi = n) ⟹ alpha ≤ 1 ────────────────
+# A conditional theorem (numeric hypothesis chi ≥ n).  Lets the engine see that a
+# premise set forcing chi = n (e.g. C115's tau ≤ alpha ∧ chi ≥ n) only admits the
+# complete graph, hence alpha ≤ 1 and (with Gallai) a degenerate small graph.
+COMPLETE_INDEP = {
+    "name": "complete_indep", "lean_name": "PolyForge.Graph.complete_indep_le_one_int",
+    "source": "GraphLemmas", "properties": [], "param": None,
+    "hypothesis": {"coeffs": _lin(chi=1, n=-1), "rel": ">=", "rhs": 0},
+    "conclusion": {"coeffs": _lin(alpha=1), "rel": "<=", "rhs": 1},
+}
+CONDITIONALS = list(TURAN) + [COMPLETE_INDEP]
 
 # P3 — is_regular(d) : 2m = d·n is LINEAR (d a constant), so it is an ordinary
 # (parametric) INVENTORY-style entry rather than a product entry.  Its coefficient
@@ -383,10 +413,10 @@ def verify_against_pool(pool: list) -> list:
         for entry in entries:
             if entry_applicable(entry, g) and not entry_holds(entry, g):
                 fails.append((entry["name"], g.get("atlas_index")))
-        # v1.2.1 §VI.2: Turán conditionals — when the hypothesis omega ≤ r holds,
-        # the conclusion 2r·m ≤ (r−1)·n² must hold.
+        # v1.2.1 §VI.2 / v1.2.2 §II: conditional theorems — when the hypothesis
+        # holds the conclusion must hold (Turán edge bound; complete-graph alpha ≤ 1).
         vals = _values_of(g)
-        for e in TURAN:
+        for e in CONDITIONALS:
             h = e["hypothesis"]
             if _holds(h["coeffs"], h["rel"], h["rhs"], vals):
                 c = e["conclusion"]

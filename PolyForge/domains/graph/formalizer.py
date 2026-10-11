@@ -91,11 +91,17 @@ WRAPPER = {
     # v1.2.1 §VI second batch
     "card_le_alpha_chi": ("card_le_alpha_chi_int", [], None),
     "omega_le_maxdeg": ("omega_le_maxdeg_add_one_int", [], None),
+    # v1.2.2 §IV diameter / cycle bounds
+    "diam_le_card_sub_one": ("diam_le_card_sub_one_int", ["is_connected"], None),
+    "girth_le_card": ("girth_le_card_int", ["has_cycle"], None),
+    "cycle_three_le_edges": ("three_le_edges_int", ["has_cycle"], None),
+    "cycle_three_le_card": ("three_le_card_of_cycle_int", ["has_cycle"], None),
 }
 
-# v1.2.1 §VI.2: Turán conditional theorems — the numeric hypothesis omega ≤ r is
+# v1.2.1 §VI.2 / v1.2.2 §II: conditional theorems whose numeric hypothesis is
 # discharged from the trigger fact (the conditional step's dep), not from G/props.
-TURAN_WRAPPER = {f"turan_r{r}": f"turan_r{r}_int" for r in (2, 3, 4, 5, 6)}
+COND_WRAPPER = {f"turan_r{r}": f"turan_r{r}_int" for r in (2, 3, 4, 5, 6)}
+COND_WRAPPER["complete_indep"] = "complete_indep_le_one_int"
 
 
 # ── rendering ─────────────────────────────────────────────────────────────────
@@ -214,12 +220,12 @@ def _emit_step(step, lines, indent, text2hyp, prop_hyps, case_hyps):
         if inv and inv.startswith("nonneg_"):
             lines.append(f"{indent}have {hid} : {stmt} := by positivity")
             return
-        if rule == "conditional" and inv in TURAN_WRAPPER:
-            # discharge the omega ≤ r hypothesis from the trigger fact (deps[0])
+        if rule == "conditional" and inv in COND_WRAPPER:
+            # discharge the numeric hypothesis from the trigger fact (deps[0])
             dep = f"s{step['deps'][0]}" if step.get("deps") else None
             disch = f"(by linarith [{dep}])" if dep else "(by omega)"
             lines.append(f"{indent}have {hid} : {stmt} := by")
-            lines.append(f"{indent}  have hw := {TURAN_WRAPPER[inv]} G {disch}")
+            lines.append(f"{indent}  have hw := {COND_WRAPPER[inv]} G {disch}")
             lines.append(f"{indent}  try push_cast at hw")
             lines.append(f"{indent}  linarith [hw]")
             return
@@ -383,8 +389,28 @@ def build_theorem(name, premises, conclusion, proof_steps, used_inventory=None, 
     for s in proof_steps:
         _emit_step(s, lines, "  ", text2hyp, prop_hyps, {})
     target = proof_steps[-1]["fid"] if proof_steps else None
-    closing = f"  linarith [s{target}]" if target is not None else "  omega"
-    body = "\n".join(lines + [closing])
+    # v1.2.2 §I.5: the steps prove the generation form; close to the DISPLAY goal
+    # with the active identity ℤ wrappers (Gallai always; tree; regular).
+    eqlines, eqnames = [], []
+    pnames = {p["name"] for p in props}
+    eqlines.append("  have heq_gallai := gallai_int G"); eqnames.append("heq_gallai")
+    if "is_tree" in pnames:
+        eqlines.append(f"  have heq_tree := tree_edges_int G {_prop_term('is_tree', prop_hyps)}")
+        eqnames.append("heq_tree")
+    if "is_regular" in pnames:
+        hr = _prop_term("is_regular", prop_hyps)
+        eqlines.append(f"  have heq_rege := regular_edges_int G {hr}")
+        eqlines.append(f"  have heq_regx := regular_max_int' G {hr}")
+        eqlines.append(f"  have heq_regn := regular_min_int' G {hr}")
+        eqnames += ["heq_rege", "heq_regx", "heq_regn"]
+    if target is not None:
+        # normalise the parametric Nat-literal casts (↑d in the regular identities)
+        # so linarith equates e.g. ↑3 with 3.
+        closing = eqlines + [f"  try push_cast at {' '.join(eqnames)}",
+                             f"  linarith [s{target}, {', '.join(eqnames)}]"]
+    else:
+        closing = ["  omega"]
+    body = "\n".join(lines + closing)
     return (f"theorem {name} {{V : Type}} [Fintype V] [DecidableEq V] [Nonempty V] "
             f"(G : SimpleGraph V) [DecidableRel G.Adj]{sig} :\n"
             f"    {goal} := by\n{body}\n")

@@ -43,7 +43,7 @@ DATA = ROOT / "data" / "graph_pool.json"
 RECORD = ROOT / "record"
 LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "1.2.1"
+GENERATOR_VERSION = "1.2.2"
 MAIN_COEFFS = (1, 2)          # main-variable coefficient
 # v1.2 §III.5: other-term coefficients widened to |·| ≤ 3 so conclusions like
 # 2m ≥ 3n (handshake under min_deg ≥ 3) can be expressed.
@@ -87,6 +87,13 @@ def _pstats(tb):
 PROP_SIMPLE = ["is_connected", "is_tree", "is_acyclic", "is_bipartite",
                "not_bipartite", "has_cycle", "nontrivial"]
 PROP_PARAM = ["is_regular", "is_k_edge_connected"]
+
+# v1.2.2 §III: two-variable relational premises are allowed only between these
+# naturally comparable variable pairs (finiteness still gates diam/radius/girth).
+_REL_PAIRS = [frozenset(p) for p in (
+    ("alpha", "tau"), ("omega", "chi"), ("omega", "alpha"), ("min_deg", "max_deg"),
+    ("chi", "max_deg"), ("omega", "max_deg"), ("radius", "diam"), ("girth", "diam"),
+    ("m", "n"), ("alpha", "n"), ("chi", "n"))]
 
 
 def property_closure(props: set) -> set:
@@ -178,10 +185,14 @@ def sample_premises(rng: random.Random):
         return {"coeffs": {v: 1}, "rel": rel, "rhs": c, "text": f"{v} {rel} {c}"}
 
     def relation():
-        # §II: two-variable relations only x≤y, x≥y, x≤2y, x≥2y
-        if len(uvars) < 2:
+        # v1.2.2 §III: two-variable relations (x≤y, x≥y, x≤2y, x≥2y) only between
+        # naturally comparable variable pairs (the whitelist).
+        avail = [tuple(sorted(p)) for p in _REL_PAIRS if set(p) <= set(uvars)]
+        if not avail:
             return bound()
-        x, y = rng.sample(uvars, 2)
+        x, y = rng.choice(avail)
+        if rng.choice([True, False]):
+            x, y = y, x
         rel = rng.choice([">=", "<="])
         mult = rng.choice([1, 2])
         rhs_txt = y if mult == 1 else f"{mult}*{y}"
@@ -538,8 +549,11 @@ def _coprime(d):
 
 def choose_primary(seed, usable):
     """§III: deterministically rotate the primary variable per premise set (by the
-    per-set seed), among the finiteness-valid variables, in fixed VARS order."""
-    uorder = [v for v in VARS if v in usable]
+    per-set seed), among the finiteness-valid variables, in fixed VARS order.
+    v1.2.2 §I.6: tau is excluded — under the Gallai identity every tau-primary
+    conclusion canonicalises to an alpha conclusion, so mining tau as primary only
+    produces disguised duplicates."""
+    uorder = [v for v in VARS if v in usable and v != "tau"]
     if not uorder:
         return None
     start = seed % len(uorder)
@@ -960,6 +974,131 @@ def _skel_lhs(coeffs):
     if prim is None:
         return ()
     return tuple(sorted((v, int(c)) for v, c in prim[0].items()))
+
+
+# ── v1.2.2 §I: canonical forms modulo active identities ───────────────────────
+def active_equalities(props, params):
+    """Equality vectors ``(coeffs, const)`` meaning ``coeffs·v + const == 0`` valid
+    under the property-closure of ``props``: Gallai α + τ − n = 0 (always); the
+    tree identity m − n + 1 = 0; and the regular-degree identities 2m − d·n = 0,
+    max_deg − d = 0, min_deg − d = 0."""
+    pset = property_closure({p["name"] for p in props})
+    eqs = [({"alpha": 1, "tau": 1, "n": -1}, 0)]
+    d = params.get("is_regular")
+    if "is_tree" in pset:
+        eqs.append(({"m": 1, "n": -1}, 1))
+    elif "is_regular" in pset and d is not None:
+        eqs.append(({"m": 2, "n": -int(d)}, 0))
+    if "is_regular" in pset and d is not None:
+        eqs.append(({"max_deg": 1}, -int(d)))
+        eqs.append(({"min_deg": 1}, -int(d)))
+    return eqs
+
+
+def _elim(coeffs, rhs, var, ecoeffs, econst):
+    """Eliminate ``var`` in ``Σ coeffs·v ≥ rhs`` using ``ecoeffs·v + econst == 0``
+    (``var`` pivot).  Returns the rewritten ``(coeffs, rhs)`` over Fractions."""
+    a = Fraction(ecoeffs[var])
+    cv = Fraction(coeffs.get(var, 0))
+    if cv == 0:
+        return {k: Fraction(c) for k, c in coeffs.items()}, Fraction(rhs)
+    factor = cv / a                       # coeffs[var]·var = -factor·(rest + econst)
+    out = {k: Fraction(c) for k, c in coeffs.items() if k != var}
+    for w, sc in ecoeffs.items():
+        if w == var:
+            continue
+        out[w] = out.get(w, Fraction(0)) - factor * Fraction(sc)
+    out = {k: v for k, v in out.items() if v != 0}
+    return out, Fraction(rhs) + factor * Fraction(econst)
+
+
+def _to_ge_primitive(coeffs, rhs):
+    """``Σ coeffs·v ≥ rhs`` → canonical ``{coeffs: coprime ints, rel: '>=', rhs: int}``
+    (scaling by a positive rational preserves the ≥ direction)."""
+    prim = _prim({k: Fraction(c) for k, c in coeffs.items()}, Fraction(-rhs))
+    if prim is None:                      # all-zero LHS
+        return {"coeffs": {}, "rel": ">=", "rhs": int(rhs) if Fraction(rhs).denominator == 1 else rhs}
+    ic, nc = prim
+    return {"coeffs": {v: int(x) for v, x in ic.items()}, "rel": ">=", "rhs": int(-nc)}
+
+
+_CANON_PIVOT = [("tau", "alpha"), ("m", None), ("max_deg", None), ("min_deg", None)]
+
+
+def canonical_conclusion(conclusion, props, params):
+    """§I.2: substitute (in fixed order) τ→n−α, then m→n−1 or d·n/2, then
+    max_deg,min_deg→d where the identity is active; reduce to a coprime-integer
+    ``>=`` form.  Deterministic — used as the key for ALL filters (§I.3)."""
+    eqs = {tuple(sorted(e[0].items())): e for e in active_equalities(props, params)}
+    coeffs = {k: Fraction(c) for k, c in conclusion["coeffs"].items() if Fraction(c) != 0}
+    rhs = Fraction(conclusion["rhs"])
+    pset = property_closure({p["name"] for p in props})
+    d = params.get("is_regular")
+    coeffs, rhs = _elim(coeffs, rhs, "tau", {"alpha": 1, "tau": 1, "n": -1}, 0)
+    if "is_tree" in pset:
+        coeffs, rhs = _elim(coeffs, rhs, "m", {"m": 1, "n": -1}, 1)
+    elif "is_regular" in pset and d is not None:
+        coeffs, rhs = _elim(coeffs, rhs, "m", {"m": 2, "n": -int(d)}, 0)
+    if "is_regular" in pset and d is not None:
+        coeffs, rhs = _elim(coeffs, rhs, "max_deg", {"max_deg": 1}, -int(d))
+        coeffs, rhs = _elim(coeffs, rhs, "min_deg", {"min_deg": 1}, -int(d))
+    return _to_ge_primitive(coeffs, rhs)
+
+
+def _equiv_forms(conclusion, eqs):
+    """All ``>=`` forms reachable from ``conclusion`` by eliminating an EXISTING
+    variable with each active identity at most once (used to find the shortest
+    equivalent display form)."""
+    results, seen = [], set()
+
+    def key(c, r):
+        prim = _prim(c, Fraction(-r))
+        if prim is None:
+            return None
+        return (tuple(sorted((v, int(x)) for v, x in prim[0].items())),
+                str(prim[1]))
+
+    def rec(coeffs, rhs, used):
+        k = key(coeffs, rhs)
+        if k is None or k in seen:
+            return
+        seen.add(k)
+        results.append((coeffs, rhs))
+        for i, (ec, ek) in enumerate(eqs):
+            if i in used:
+                continue
+            for p in ec:
+                if Fraction(coeffs.get(p, 0)) != 0:
+                    nc, nr = _elim(coeffs, rhs, p, ec, ek)
+                    rec(nc, nr, used | {i})
+
+    start = {k: Fraction(c) for k, c in conclusion["coeffs"].items() if Fraction(c) != 0}
+    rec(start, Fraction(conclusion["rhs"]), frozenset())
+    return results
+
+
+def display_form(conclusion, props, params):
+    """§I.4: among all equivalent rewrites (via the active identities), the one with
+    the fewest terms; ties → the canonical form, then lexicographic."""
+    eqs = active_equalities(props, params)
+    canon = canonical_conclusion(conclusion, props, params)
+    canon_key = tuple(sorted(canon["coeffs"].items()))
+    best = None
+    for (c, r) in _equiv_forms(conclusion, eqs):
+        prim = _prim(c, Fraction(-r))
+        if prim is None or prim[1].denominator != 1:
+            continue
+        ic = {v: int(x) for v, x in prim[0].items()}
+        rr = int(-prim[1])
+        if any(abs(x) > MAX_COEFF for x in ic.values()):
+            continue
+        items = tuple(sorted(ic.items()))
+        cand = (len(ic), 0 if items == canon_key else 1, items, rr)
+        if best is None or cand[:3] < best[:3]:
+            best = cand
+    if best is None:
+        return canon
+    return {"coeffs": dict(best[2]), "rel": ">=", "rhs": best[3]}
 
 
 def premise_key(props, numeric):
@@ -1479,29 +1618,35 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         if res is None:
             stats["proof_reconstruct_failed"] += 1
             continue
-        conclusion, ctx_m, fact = res
+        conclusion, ctx_m, fact = res          # generation form (the proof proves this)
         ccoeffs = {v: int(c) for v, c in conclusion["coeffs"].items()}
-        prim = primary if ccoeffs.get(primary, 0) != 0 else _coeff1_var(ccoeffs)
+        # v1.2.2 §I: the canonical form (modulo active identities) drives EVERY
+        # filter; the display form is the shortest equivalent rewrite.
+        canon = canonical_conclusion(conclusion, c_props, c_params)
+        canon_coeffs = {v: int(c) for v, c in canon["coeffs"].items()}
+        disp_internal = display_form(conclusion, c_props, c_params)
+        disp_coeffs = {v: int(c) for v, c in disp_internal["coeffs"].items()}
+        prim = primary if disp_coeffs.get(primary, 0) != 0 else _coeff1_var(disp_coeffs)
         if prim is None:
             continue
-        n_terms = len([v for v in ccoeffs if v != prim and ccoeffs[v] != 0])
+        n_terms = len([v for v in disp_coeffs if v != prim and disp_coeffs[v] != 0])
         if n_terms > MAX_CONCLUSION_TERMS:
             stats["too_many_terms"] += 1
             continue
-        # trivial / linear (cheap)
-        if _is_trivial(ccoeffs, int(conclusion["rhs"])):
+        # trivial (on the canonical form) / linear (on the proven form)
+        if _is_trivial(canon_coeffs, int(canon["rhs"])):
             stats["trivial"] += 1
             continue
         if linearly_derivable(c_numeric, conclusion):
             stats["linear_only"] += 1
             continue
-        # §IV decomposability filter (full deduction power)
-        if is_decomposable(c_numeric, conclusion):
+        # §IV decomposability filter (full deduction power) — on the canonical form
+        if is_decomposable(c_numeric, canon):
             stats["decomposable"] += 1
             continue
-        skel = conjecture_skeleton(c_props, c_numeric, conclusion)
-        # §V logical-redundancy pre-check against the run-start snapshot
-        if is_redundant_vs_records(c_pset, c_numeric, conclusion, _W_SNAPSHOT_RECORDS):
+        skel = conjecture_skeleton(c_props, c_numeric, canon)
+        # §V logical-redundancy pre-check against the run-start snapshot (canonical)
+        if is_redundant_vs_records(c_pset, c_numeric, canon, _W_SNAPSHOT_RECORDS):
             stats["redundant_vs_record"] += 1
             continue
         tb = traceback(ctx_m, fact)
@@ -1564,9 +1709,9 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             touch_val = None
             stats["skipped_pool_checks"] += 1
 
-        sl = HARD.statement_length(c_numeric, conclusion)
+        sl = HARD.statement_length(c_numeric, disp_internal)
         hard = (proof_cost_expanded / sl) if sl else 0.0
-        h = conjecture_hash(c_props, c_numeric, conclusion)
+        h = conjecture_hash(c_props, c_numeric, canon)
         if h in existing_hashes:
             stats["duplicate"] += 1
             continue
@@ -1579,11 +1724,14 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         # §VI.2: product conjectures are arithmetically sharp only in the relaxed
         # (envelope) sense — the counter-model gate cannot certify true optimality.
         arith_sharp = "relaxed" if proof_stats.get("product_steps", 0) > 0 else "exact"
-        disp, prim = display_conclusion(conclusion, prim)
+        disp_oriented, _ = display_conclusion(disp_internal, prim)   # for property tag
         return {
             "seed": seed, "props": c_props, "numeric": c_numeric, "conclusion": conclusion,
-            # aliases consumed by the generic run.py driver:
-            "premises": {"props": c_props, "numeric": c_numeric, "primary": prim}, "disp": conclusion,
+            # aliases consumed by the generic run.py driver: ``disp`` is the internal
+            # (>=) DISPLAY form (the formalizer/assembler orient it by ``primary``);
+            # ``gen_conclusion`` is what the proof steps actually prove (pre-identity).
+            "premises": {"props": c_props, "numeric": c_numeric, "primary": prim}, "disp": disp_internal,
+            "gen_conclusion": conclusion, "canonical": canon,
             "main_var": prim, "tb": tb, "inv_used": inv_used,
             "iris": {k: iris[k] for k in ("T", "R", "L", "score")},
             "attained": attained, "touch": touch_val, "hardness": hard,
@@ -1594,7 +1742,7 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             "generation": generation, "lemma_refs": [f"C{c}" for c in lemma_cnums],
             "hash": h, "skeleton": skel, "metrics": new_metrics,
             "properties": _prop_names(c_props),
-            "conclusion_property": conclusion_property(c_props, disp),
+            "conclusion_property": conclusion_property(c_props, disp_oriented),
             "dalmatian": "unknown",   # finalised in the main process at commit (§VI.4)
         }
     return None
@@ -1694,13 +1842,14 @@ def main_commit_check(prop, committed, snapshot, pool):
     ``{"skeleton", "data"}`` for records already written this run.  Returns
     ``(ok, reason)``; also finalises ``prop["dalmatian"]``."""
     pset = property_closure(set(prop["properties"]))
+    canon = prop.get("canonical", prop["conclusion"])
     # §V main re-check: redundancy vs this-run records (excluding a same-skeleton one)
     recs = [c["data"] for c in committed if c["skeleton"] != prop["skeleton"]]
-    if is_redundant_vs_records(pset, prop["numeric"], prop["conclusion"], recs):
+    if is_redundant_vs_records(pset, prop["numeric"], canon, recs):
         return False, "redundant_vs_record_main"
-    # §VI Dalmatian significance vs all existing (snapshot + this-run)
+    # §VI Dalmatian significance vs all existing (snapshot + this-run); canonical form
     existing = list(snapshot) + [c["data"] for c in committed]
-    dj = dalmatian(prop["props"], prop["numeric"], prop["conclusion"], prop["main_var"],
+    dj = dalmatian(prop["props"], prop["numeric"], canon, prop["main_var"],
                    existing, pool)
     prop["dalmatian"] = dj
     if DALMATIAN_FILTER and dj == "not_significant":
@@ -1710,15 +1859,20 @@ def main_commit_check(prop, committed, snapshot, pool):
 
 # ── record assembly ───────────────────────────────────────────────────────────
 def assemble_data(proposal, target, supersedes):
-    props, numeric, conclusion = proposal["props"], proposal["numeric"], proposal["conclusion"]
+    props, numeric = proposal["props"], proposal["numeric"]
     primary = proposal["main_var"]
-    disp, prim = display_conclusion(conclusion, primary)
+    # v1.2.2: the displayed conclusion is the shortest equivalent (display) form;
+    # ``canonical_form`` records the identity-canonical form used for de-duplication.
+    disp_internal = proposal.get("disp", proposal["conclusion"])
+    disp, prim = display_conclusion(disp_internal, primary)
+    canon = proposal.get("canonical", disp_internal)
+    canon_disp, canon_prim = display_conclusion(canon, None)
     return {
         "id": target,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "generator": {"version": GENERATOR_VERSION, "seed": proposal["seed"]},
         "conjecture": {
-            "formula": formula_string(props, numeric, conclusion, primary),
+            "formula": formula_string(props, numeric, disp_internal, primary),
             "properties_premises": [{"name": p["name"], **({"param": p["param"]} if "param" in p else {})} for p in props],
             "numeric_premises": [{"text": pr.get("text", ""),
                                   "coeffs": {k: int(v) for k, v in pr["coeffs"].items()},
@@ -1726,7 +1880,10 @@ def assemble_data(proposal, target, supersedes):
             "conclusion": {"text": _render_isolated(disp, prim),
                            "coeffs": {k: int(v) for k, v in disp["coeffs"].items()},
                            "rel": disp["rel"], "rhs": int(disp["rhs"])},
-            "natural_language": natural_language(props, numeric, conclusion, primary),
+            "canonical_form": {"text": _render_isolated(canon_disp, canon_prim),
+                               "coeffs": {k: int(v) for k, v in canon_disp["coeffs"].items()},
+                               "rel": canon_disp["rel"], "rhs": int(canon_disp["rhs"])},
+            "natural_language": natural_language(props, numeric, disp_internal, primary),
         },
         "primary_var": prim,
         "dalmatian": proposal.get("dalmatian", "unknown"),
@@ -1766,6 +1923,24 @@ def load_records(record_dir):
     return out
 
 
+def _record_props_canon(data):
+    """A record's (props, numeric, canonical-conclusion) for de-dup / skeleton keys
+    (v1.2.2 §I.3).  Uses the stored ``canonical_form`` if present, else canonicalises
+    the display conclusion on the fly."""
+    cj = data["conjecture"]
+    props = [{"name": p["name"], **({"param": p["param"]} if "param" in p else {})}
+             for p in cj.get("properties_premises", [])]
+    numeric = cj.get("numeric_premises", [])
+    params = {p["name"]: p.get("param") for p in props if "param" in p}
+    c = cj.get("canonical_form") or cj["conclusion"]
+    coeffs = {k: int(v) for k, v in c["coeffs"].items()}
+    rhs = int(c["rhs"])
+    if c["rel"] == "<=":                         # convert display orientation to internal >=
+        coeffs = {k: -v for k, v in coeffs.items()}; rhs = -rhs
+    canon = canonical_conclusion({"coeffs": coeffs, "rel": ">=", "rhs": rhs}, props, params)
+    return props, numeric, canon
+
+
 def load_existing_hashes(record_dir):
     hashes, max_id = {}, 0
     if not record_dir.exists():
@@ -1775,11 +1950,8 @@ def load_existing_hashes(record_dir):
         if not j.exists():
             continue
         data = json.load(open(j))
-        cj = data["conjecture"]
-        props = [{"name": p["name"], **({"param": p["param"]} if "param" in p else {})}
-                 for p in cj.get("properties_premises", [])]
-        numeric = cj.get("numeric_premises", [])
-        h = conjecture_hash(props, numeric, cj["conclusion"])
+        props, numeric, canon = _record_props_canon(data)
+        h = conjecture_hash(props, numeric, canon)
         hashes[h] = d.name
         try:
             max_id = max(max_id, int(d.name[1:]))
@@ -1798,10 +1970,8 @@ def build_skeleton_index(record_dir, features):
             continue
         data = json.load(open(j))
         cj = data["conjecture"]
-        props = [{"name": p["name"], **({"param": p["param"]} if "param" in p else {})}
-                 for p in cj.get("properties_premises", [])]
-        numeric = cj.get("numeric_premises", [])
-        skel = conjecture_skeleton(props, numeric, cj["conclusion"])
+        props, numeric, canon = _record_props_canon(data)
+        skel = conjecture_skeleton(props, numeric, canon)
         idx[skel] = {"name": d.name, "attained": data.get("attained", "yes"),
                      "touch": data.get("touch"), "hardness": data["hardness"],
                      "formula": cj["formula"], "supersedes": data.get("supersedes", [])}
