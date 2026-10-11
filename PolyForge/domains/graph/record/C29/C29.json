@@ -1,179 +1,174 @@
 {
   "id": "C29",
-  "created_at": "2026-10-11T06:54:21.161796+00:00",
+  "created_at": "2026-10-11T18:43:16.686234+00:00",
   "generator": {
-    "version": "1.2",
-    "seed": 2024006376
+    "version": "1.2.1",
+    "seed": 2024006161
   },
   "conjecture": {
-    "formula": "if ((nontrivial) and (min_deg >= 4)), then (n <= 3*m - 25)",
+    "formula": "if ((is_acyclic)), then (m >= 2*n - 3*alpha)",
     "properties_premises": [
       {
-        "name": "nontrivial"
+        "name": "is_acyclic"
       }
     ],
-    "numeric_premises": [
-      {
-        "text": "min_deg >= 4",
-        "coeffs": {
-          "min_deg": 1
-        },
-        "rel": ">=",
-        "rhs": 4
-      }
-    ],
+    "numeric_premises": [],
     "conclusion": {
-      "text": "n <= 3*m - 25",
+      "text": "m >= 2*n - 3*alpha",
       "coeffs": {
-        "n": 1,
-        "m": -3
+        "m": 1,
+        "alpha": 3,
+        "n": -2
       },
-      "rel": "<=",
-      "rhs": -25
+      "rel": ">=",
+      "rhs": 0
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose nontrivial, min_deg >= 4. Then n <= 3*m - 25."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_acyclic. Then m >= 2*n - 3*alpha."
   },
-  "primary_var": "n",
+  "primary_var": "m",
   "dalmatian": "significant",
   "properties": [
-    "nontrivial"
+    "is_acyclic"
   ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
-      "handshake_min",
-      "max_lt_card",
-      "min_le_max",
-      "n_ge_one"
+      "acyclic_chi",
+      "alpha_ge_one",
+      "card_le_alpha_chi",
+      "gallai",
+      "tau_le_m"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
         "rule": "inventory",
-        "text": "1*max_deg + -1*min_deg >= 0",
+        "text": "-1*chi + 2 >= 0",
         "coeffs": {
-          "min_deg": "-1",
-          "max_deg": "1"
+          "chi": "-1"
         },
-        "const": "0",
+        "const": "2",
         "rel": ">=",
-        "inventory": "min_le_max"
+        "inventory": "acyclic_chi"
       },
       {
         "fid": 2,
         "rule": "inventory",
-        "text": "1*n + -1*max_deg + -1 >= 0",
+        "text": "1*m + -1*tau >= 0",
         "coeffs": {
-          "max_deg": "-1",
-          "n": "1"
+          "tau": "-1",
+          "m": "1"
         },
-        "const": "-1",
+        "const": "0",
         "rel": ">=",
-        "inventory": "max_lt_card"
+        "inventory": "tau_le_m"
       },
       {
         "fid": 3,
-        "rule": "premise",
-        "text": "1*min_deg + -4 >= 0",
+        "rule": "inventory",
+        "text": "-1*n + 1*P_alpha_chi >= 0",
         "coeffs": {
-          "min_deg": "1"
+          "n": "-1",
+          "P_alpha_chi": "1"
         },
-        "const": "-4",
+        "const": "0",
         "rel": ">=",
-        "note": "min_deg >= 4"
+        "inventory": "card_le_alpha_chi"
       },
       {
         "fid": 4,
         "rule": "inventory",
-        "text": "2*m + -1*P_n_mindeg >= 0",
+        "text": "1*alpha + -1 >= 0",
         "coeffs": {
-          "P_n_mindeg": "-1",
-          "m": "2"
-        },
-        "const": "0",
-        "rel": ">=",
-        "inventory": "handshake_min"
-      },
-      {
-        "fid": 5,
-        "rule": "inventory",
-        "text": "1*n + -1 >= 0",
-        "coeffs": {
-          "n": "1"
+          "alpha": "1"
         },
         "const": "-1",
         "rel": ">=",
-        "inventory": "n_ge_one"
+        "inventory": "alpha_ge_one"
       },
       {
-        "fid": 6,
+        "fid": 5,
         "rule": "product",
-        "text": "-4*n + -1*min_deg + 1*P_n_mindeg + 4 >= 0",
+        "text": "1*chi + 2*alpha + -1*P_alpha_chi + -2 >= 0",
         "coeffs": {
-          "P_n_mindeg": "1",
-          "n": "-4",
-          "min_deg": "-1"
+          "P_alpha_chi": "-1",
+          "alpha": "2",
+          "chi": "1"
         },
-        "const": "4",
+        "const": "-2",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
-          5,
-          3
+          4,
+          1
         ],
-        "prod_var": "P_n_mindeg",
+        "prod_var": "P_alpha_chi",
         "prod_factors": [
           [
-            "n",
+            "alpha",
             "lower",
             1,
-            5
+            4
           ],
           [
-            "min_deg",
-            "lower",
-            4,
-            3
+            "chi",
+            "upper",
+            2,
+            1
           ]
         ]
       },
       {
+        "fid": 6,
+        "rule": "inventory",
+        "text": "-1*n + 1*alpha + 1*tau == 0",
+        "coeffs": {
+          "alpha": "1",
+          "tau": "1",
+          "n": "-1"
+        },
+        "const": "0",
+        "rel": "==",
+        "inventory": "gallai"
+      },
+      {
         "fid": 7,
         "rule": "combination",
-        "text": "-1*n + 3*m + -25 >= 0",
+        "text": "-2*n + 1*m + 3*alpha >= 0",
         "coeffs": {
-          "n": "-1",
-          "m": "3"
+          "m": "1",
+          "alpha": "3",
+          "n": "-2"
         },
-        "const": "-25",
+        "const": "0",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
           2,
           3,
-          4,
+          5,
           6
         ],
         "mults": [
-          "5",
-          "5",
-          "13/2",
-          "3/2",
-          "3/2"
+          "1",
+          "1",
+          "1",
+          "1",
+          "1"
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.029411764705882353,
-    "R": 1.0,
-    "L": 0.0,
-    "score": 1.0294117647058822
+    "T": 0.0379746835443038,
+    "R": 0.3333333333333333,
+    "L": 0.4974160033738069,
+    "score": 0.868724020251444
   },
   "attained": "yes",
-  "touch": 1,
+  "touch": 3,
   "arith_sharp": "relaxed",
   "depth_type": "product_needed",
   "proof_stats": {
@@ -182,16 +177,16 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 0,
-    "inventory_theorems": 3,
+    "inventory_theorems": 4,
     "product_steps": 1
   },
-  "proof_cost_initial": 9.5,
-  "proof_cost": 9.5,
-  "proof_cost_expanded": 9.5,
+  "proof_cost_initial": 11.0,
+  "proof_cost": 11.0,
+  "proof_cost_expanded": 11.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.375,
+  "hardness": 3.6666666666666665,
   "lean": {
     "theorem_name": "C29",
     "status": "compiled"

@@ -478,6 +478,102 @@ theorem bipartite_four_mul_edges_int (h : G.IsBipartite) :
   push_cast at hcast
   nlinarith [hcast]
 
+/-! ### v1.2.1 §VI: second batch of product facts
+
+Turán-type edge bounds (parametric in a clique-number cap r), the n ≤ α·χ product
+fact, and ω ≤ Δ + 1.  See domains/graph/inventory.py. -/
+
+-- ω ≤ r  ⟹  CliqueFree (r+1)
+theorem cliqueFree_of_cliqueNum_le {r : ℕ} (h : G.cliqueNum ≤ r) : G.CliqueFree (r + 1) := by
+  intro s hs
+  have hc := hs.isClique.card_le_cliqueNum
+  rw [hs.card_eq] at hc
+  omega
+
+-- Turán (loose form): ω ≤ r ⟹ 2r·m ≤ (r−1)·n²   (r ≥ 1)
+theorem turan_generic {r : ℕ} (hr : 1 ≤ r) (h : (G.cliqueNum : ℤ) ≤ (r : ℤ)) :
+    2 * (r : ℤ) * (G.edgeFinset.card : ℤ)
+      ≤ ((r : ℤ) - 1) * ((Fintype.card V : ℤ) * (Fintype.card V : ℤ)) := by
+  have hr' : G.cliqueNum ≤ r := by exact_mod_cast h
+  have hcf := cliqueFree_of_cliqueNum_le G hr'
+  have hb := hcf.card_edgeFinset_le
+  have ht := SimpleGraph.mul_turanNumber_le (n := Fintype.card V) (r := r)
+  have key : 2 * r * G.edgeFinset.card ≤ (r - 1) * Fintype.card V ^ 2 := by
+    calc 2 * r * G.edgeFinset.card
+        ≤ 2 * r * turanNumber (Fintype.card V) r := by gcongr
+      _ ≤ (r - 1) * Fintype.card V ^ 2 := ht
+  have hcast : (2 * r * G.edgeFinset.card : ℤ) ≤ (((r - 1) * Fintype.card V ^ 2 : ℕ) : ℤ) := by
+    exact_mod_cast key
+  rw [Nat.cast_mul, Nat.cast_sub hr, Nat.cast_pow] at hcast
+  push_cast at hcast ⊢
+  nlinarith [hcast]
+
+-- Turán specialisations r = 2 (Mantel) … 6, each with the concrete constants the
+-- formalizer renders (2r·m ≤ (r−1)·n², using the N2 product variable for n²).
+theorem turan_r2_int (h : (G.cliqueNum : ℤ) ≤ 2) :
+    4 * (G.edgeFinset.card : ℤ) ≤ (Fintype.card V : ℤ) * (Fintype.card V : ℤ) := by
+  have := turan_generic G (r := 2) (by norm_num) (by exact_mod_cast h); push_cast at this; linarith
+theorem turan_r3_int (h : (G.cliqueNum : ℤ) ≤ 3) :
+    6 * (G.edgeFinset.card : ℤ) ≤ 2 * ((Fintype.card V : ℤ) * (Fintype.card V : ℤ)) := by
+  have := turan_generic G (r := 3) (by norm_num) (by exact_mod_cast h); push_cast at this; linarith
+theorem turan_r4_int (h : (G.cliqueNum : ℤ) ≤ 4) :
+    8 * (G.edgeFinset.card : ℤ) ≤ 3 * ((Fintype.card V : ℤ) * (Fintype.card V : ℤ)) := by
+  have := turan_generic G (r := 4) (by norm_num) (by exact_mod_cast h); push_cast at this; linarith
+theorem turan_r5_int (h : (G.cliqueNum : ℤ) ≤ 5) :
+    10 * (G.edgeFinset.card : ℤ) ≤ 4 * ((Fintype.card V : ℤ) * (Fintype.card V : ℤ)) := by
+  have := turan_generic G (r := 5) (by norm_num) (by exact_mod_cast h); push_cast at this; linarith
+theorem turan_r6_int (h : (G.cliqueNum : ℤ) ≤ 6) :
+    12 * (G.edgeFinset.card : ℤ) ≤ 5 * ((Fintype.card V : ℤ) * (Fintype.card V : ℤ)) := by
+  have := turan_generic G (r := 6) (by norm_num) (by exact_mod_cast h); push_cast at this; linarith
+
+-- n ≤ α·χ : a χ-colouring partitions V into χ independent sets, each of size ≤ α
+theorem card_le_indepNum_mul_chi :
+    Fintype.card V ≤ G.indepNum * G.chromaticNumber.toNat := by
+  classical
+  obtain ⟨C⟩ := G.colorable_chromaticNumber G.colorable_of_fintype
+  set k := G.chromaticNumber.toNat
+  have hsum : Fintype.card V
+      = ∑ c : Fin k, (univ.filter (fun v => C v = c)).card := by
+    rw [← Finset.card_univ]
+    exact Finset.card_eq_sum_card_fiberwise (fun v _ => Finset.mem_univ (C v))
+  have hfib : ∀ c : Fin k, (univ.filter (fun v => C v = c)).card ≤ G.indepNum := by
+    intro c
+    have hset : (↑(univ.filter (fun v => C v = c)) : Set V) = C.colorClass c := by
+      ext v; simp [Coloring.colorClass]
+    have hind : G.IsIndepSet (univ.filter (fun v => C v = c) : Finset V) := by
+      rw [hset]; exact C.isIndepSet_colorClass c
+    exact hind.card_le_indepNum
+  calc Fintype.card V = ∑ c : Fin k, (univ.filter (fun v => C v = c)).card := hsum
+    _ ≤ ∑ _c : Fin k, G.indepNum := Finset.sum_le_sum (fun c _ => hfib c)
+    _ = k * G.indepNum := by rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, smul_eq_mul]
+    _ = G.indepNum * k := Nat.mul_comm _ _
+
+theorem card_le_alpha_chi_int :
+    (Fintype.card V : ℤ) ≤ (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) := by
+  have := card_le_indepNum_mul_chi G; exact_mod_cast this
+
+-- ω ≤ Δ + 1 : a vertex of a maximum clique has ≥ ω−1 clique-neighbours
+theorem cliqueNum_le_maxDegree_add_one : G.cliqueNum ≤ G.maxDegree + 1 := by
+  classical
+  obtain ⟨s, hs⟩ := G.exists_isNClique_cliqueNum
+  rcases Finset.eq_empty_or_nonempty s with rfl | ⟨v, hv⟩
+  · have hc := hs.card_eq; simp at hc; omega
+  · have hsub : s.erase v ⊆ G.neighborFinset v := by
+      intro w hw
+      rw [Finset.mem_erase] at hw
+      rw [SimpleGraph.mem_neighborFinset]
+      exact hs.isClique (Finset.mem_coe.mpr hv) (Finset.mem_coe.mpr hw.2) (Ne.symm hw.1)
+    have h1 : (s.erase v).card ≤ G.degree v := by
+      have hle := Finset.card_le_card hsub
+      rwa [← SimpleGraph.card_neighborFinset_eq_degree]
+    have h2 := G.degree_le_maxDegree v
+    have h3 : (s.erase v).card = G.cliqueNum - 1 := by
+      rw [Finset.card_erase_of_mem hv, hs.card_eq]
+    omega
+
+theorem omega_le_maxdeg_add_one_int : (G.cliqueNum : ℤ) ≤ (G.maxDegree : ℤ) + 1 := by
+  have := cliqueNum_le_maxDegree_add_one G; omega
+
 /-! ### property-implication discharge (§II.2, used by the formalizer) -/
 
 theorem isTree_connected (h : G.IsTree) : G.Connected := h.connected

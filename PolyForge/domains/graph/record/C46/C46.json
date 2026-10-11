@@ -1,75 +1,73 @@
 {
   "id": "C46",
-  "created_at": "2026-10-11T07:03:41.549831+00:00",
+  "created_at": "2026-10-11T18:45:58.624357+00:00",
   "generator": {
-    "version": "1.2",
-    "seed": 2024006704
+    "version": "1.2.1",
+    "seed": 2024006206
   },
   "conjecture": {
-    "formula": "if ((is_bipartite) and (alpha >= 3) and (n <= 5)), then (n <= 2*max_deg + 3*alpha - 6)",
-    "properties_premises": [
-      {
-        "name": "is_bipartite"
-      }
-    ],
+    "formula": "if ((n >= 5)), then (alpha >= -2*m + 3*min_deg + 5)",
+    "properties_premises": [],
     "numeric_premises": [
       {
-        "text": "alpha >= 3",
-        "coeffs": {
-          "alpha": 1
-        },
-        "rel": ">=",
-        "rhs": 3
-      },
-      {
-        "text": "n <= 5",
+        "text": "n >= 5",
         "coeffs": {
           "n": 1
         },
-        "rel": "<=",
+        "rel": ">=",
         "rhs": 5
       }
     ],
     "conclusion": {
-      "text": "n <= 2*max_deg + 3*alpha - 6",
+      "text": "alpha >= -2*m + 3*min_deg + 5",
       "coeffs": {
-        "n": 1,
-        "alpha": -3,
-        "max_deg": -2
+        "alpha": 1,
+        "m": 2,
+        "min_deg": -3
       },
-      "rel": "<=",
-      "rhs": -6
+      "rel": ">=",
+      "rhs": 5
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_bipartite, alpha >= 3, n <= 5. Then n <= 2*max_deg + 3*alpha - 6."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose n >= 5. Then alpha >= -2*m + 3*min_deg + 5."
   },
-  "primary_var": "n",
-  "dalmatian": "unknown",
-  "properties": [
-    "is_bipartite"
-  ],
+  "primary_var": "alpha",
+  "dalmatian": "significant",
+  "properties": [],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
+      "alpha_ge_one",
       "gallai",
-      "handshake_max",
-      "nonneg_max_deg",
+      "handshake_min",
+      "nonneg_min_deg",
       "tau_le_m"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
-        "rule": "premise",
-        "text": "1*alpha + -3 >= 0",
+        "rule": "inventory",
+        "text": "1*alpha + -1 >= 0",
         "coeffs": {
           "alpha": "1"
         },
-        "const": "-3",
+        "const": "-1",
         "rel": ">=",
-        "note": "alpha >= 3"
+        "inventory": "alpha_ge_one"
       },
       {
         "fid": 2,
+        "rule": "premise",
+        "text": "1*n + -5 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-5",
+        "rel": ">=",
+        "note": "n >= 5"
+      },
+      {
+        "fid": 3,
         "rule": "inventory",
         "text": "1*m + -1*tau >= 0",
         "coeffs": {
@@ -81,64 +79,53 @@
         "inventory": "tau_le_m"
       },
       {
-        "fid": 3,
+        "fid": 4,
         "rule": "inventory",
-        "text": "-2*m + 1*P_n_maxdeg >= 0",
+        "text": "2*m + -1*P_n_mindeg >= 0",
         "coeffs": {
-          "m": "-2",
-          "P_n_maxdeg": "1"
+          "P_n_mindeg": "-1",
+          "m": "2"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "handshake_max"
-      },
-      {
-        "fid": 4,
-        "rule": "premise",
-        "text": "-1*n + 5 >= 0",
-        "coeffs": {
-          "n": "-1"
-        },
-        "const": "5",
-        "rel": ">=",
-        "note": "n <= 5"
+        "inventory": "handshake_min"
       },
       {
         "fid": 5,
         "rule": "inventory",
-        "text": "1*max_deg >= 0",
+        "text": "1*min_deg >= 0",
         "coeffs": {
-          "max_deg": "1"
+          "min_deg": "1"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "nonneg_max_deg"
+        "inventory": "nonneg_min_deg"
       },
       {
         "fid": 6,
         "rule": "product",
-        "text": "5*max_deg + -1*P_n_maxdeg >= 0",
+        "text": "-5*min_deg + 1*P_n_mindeg >= 0",
         "coeffs": {
-          "P_n_maxdeg": "-1",
-          "max_deg": "5"
+          "P_n_mindeg": "1",
+          "min_deg": "-5"
         },
         "const": "0",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
           5,
-          4
+          2
         ],
-        "prod_var": "P_n_maxdeg",
+        "prod_var": "P_n_mindeg",
         "prod_factors": [
           [
             "n",
-            "upper",
+            "lower",
             5,
-            4
+            2
           ],
           [
-            "max_deg",
+            "min_deg",
             "lower",
             0,
             5
@@ -161,13 +148,13 @@
       {
         "fid": 8,
         "rule": "combination",
-        "text": "-1*n + 2*max_deg + 3*alpha + -28/5 >= 0",
+        "text": "2*m + -3*min_deg + 1*alpha + -21/5 >= 0",
         "coeffs": {
-          "n": "-1",
-          "alpha": "3",
-          "max_deg": "2"
+          "alpha": "1",
+          "m": "2",
+          "min_deg": "-3"
         },
-        "const": "-28/5",
+        "const": "-21/5",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
@@ -179,24 +166,24 @@
           7
         ],
         "mults": [
-          "11/5",
-          "4/5",
-          "2/5",
           "1/5",
-          "2/5",
+          "4/5",
+          "4/5",
+          "3/5",
+          "3/5",
           "4/5"
         ]
       },
       {
         "fid": 9,
         "rule": "rounding",
-        "text": "-1*n + 2*max_deg + 3*alpha + -6 >= 0",
+        "text": "2*m + -3*min_deg + 1*alpha + -5 >= 0",
         "coeffs": {
-          "n": "-1",
-          "alpha": "3",
-          "max_deg": "2"
+          "alpha": "1",
+          "m": "2",
+          "min_deg": "-3"
         },
-        "const": "-6",
+        "const": "-5",
         "rel": ">=",
         "tactic": "omega",
         "deps": [
@@ -206,13 +193,13 @@
     ]
   },
   "iris": {
-    "T": 0.1111111111111111,
+    "T": 0.0008103727714748784,
     "R": 1.0,
-    "L": 0.48795003647426666,
-    "score": 1.5990611475853778
+    "L": 0.0,
+    "score": 1.0008103727714748
   },
   "attained": "yes",
-  "touch": 2,
+  "touch": 1,
   "arith_sharp": "relaxed",
   "depth_type": "product_needed",
   "proof_stats": {
@@ -221,16 +208,16 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 1,
-    "inventory_theorems": 2,
+    "inventory_theorems": 3,
     "product_steps": 1
   },
-  "proof_cost_initial": 10.5,
-  "proof_cost": 10.5,
-  "proof_cost_expanded": 10.5,
+  "proof_cost_initial": 12.0,
+  "proof_cost": 12.0,
+  "proof_cost_expanded": 12.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.5,
+  "hardness": 2.4,
   "lean": {
     "theorem_name": "C46",
     "status": "compiled"

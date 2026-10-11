@@ -43,7 +43,7 @@ DATA = ROOT / "data" / "graph_pool.json"
 RECORD = ROOT / "record"
 LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "1.2"
+GENERATOR_VERSION = "1.2.1"
 MAIN_COEFFS = (1, 2)          # main-variable coefficient
 # v1.2 §III.5: other-term coefficients widened to |·| ≤ 3 so conclusions like
 # 2m ≥ 3n (handshake under min_deg ≥ 3) can be expressed.
@@ -189,8 +189,19 @@ def sample_premises(rng: random.Random):
                 "text": f"{x} {rel} {rhs_txt}"}
 
     makers = [bound, bound, relation]
+    # v1.2.1 §II: reject a numeric premise that is always true (Inventory-derivable
+    # with no premises, e.g. alpha ≤ 2n since alpha ≤ n); resample it a few times.
     for _ in range(n_num):
-        numeric.append(rng.choice(makers)())
+        pr = None
+        for _try in range(8):
+            cand = rng.choice(makers)()
+            goal = _as_ge_goal(cand)
+            if goal is not None and _inventory_entails(goal):
+                continue                            # always true — resample
+            pr = cand
+            break
+        if pr is not None:
+            numeric.append(pr)
     return props, numeric
 
 
@@ -370,10 +381,14 @@ def _cvec(direction):
 def _triggerable_conditionals(constraints):
     out = []
     for e in DED.CONDITIONAL_THEOREMS:
-        h = e["hypothesis"]
-        coeffs = {v: Fraction(c) for v, c in h["coeffs"].items()}
-        st, v, _ = _lp(_cvec(coeffs), _prep(constraints))
-        if st == "opt" and v - float(h["rhs"]) >= -_LP_TOL:
+        # v1.2.1 fix: honour the hypothesis relation.  _conc_form turns the
+        # hypothesis into a ``hc·x + hk ≥ 0`` (or ``== 0``) form, so a "<=" cap
+        # like the Turán ``omega ≤ r`` triggers when its MAX is within the cap —
+        # the old code assumed a ">=" lower-bound hypothesis and silently failed
+        # for the new "<=" conditionals.
+        hc, hk, hrel = _conc_form(e["hypothesis"])
+        st, v, _ = _lp(_cvec(hc), _prep(constraints))
+        if st == "opt" and v + float(hk) >= -_LP_TOL:
             out.append(_conc_form(e["conclusion"]))
     return out
 
@@ -568,11 +583,10 @@ def enumerate_candidates(premises, usable, main, stats, rng, accept):
     lin_mats = _prep(lin)
     tree_np = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH, products=False)
     tree_p = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH, products=True)
-    directions = enumerate_directions(usable, main)
-    rng.shuffle(directions)
+    directions = enumerate_directions(usable, main)   # fixed deterministic order
     stats["directions_total"] += len(directions)
     out = []
-    for d in directions:
+    for order, d in enumerate(directions):
         cvec = _cvec(d)
         slin, vlin, _ = _lp(cvec, lin_mats)
         if slin == "infeasible":                    # premises have no model
@@ -591,7 +605,11 @@ def enumerate_candidates(premises, usable, main, stats, rng, accept):
         if not _accepts(accept, dtype):
             stats[dtype + "_skipped"] += 1
             continue
-        out.append({"coeffs": dict(d), "rel": ">=", "rhs": int(v_p)})
+        # v1.2.1 §IV: rank by v_int − v_lin (∞ when the linear relaxation is
+        # unbounded, i.e. a pure product/split lift), ties by enumeration order.
+        margin = (v_p - vlin) if slin == "opt" else float("inf")
+        out.append({"coeffs": dict(d), "rel": ">=", "rhs": int(v_p),
+                    "margin": margin, "order": order})
     # dedup to best bound per primitive LHS, apply coeff guard
     best = {}
     for cand in out:
@@ -603,9 +621,81 @@ def enumerate_candidates(premises, usable, main, stats, rng, accept):
         if any(abs(c) > MAX_COEFF for c in ic.values()):
             continue
         key = tuple(sorted(ic.items()))
+        entry = {"coeffs": ic, "rel": ">=", "rhs": rhs,
+                 "margin": cand["margin"], "order": cand["order"]}
         if key not in best or rhs > best[key]["rhs"]:
-            best[key] = {"coeffs": ic, "rel": ">=", "rhs": rhs}
-    return list(best.values())
+            best[key] = entry
+    cands = list(best.values())
+    cands.sort(key=lambda c: (-c["margin"], c["order"]))   # §IV deterministic order
+    return cands
+
+
+# ── logical-implication checks over the full engine (v1.2.1 §I / §III) ─────────
+def _full_forms(premises):
+    """Every fact form available to the engine under ``premises``: the premises,
+    the linear inventory, triggerable conditionals, the product facts, and the
+    McCormick envelopes derived from the premise bounds."""
+    lin = _premise_forms(premises) + _unconditional_forms()
+    lin = lin + _triggerable_conditionals(lin)
+    return lin + _product_forms() + _envelope_forms(lin)
+
+
+def _implies(antecedent, consequent):
+    """Does ``antecedent`` + the UNIVERSAL Inventory (base facts, products,
+    envelopes — holding for all graphs, with NO premises and NO property-conditional
+    facts) logically entail ``consequent``?  Both are ``{coeffs, rel: '>=', rhs}``.
+
+    Premises AND property-conditional facts are deliberately excluded: including the
+    premises makes the check vacuous (the original is already provable), and
+    including property facts (e.g. is_k_edge_connected ⟹ min_deg ≥ k) smuggles a
+    premise consequence back in — which would wrongly let ``m ≥ 3`` "imply" ``m ≥
+    n``.  The spec's own counterexample — m ≥ 6 ⇏ 2m ≥ 3n at n=100,m=10 — is a
+    premise-free witness.  Rebuilds the base (no-property) inventory and restores
+    the caller's afterwards.  Checked by LP: minimise the consequent LHS over the
+    universal facts + the antecedent and test it stays ≥ the consequent rhs."""
+    saved = (DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME)
+    DED.set_active_inventory(set(), {})
+    try:
+        base = _full_forms([])
+        ac = {v: Fraction(c) for v, c in antecedent["coeffs"].items()}
+        base = base + [(ac, Fraction(-antecedent["rhs"]), ">=")]
+        st, v, _ = _lp(_cvec({v: int(c) for v, c in consequent["coeffs"].items()}), _prep(base))
+        return st == "opt" and v - float(consequent["rhs"]) >= -_LP_TOL
+    finally:
+        DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME = saved
+
+
+def _inventory_entails(goal):
+    """Is ``goal`` ({coeffs, rel: '>=', rhs}) provable from the Inventory ALONE
+    (no premises), with full power (products, envelopes, rounding, case split)?
+    Used to reject always-true premises.  Rebuilds the base (no-property) inventory
+    and restores the caller's afterwards; uses the LP v_int (fast, full power)."""
+    gc = {v: int(c) for v, c in goal["coeffs"].items() if int(c) != 0}
+    if not gc:
+        return Fraction(goal["rhs"]) <= 0
+    global _BASE_TREE
+    saved = (DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME)
+    DED.set_active_inventory(set(), {})
+    try:
+        if _BASE_TREE is None:
+            _BASE_TREE = _build_split_tree([], [], D.DEFAULT_SPLIT_DEPTH, products=True)
+        s, v = _vint(_BASE_TREE, _cvec(gc), D.DEFAULT_SPLIT_DEPTH, use_bnb=True)
+        return s == "opt" and v >= int(goal["rhs"])
+    finally:
+        DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME = saved
+
+
+_BASE_TREE = None   # cached empty-premise (base-inventory) split tree for §II resampling
+
+
+def _as_ge_goal(pr):
+    """A premise/relation ``{coeffs, rel, rhs}`` as an equivalent ``>=`` goal, or
+    None for equalities (handled as the conjunction of both directions elsewhere)."""
+    if pr["rel"] == ">=":
+        return {"coeffs": dict(pr["coeffs"]), "rel": ">=", "rhs": pr["rhs"]}
+    if pr["rel"] == "<=":
+        return {"coeffs": {v: -c for v, c in pr["coeffs"].items()}, "rel": ">=", "rhs": -pr["rhs"]}
+    return None
 
 
 # ── strengthen + drop redundant terms (§III.5) ────────────────────────────────
@@ -668,8 +758,13 @@ def strengthen_and_simplify(conclusion0, premises, main_var, use_lemmas=True):
             if rr is None:
                 continue
             red_concl, rfact = rr
-            # reduced implies cur using only non-negativity? keep if provable & not weaker
-            if red_concl["rhs"] >= cur["rhs"] - 0 and set(red_concl["coeffs"]) <= set(cur["coeffs"]):
+            # v1.2.1 §III (v0.3 rule): a term may be dropped only when the reduced
+            # conclusion is (a) provable — guaranteed by _strongest_in — AND (b) still
+            # IMPLIES the current conclusion under the premises + Inventory + products
+            # + envelopes.  (b) is a logical check, not "looks simpler": e.g. 2m ≥ 12
+            # must NOT replace 2m ≥ 3n, since 2m ≥ 12 does not imply 2m ≥ 3n.
+            if set(red_concl["coeffs"]) <= set(cur["coeffs"]) \
+                    and _implies(red_concl, cur):
                 cur, fact = red_concl, rfact
                 changed = True
                 break
@@ -1358,24 +1453,29 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
     if not candidates:
         stats["no_candidate"] += 1
         return None
-    rng.shuffle(candidates)
+    # §IV: candidates arrive sorted by (v_int − v_lin) desc, enumeration order; the
+    # cap keeps the strongest; no shuffle (deterministic).
     if len(candidates) > MAX_CANDIDATES_PER_SET:
         stats["candidates_capped"] += len(candidates) - MAX_CANDIDATES_PER_SET
+        stats["candidate_cap_sets"] += 1
         candidates = candidates[:MAX_CANDIDATES_PER_SET]
 
     for cand in candidates:
-        # §VIII order (performance-adjusted, see note): linear → premise-minimise →
-        # strengthen & drop terms (proof already over the minimized premises, so no
-        # re-derivation is needed) → trivial/linear → decomposability (expensive, so
-        # after the cheap filters) → skeleton → redundancy pre-check → counter-model.
+        # restore the FULL-premise active inventory for the linear-derivability gate
+        # (per-candidate minimisation below re-points it at the pruned set).
+        DED.set_active_inventory(pset, params)
         if linearly_derivable(numeric, cand):
             stats["linear_only"] += 1
             continue
-        # premise minimisation first (cheap, cached) so the strengthened proof uses
-        # exactly the minimized premises — avoids a separate re-proof step.
-        pruned = minimize_premises_num(numeric, cand)
-        pruned = minimize_numeric_redundant(pruned)
-        res = strengthen_and_simplify(cand, pruned, primary)
+        # v1.2.1 §I: minimise BOTH property and numeric premises (full power, with
+        # the conclusion direction), then re-point the active inventory + ctx cache
+        # at the pruned premise set for everything downstream.
+        c_props, c_numeric = minimize_premises(props, numeric, cand, params)
+        c_pset = property_closure({p["name"] for p in c_props})
+        c_params = {p["name"]: p.get("param") for p in c_props if "param" in p}
+        DED.set_active_inventory(c_pset, c_params)
+        _ctx_cache_clear()                       # cache is invalid across inventories
+        res = strengthen_and_simplify(cand, c_numeric, primary)
         if res is None:
             stats["proof_reconstruct_failed"] += 1
             continue
@@ -1392,49 +1492,49 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         if _is_trivial(ccoeffs, int(conclusion["rhs"])):
             stats["trivial"] += 1
             continue
-        if linearly_derivable(pruned, conclusion):
+        if linearly_derivable(c_numeric, conclusion):
             stats["linear_only"] += 1
             continue
         # §IV decomposability filter (full deduction power)
-        if is_decomposable(pruned, conclusion):
+        if is_decomposable(c_numeric, conclusion):
             stats["decomposable"] += 1
             continue
-        skel = conjecture_skeleton(props, pruned, conclusion)
+        skel = conjecture_skeleton(c_props, c_numeric, conclusion)
         # §V logical-redundancy pre-check against the run-start snapshot
-        if is_redundant_vs_records(pset, pruned, conclusion, _W_SNAPSHOT_RECORDS):
+        if is_redundant_vs_records(c_pset, c_numeric, conclusion, _W_SNAPSHOT_RECORDS):
             stats["redundant_vs_record"] += 1
             continue
         tb = traceback(ctx_m, fact)
         if _count_derivation_steps(tb) < 1:
             stats["too_shallow"] += 1
             continue
-        ok, _msg = recheck(ctx_m, fact, pruned)
+        ok, _msg = recheck(ctx_m, fact, c_numeric)
         if not ok:
             stats["recheck_failed"] += 1
             continue
-        soundness_check(props, pruned, conclusion, pool)
-        cm = counter_model(pruned, conclusion)
+        soundness_check(c_props, c_numeric, conclusion, pool)
+        cm = counter_model(c_numeric, conclusion)
         if cm is not None:
             model, is_real = cm
             if is_real:
                 raise AssertionError(
-                    f"COUNTER-MODEL: not inventory-derivable.\n props={props}\n "
-                    f"numeric={pruned}\n conclusion={conclusion}\n model={model}")
+                    f"COUNTER-MODEL: not inventory-derivable.\n props={c_props}\n "
+                    f"numeric={c_numeric}\n conclusion={conclusion}\n model={model}")
             # §VI.1: a relaxed-only model (some P ≠ x·y) is a statistic, not fatal.
             stats["relaxed_counter_model"] += 1
         # depth label (product_needed / split_needed / rounding_only)
-        depth_type = classify_depth(pruned, ccoeffs)
+        depth_type = classify_depth(c_numeric, ccoeffs)
         if not _accepts(accept, depth_type):
             stats["depth_mismatch"] += 1
             continue
         # shortest proof
         proof_cost_initial = _pdiff(tb)
         tb, ctx_m, fact, proof_cost, shorten_rounds = shorten_proof(
-            pruned, conclusion, tb, ctx_m, fact, proof_cost_initial)
+            c_numeric, conclusion, tb, ctx_m, fact, proof_cost_initial)
         # lemma usage
         lemma_cnums = sorted(F._lemma_cnums_in(tb))
         if lemma_cnums:
-            free = shortest_lemma_free(pruned, conclusion)
+            free = shortest_lemma_free(c_numeric, conclusion)
             if free is not None:
                 ctx_m, fact, tb, proof_cost = free
                 lemma_cnums = []
@@ -1443,9 +1543,10 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         proof_cost_expanded = proof_cost + sum(_W_LEMMA_META[c]["proof_cost_expanded"] for c in lemma_cnums)
 
         # attainment / IRIS on the real subset (if n ≤ 7 covered)
-        feat_vars = iris_feature_vars(props, pruned, conclusion)
+        covered = pool_covered(c_props, c_numeric)
+        feat_vars = iris_feature_vars(c_props, c_numeric, conclusion)
         if covered:
-            subset = dataset_subset(pool, props, pruned)
+            subset = dataset_subset(pool, c_props, c_numeric)
             feats = [tuple(int(DED.vars_from_graph(g)[v]) for v in feat_vars) for g in subset]
             touch = sum(1 for f in feats
                         if sum(ccoeffs.get(v, 0) * f[i] for i, v in enumerate(feat_vars)) == int(conclusion["rhs"]))
@@ -1463,9 +1564,9 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             touch_val = None
             stats["skipped_pool_checks"] += 1
 
-        sl = HARD.statement_length(pruned, conclusion)
+        sl = HARD.statement_length(c_numeric, conclusion)
         hard = (proof_cost_expanded / sl) if sl else 0.0
-        h = conjecture_hash(props, pruned, conclusion)
+        h = conjecture_hash(c_props, c_numeric, conclusion)
         if h in existing_hashes:
             stats["duplicate"] += 1
             continue
@@ -1480,9 +1581,9 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         arith_sharp = "relaxed" if proof_stats.get("product_steps", 0) > 0 else "exact"
         disp, prim = display_conclusion(conclusion, prim)
         return {
-            "seed": seed, "props": props, "numeric": pruned, "conclusion": conclusion,
+            "seed": seed, "props": c_props, "numeric": c_numeric, "conclusion": conclusion,
             # aliases consumed by the generic run.py driver:
-            "premises": {"props": props, "numeric": pruned, "primary": prim}, "disp": conclusion,
+            "premises": {"props": c_props, "numeric": c_numeric, "primary": prim}, "disp": conclusion,
             "main_var": prim, "tb": tb, "inv_used": inv_used,
             "iris": {k: iris[k] for k in ("T", "R", "L", "score")},
             "attained": attained, "touch": touch_val, "hardness": hard,
@@ -1492,24 +1593,80 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             "proof_cost_expanded": proof_cost_expanded, "shorten_rounds": shorten_rounds,
             "generation": generation, "lemma_refs": [f"C{c}" for c in lemma_cnums],
             "hash": h, "skeleton": skel, "metrics": new_metrics,
-            "properties": _prop_names(props),
-            "conclusion_property": conclusion_property(props, disp),
+            "properties": _prop_names(c_props),
+            "conclusion_property": conclusion_property(c_props, disp),
             "dalmatian": "unknown",   # finalised in the main process at commit (§VI.4)
         }
     return None
 
 
-def minimize_premises_num(premises, conclusion):
-    kept = list(premises)
-    i = 0
-    while i < len(kept):
-        trial = kept[:i] + kept[i + 1:]
-        ctx = cached_context(trial)
-        if _find_fact(ctx, conclusion) is not None:
-            kept = trial
-        else:
-            i += 1
-    return kept
+def _provable_under(props, numeric, conclusion):
+    """Is ``conclusion`` ({coeffs, rel: '>=', rhs}) provable under property premises
+    ``props`` and numeric premises ``numeric`` with the FULL engine power used at
+    generation (linear combination, rounding, case split, branch-and-bound,
+    products + envelopes)?  Uses the same LP v_int as generation (fast); rebuilds
+    the active inventory for ``props`` (caller restores it)."""
+    pset = property_closure({p["name"] for p in props})
+    pr = {p["name"]: p.get("param") for p in props if "param" in p}
+    DED.set_active_inventory(pset, pr)
+    d = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
+    if not d:
+        return False
+    tree = _build_split_tree(_premise_forms(numeric), [], D.DEFAULT_SPLIT_DEPTH, products=True)
+    s, v = _vint(tree, _cvec(d), D.DEFAULT_SPLIT_DEPTH, use_bnb=True)
+    return s == "opt" and v >= int(conclusion["rhs"])
+
+
+def _finiteness_ok(props, conclusion, numeric):
+    """True if every variable appearing in ``conclusion``/``numeric`` is still
+    finite under the property closure of ``props`` (diam/radius need is_connected,
+    girth needs has_cycle).  Guards premise drops against unsoundly exposing a ⊤."""
+    used = set(conclusion["coeffs"])
+    for pr in numeric:
+        used |= set(pr["coeffs"])
+    pset = property_closure({p["name"] for p in props})
+    for v, need in DED.FINITENESS.items():
+        if v in used and need not in pset:
+            return False
+    return True
+
+
+def minimize_premises(props, numeric, conclusion, params):
+    """v1.2.1 §I: remove every premise not needed to prove ``conclusion``.
+
+    Greedily drop one premise at a time (numeric first, then property), re-proving
+    with the SAME full power used to generate the conclusion (and the conclusion
+    direction), until a fixpoint.  This subsumes: unused premises, premises implied
+    by the rest (dropping them keeps the conclusion provable), and always-true
+    premises (an Inventory-derivable premise adds nothing, so dropping it is safe).
+    Property drops additionally respect the finiteness restrictions.  Returns the
+    pruned ``(props, numeric)``; the active inventory is left set for the result."""
+    props = [dict(p) for p in props]
+    numeric = [dict(n) for n in numeric]
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(numeric)):
+            trial = numeric[:i] + numeric[i + 1:]
+            if _provable_under(props, trial, conclusion):
+                numeric = trial
+                changed = True
+                break
+        if changed:
+            continue
+        for i in range(len(props)):
+            trial = props[:i] + props[i + 1:]
+            if _finiteness_ok(trial, conclusion, numeric) \
+                    and _provable_under(trial, numeric, conclusion):
+                props = trial
+                changed = True
+                break
+    # §I.3: re-run de-duplication (property closure, numeric redundancy) on the result
+    props = dedup_properties(props)
+    numeric = minimize_numeric_redundant(numeric)
+    pset = property_closure({p["name"] for p in props})
+    DED.set_active_inventory(pset, {p["name"]: p.get("param") for p in props if "param" in p})
+    return props, numeric
 
 
 def _iris_from_feats(feats, feat_vars, ccoeffs, rhs):

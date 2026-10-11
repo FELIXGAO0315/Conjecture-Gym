@@ -88,7 +88,14 @@ WRAPPER = {
     "edge_card_bound": ("two_mul_edges_le_card_sq_sub_card_int", [], None),
     "bipartite_edges": ("bipartite_four_mul_edges_int", ["is_bipartite"], None),
     "regular_edges": ("regular_edges_int", ["is_regular"], None),
+    # v1.2.1 §VI second batch
+    "card_le_alpha_chi": ("card_le_alpha_chi_int", [], None),
+    "omega_le_maxdeg": ("omega_le_maxdeg_add_one_int", [], None),
 }
+
+# v1.2.1 §VI.2: Turán conditional theorems — the numeric hypothesis omega ≤ r is
+# discharged from the trigger fact (the conditional step's dep), not from G/props.
+TURAN_WRAPPER = {f"turan_r{r}": f"turan_r{r}_int" for r in (2, 3, 4, 5, 6)}
 
 
 # ── rendering ─────────────────────────────────────────────────────────────────
@@ -206,6 +213,15 @@ def _emit_step(step, lines, indent, text2hyp, prop_hyps, case_hyps):
         inv = step["inventory"]
         if inv and inv.startswith("nonneg_"):
             lines.append(f"{indent}have {hid} : {stmt} := by positivity")
+            return
+        if rule == "conditional" and inv in TURAN_WRAPPER:
+            # discharge the omega ≤ r hypothesis from the trigger fact (deps[0])
+            dep = f"s{step['deps'][0]}" if step.get("deps") else None
+            disch = f"(by linarith [{dep}])" if dep else "(by omega)"
+            lines.append(f"{indent}have {hid} : {stmt} := by")
+            lines.append(f"{indent}  have hw := {TURAN_WRAPPER[inv]} G {disch}")
+            lines.append(f"{indent}  try push_cast at hw")
+            lines.append(f"{indent}  linarith [hw]")
             return
         call = _wrapper_call(inv, prop_hyps)
         lines.append(f"{indent}have {hid} : {stmt} := by")

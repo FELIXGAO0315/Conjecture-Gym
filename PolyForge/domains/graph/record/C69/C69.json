@@ -1,41 +1,42 @@
 {
   "id": "C69",
-  "created_at": "2026-10-11T07:10:38.012520+00:00",
+  "created_at": "2026-10-11T18:49:40.745144+00:00",
   "generator": {
-    "version": "1.2",
-    "seed": 2024007074
+    "version": "1.2.1",
+    "seed": 2024006291
   },
   "conjecture": {
-    "formula": "if ((min_deg >= 4)), then (max_deg <= m - 6)",
+    "formula": "if ((max_deg <= 4)), then (min_deg <= 3*n - m - 1)",
     "properties_premises": [],
     "numeric_premises": [
       {
-        "text": "min_deg >= 4",
+        "text": "max_deg <= 4",
         "coeffs": {
-          "min_deg": 1
+          "max_deg": 1
         },
-        "rel": ">=",
+        "rel": "<=",
         "rhs": 4
       }
     ],
     "conclusion": {
-      "text": "max_deg <= m - 6",
+      "text": "min_deg <= 3*n - m - 1",
       "coeffs": {
-        "max_deg": 1,
-        "m": -1
+        "min_deg": 1,
+        "m": 1,
+        "n": -3
       },
       "rel": "<=",
-      "rhs": -6
+      "rhs": -1
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose min_deg >= 4. Then max_deg <= m - 6."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose max_deg <= 4. Then min_deg <= 3*n - m - 1."
   },
-  "primary_var": "max_deg",
+  "primary_var": "min_deg",
   "dalmatian": "significant",
   "properties": [],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
-      "handshake_min",
+      "handshake_max",
       "max_lt_card",
       "min_le_max",
       "n_ge_one"
@@ -68,26 +69,26 @@
       },
       {
         "fid": 3,
-        "rule": "premise",
-        "text": "1*min_deg + -4 >= 0",
-        "coeffs": {
-          "min_deg": "1"
-        },
-        "const": "-4",
-        "rel": ">=",
-        "note": "min_deg >= 4"
-      },
-      {
-        "fid": 4,
         "rule": "inventory",
-        "text": "2*m + -1*P_n_mindeg >= 0",
+        "text": "-2*m + 1*P_n_maxdeg >= 0",
         "coeffs": {
-          "P_n_mindeg": "-1",
-          "m": "2"
+          "m": "-2",
+          "P_n_maxdeg": "1"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "handshake_min"
+        "inventory": "handshake_max"
+      },
+      {
+        "fid": 4,
+        "rule": "premise",
+        "text": "-1*max_deg + 4 >= 0",
+        "coeffs": {
+          "max_deg": "-1"
+        },
+        "const": "4",
+        "rel": ">=",
+        "note": "max_deg <= 4"
       },
       {
         "fid": 5,
@@ -103,20 +104,20 @@
       {
         "fid": 6,
         "rule": "product",
-        "text": "-4*n + -1*min_deg + 1*P_n_mindeg + 4 >= 0",
+        "text": "4*n + 1*max_deg + -1*P_n_maxdeg + -4 >= 0",
         "coeffs": {
-          "P_n_mindeg": "1",
-          "n": "-4",
-          "min_deg": "-1"
+          "P_n_maxdeg": "-1",
+          "n": "4",
+          "max_deg": "1"
         },
-        "const": "4",
+        "const": "-4",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
           5,
-          3
+          4
         ],
-        "prod_var": "P_n_mindeg",
+        "prod_var": "P_n_maxdeg",
         "prod_factors": [
           [
             "n",
@@ -125,22 +126,23 @@
             5
           ],
           [
-            "min_deg",
-            "lower",
+            "max_deg",
+            "upper",
             4,
-            3
+            4
           ]
         ]
       },
       {
         "fid": 7,
         "rule": "combination",
-        "text": "1*m + -1*max_deg + -6 >= 0",
+        "text": "3*n + -1*m + -1*min_deg + -1 >= 0",
         "coeffs": {
-          "max_deg": "-1",
-          "m": "1"
+          "min_deg": "-1",
+          "m": "-1",
+          "n": "3"
         },
-        "const": "-6",
+        "const": "-1",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
@@ -152,8 +154,8 @@
         ],
         "mults": [
           "1",
-          "2",
-          "3/2",
+          "1",
+          "1/2",
           "1/2",
           "1/2"
         ]
@@ -161,10 +163,10 @@
     ]
   },
   "iris": {
-    "T": 0.029411764705882353,
+    "T": 0.0014619883040935672,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.0294117647058822
+    "score": 1.0014619883040936
   },
   "attained": "yes",
   "touch": 1,
@@ -185,7 +187,7 @@
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.375,
+  "hardness": 1.9,
   "lean": {
     "theorem_name": "C69",
     "status": "compiled"

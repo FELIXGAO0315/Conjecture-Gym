@@ -46,9 +46,13 @@ def _base_directions():
 
 BASE_DIRECTIONS = _base_directions()
 
-# ── case splits: "is bipartite?" as a chi threshold 2/3 split (§III.2) ─────────
+# ── case splits (§III.2) ───────────────────────────────────────────────────────
 # (label, coeff-dict, thresholds): split is ``expr >= c`` vs ``expr <= c-1``.
-SPLIT_SPECS = [("chi", {"chi": 1}, [3])]
+#   chi   threshold 3 : "is it bipartite?" (chi ≤ 2 vs ≥ 3)
+#   omega threshold 3 : "is it triangle-free?" (omega ≤ 2 vs ≥ 3) — v1.2.1 §VI.6,
+#                       lets the Turán r = 2 (Mantel) conditional trigger without an
+#                       explicit omega bound in the premises.
+SPLIT_SPECS = [("chi", {"chi": 1}, [3]), ("omega", {"omega": 1}, [3])]
 
 # ── branch-and-bound split variables ──────────────────────────────────────────
 BNB_VARS = list(VARS)
@@ -128,6 +132,14 @@ def set_active_inventory(properties: set, params: dict):
                      "conclusion": {"coeffs": dict(e["conclusion"]["coeffs"]),
                                     "rel": e["conclusion"]["rel"],
                                     "rhs": int(e["conclusion"]["rhs"])}})
+    # v1.2.1 §VI.2: Turán-type conditional theorems (hypothesis omega ≤ r, numeric
+    # — always available; they fire when the context entails the cap).
+    for e in INV.TURAN:
+        cond.append({"name": e["name"], "lean_name": e["lean_name"],
+                     "hypothesis": {"coeffs": dict(e["hypothesis"]["coeffs"]),
+                                    "rel": e["hypothesis"]["rel"], "rhs": int(e["hypothesis"]["rhs"])},
+                     "conclusion": {"coeffs": dict(e["conclusion"]["coeffs"]),
+                                    "rel": e["conclusion"]["rel"], "rhs": int(e["conclusion"]["rhs"])}})
     INVENTORY = inv
     PRODUCT_FACTS = prod
     CONDITIONAL_THEOREMS = cond

@@ -1,53 +1,42 @@
 {
   "id": "C23",
-  "created_at": "2026-10-11T06:52:34.109539+00:00",
+  "created_at": "2026-10-11T18:41:43.714741+00:00",
   "generator": {
-    "version": "1.2",
-    "seed": 2024006311
+    "version": "1.2.1",
+    "seed": 2024006144
   },
   "conjecture": {
-    "formula": "if ((is_k_edge_connected(1)) and (not_bipartite) and (min_deg >= 4)), then (2*tau <= 3*m - 22)",
-    "properties_premises": [
-      {
-        "name": "is_k_edge_connected",
-        "param": 1
-      },
-      {
-        "name": "not_bipartite"
-      }
-    ],
+    "formula": "if ((min_deg >= 3)), then (n >= -m + 2*chi + 2)",
+    "properties_premises": [],
     "numeric_premises": [
       {
-        "text": "min_deg >= 4",
+        "text": "min_deg >= 3",
         "coeffs": {
           "min_deg": 1
         },
         "rel": ">=",
-        "rhs": 4
+        "rhs": 3
       }
     ],
     "conclusion": {
-      "text": "2*tau <= 3*m - 22",
+      "text": "n >= -m + 2*chi + 2",
       "coeffs": {
-        "tau": 2,
-        "m": -3
+        "n": 1,
+        "chi": -2,
+        "m": 1
       },
-      "rel": "<=",
-      "rhs": -22
+      "rel": ">=",
+      "rhs": 2
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_k_edge_connected(1), not_bipartite, min_deg >= 4. Then 2*tau <= 3*m - 22."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose min_deg >= 3. Then n >= -m + 2*chi + 2."
   },
-  "primary_var": "tau",
+  "primary_var": "n",
   "dalmatian": "significant",
-  "properties": [
-    "is_k_edge_connected",
-    "not_bipartite"
-  ],
+  "properties": [],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
-      "alpha_ge_one",
-      "gallai",
+      "chi_le_n",
       "handshake_min",
       "max_lt_card",
       "min_le_max",
@@ -57,6 +46,18 @@
     "steps": [
       {
         "fid": 1,
+        "rule": "inventory",
+        "text": "1*n + -1*chi >= 0",
+        "coeffs": {
+          "chi": "-1",
+          "n": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "chi_le_n"
+      },
+      {
+        "fid": 2,
         "rule": "inventory",
         "text": "1*max_deg + -1*min_deg >= 0",
         "coeffs": {
@@ -68,7 +69,7 @@
         "inventory": "min_le_max"
       },
       {
-        "fid": 2,
+        "fid": 3,
         "rule": "inventory",
         "text": "1*n + -1*max_deg + -1 >= 0",
         "coeffs": {
@@ -80,26 +81,15 @@
         "inventory": "max_lt_card"
       },
       {
-        "fid": 3,
-        "rule": "inventory",
-        "text": "1*alpha + -1 >= 0",
-        "coeffs": {
-          "alpha": "1"
-        },
-        "const": "-1",
-        "rel": ">=",
-        "inventory": "alpha_ge_one"
-      },
-      {
         "fid": 4,
         "rule": "premise",
-        "text": "1*min_deg + -4 >= 0",
+        "text": "1*min_deg + -3 >= 0",
         "coeffs": {
           "min_deg": "1"
         },
-        "const": "-4",
+        "const": "-3",
         "rel": ">=",
-        "note": "min_deg >= 4"
+        "note": "min_deg >= 3"
       },
       {
         "fid": 5,
@@ -127,13 +117,13 @@
       {
         "fid": 7,
         "rule": "product",
-        "text": "-4*n + -1*min_deg + 1*P_n_mindeg + 4 >= 0",
+        "text": "-3*n + -1*min_deg + 1*P_n_mindeg + 3 >= 0",
         "coeffs": {
           "P_n_mindeg": "1",
-          "n": "-4",
+          "n": "-3",
           "min_deg": "-1"
         },
-        "const": "4",
+        "const": "3",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
@@ -151,33 +141,21 @@
           [
             "min_deg",
             "lower",
-            4,
+            3,
             4
           ]
         ]
       },
       {
         "fid": 8,
-        "rule": "inventory",
-        "text": "-1*n + 1*alpha + 1*tau == 0",
-        "coeffs": {
-          "alpha": "1",
-          "tau": "1",
-          "n": "-1"
-        },
-        "const": "0",
-        "rel": "==",
-        "inventory": "gallai"
-      },
-      {
-        "fid": 9,
         "rule": "combination",
-        "text": "3*m + -2*tau + -22 >= 0",
+        "text": "1*n + 1*m + -2*chi + -2 >= 0",
         "coeffs": {
-          "tau": "-2",
-          "m": "3"
+          "n": "1",
+          "chi": "-2",
+          "m": "1"
         },
-        "const": "-22",
+        "const": "-2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
@@ -186,26 +164,24 @@
           3,
           4,
           5,
-          7,
-          8
+          7
         ],
         "mults": [
-          "4",
-          "4",
           "2",
-          "11/2",
-          "3/2",
-          "3/2",
-          "-2"
+          "1/2",
+          "1/2",
+          "1",
+          "1/2",
+          "1/2"
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.029411764705882353,
+    "T": 0.005780346820809248,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.0294117647058822
+    "score": 1.0057803468208093
   },
   "attained": "yes",
   "touch": 1,
@@ -217,16 +193,16 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 0,
-    "inventory_theorems": 5,
+    "inventory_theorems": 4,
     "product_steps": 1
   },
-  "proof_cost_initial": 13.5,
-  "proof_cost": 13.5,
-  "proof_cost_expanded": 13.5,
+  "proof_cost_initial": 11.5,
+  "proof_cost": 11.5,
+  "proof_cost_expanded": 11.5,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 3.375,
+  "hardness": 2.3,
   "lean": {
     "theorem_name": "C23",
     "status": "compiled"

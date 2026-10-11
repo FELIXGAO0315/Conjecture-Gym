@@ -1,63 +1,83 @@
 {
   "id": "C65",
-  "created_at": "2026-10-11T07:08:18.071876+00:00",
+  "created_at": "2026-10-11T18:49:40.116127+00:00",
   "generator": {
-    "version": "1.2",
-    "seed": 2024007037
+    "version": "1.2.1",
+    "seed": 2024006279
   },
   "conjecture": {
-    "formula": "if ((is_tree) and (min_deg <= 3) and (chi <= 2*tau)), then (tau <= 3*n - 5)",
+    "formula": "if ((is_bipartite)), then (tau >= 2*max_deg - 3*alpha + 2)",
     "properties_premises": [
       {
-        "name": "is_tree"
+        "name": "is_bipartite"
       }
     ],
-    "numeric_premises": [
-      {
-        "text": "min_deg <= 3",
-        "coeffs": {
-          "min_deg": 1
-        },
-        "rel": "<=",
-        "rhs": 3
-      },
-      {
-        "text": "chi <= 2*tau",
-        "coeffs": {
-          "chi": 1,
-          "tau": -2
-        },
-        "rel": "<=",
-        "rhs": 0
-      }
-    ],
+    "numeric_premises": [],
     "conclusion": {
-      "text": "tau <= 3*n - 5",
+      "text": "tau >= 2*max_deg - 3*alpha + 2",
       "coeffs": {
         "tau": 1,
-        "n": -3
+        "alpha": 3,
+        "max_deg": -2
       },
-      "rel": "<=",
-      "rhs": -5
+      "rel": ">=",
+      "rhs": 2
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, min_deg <= 3, chi <= 2*tau. Then tau <= 3*n - 5."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_bipartite. Then tau >= 2*max_deg - 3*alpha + 2."
   },
   "primary_var": "tau",
   "dalmatian": "significant",
   "properties": [
-    "is_tree"
+    "is_bipartite"
   ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
       "alpha_ge_one",
-      "chi_ge_one",
-      "gallai"
+      "bipartite_chi",
+      "card_le_alpha_chi",
+      "gallai",
+      "max_lt_card"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
+        "rule": "inventory",
+        "text": "1*n + -1*max_deg + -1 >= 0",
+        "coeffs": {
+          "max_deg": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "max_lt_card"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "-1*chi + 2 >= 0",
+        "coeffs": {
+          "chi": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "inventory": "bipartite_chi"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "-1*n + 1*P_alpha_chi >= 0",
+        "coeffs": {
+          "n": "-1",
+          "P_alpha_chi": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "card_le_alpha_chi"
+      },
+      {
+        "fid": 4,
         "rule": "inventory",
         "text": "1*alpha + -1 >= 0",
         "coeffs": {
@@ -68,59 +88,35 @@
         "inventory": "alpha_ge_one"
       },
       {
-        "fid": 2,
-        "rule": "inventory",
-        "text": "1*chi + -1 >= 0",
+        "fid": 5,
+        "rule": "product",
+        "text": "1*chi + 2*alpha + -1*P_alpha_chi + -2 >= 0",
         "coeffs": {
+          "P_alpha_chi": "-1",
+          "alpha": "2",
           "chi": "1"
         },
-        "const": "-1",
+        "const": "-2",
         "rel": ">=",
-        "inventory": "chi_ge_one"
-      },
-      {
-        "fid": 3,
-        "rule": "premise",
-        "text": "-1*chi + 2*tau >= 0",
-        "coeffs": {
-          "chi": "-1",
-          "tau": "2"
-        },
-        "const": "0",
-        "rel": ">=",
-        "note": "chi <= 2*tau"
-      },
-      {
-        "fid": 4,
-        "rule": "combination",
-        "text": "1*tau + -1/2 >= 0",
-        "coeffs": {
-          "tau": "1"
-        },
-        "const": "-1/2",
-        "rel": ">=",
-        "tactic": "linarith",
+        "tactic": "mul_nonneg",
         "deps": [
-          2,
-          3
+          4,
+          2
         ],
-        "mults": [
-          "1/2",
-          "1/2"
-        ]
-      },
-      {
-        "fid": 5,
-        "rule": "rounding",
-        "text": "1*tau + -1 >= 0",
-        "coeffs": {
-          "tau": "1"
-        },
-        "const": "-1",
-        "rel": ">=",
-        "tactic": "omega",
-        "deps": [
-          4
+        "prod_var": "P_alpha_chi",
+        "prod_factors": [
+          [
+            "alpha",
+            "lower",
+            1,
+            4
+          ],
+          [
+            "chi",
+            "upper",
+            2,
+            2
+          ]
         ]
       },
       {
@@ -139,45 +135,50 @@
       {
         "fid": 7,
         "rule": "combination",
-        "text": "3*n + -1*tau + -5 >= 0",
+        "text": "-2*max_deg + 3*alpha + 1*tau + -2 >= 0",
         "coeffs": {
-          "tau": "-1",
-          "n": "3"
+          "tau": "1",
+          "alpha": "3",
+          "max_deg": "-2"
         },
-        "const": "-5",
+        "const": "-2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
+          2,
+          3,
           5,
           6
         ],
         "mults": [
-          "3",
           "2",
-          "-3"
+          "1",
+          "1",
+          "1",
+          "1"
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.041666666666666664,
+    "T": 0.006711409395973154,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.0416666666666667
+    "score": 1.0067114093959733
   },
   "attained": "yes",
   "touch": 1,
-  "arith_sharp": "exact",
-  "depth_type": "split_needed",
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
   "proof_stats": {
     "case_splits": 0,
     "case_splits_conditional": 0,
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
-    "roundings": 1,
+    "roundings": 0,
     "inventory_theorems": 3,
-    "product_steps": 0
+    "product_steps": 1
   },
   "proof_cost_initial": 9.5,
   "proof_cost": 9.5,
@@ -185,7 +186,7 @@
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.3571428571428572,
+  "hardness": 3.1666666666666665,
   "lean": {
     "theorem_name": "C65",
     "status": "compiled"

@@ -4,33 +4,21 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C51 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.vertexCoverNum.toNat : ℤ) ≥ 1) (hn2 : (G.minDegree : ℤ) ≥ 3) :
-    (G.chromaticNumber.toNat : ℤ) ≤ (G.edgeFinset.card : ℤ) - 2 := by
-  have s1 : (Fintype.card V : ℤ) - (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
-    have hw := chi_le_n_int G
+theorem C51 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.maxDegree : ℤ) ≤ 3) :
+    (G.maxDegree : ℤ) ≥ -3 * (Fintype.card V : ℤ) + 2 * (G.edgeFinset.card : ℤ) + 3 := by
+  have s1 : -2 * (G.edgeFinset.card : ℤ) + (Fintype.card V : ℤ) * (G.maxDegree : ℤ) ≥ 0 := by
+    have hw := handshake_max_int G
     try push_cast at hw
     linarith [hw]
-  have s2 : (G.maxDegree : ℤ) - (G.minDegree : ℤ) ≥ 0 := by
-    have hw := min_le_max_int G
-    try push_cast at hw
-    linarith [hw]
-  have s3 : (Fintype.card V : ℤ) - (G.maxDegree : ℤ) ≥ 1 := by
-    have hw := max_lt_card_int' G
-    try push_cast at hw
-    linarith [hw]
-  have s4 : (G.minDegree : ℤ) ≥ 3 := by linarith [hn2]
-  have s5 : 2 * (G.edgeFinset.card : ℤ) - (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ 0 := by
-    have hw := handshake_min_int G
-    try push_cast at hw
-    linarith [hw]
-  have s6 : (Fintype.card V : ℤ) ≥ 1 := by
+  have s2 : (Fintype.card V : ℤ) ≥ 1 := by
     have hw := card_ge_one_int (V := V)
     try push_cast at hw
     linarith [hw]
-  have s7 : -3 * (Fintype.card V : ℤ) - (G.minDegree : ℤ) + (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ -3 := by
-    have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 1) * ((G.minDegree : ℤ) - 3) :=
-      mul_nonneg (by linarith [s6]) (by linarith [s4])
+  have s3 : -(G.maxDegree : ℤ) ≥ -3 := by linarith [hn1]
+  have s4 : 3 * (Fintype.card V : ℤ) + (G.maxDegree : ℤ) - (Fintype.card V : ℤ) * (G.maxDegree : ℤ) ≥ 3 := by
+    have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 1) * (3 - (G.maxDegree : ℤ)) :=
+      mul_nonneg (by linarith [s2]) (by linarith [s3])
     ring_nf at hmul ⊢
     linarith [hmul]
-  have s8 : (G.edgeFinset.card : ℤ) - (G.chromaticNumber.toNat : ℤ) ≥ 2 := by linarith [s1, s2, s3, s4, s5, s7]
-  linarith [s8]
+  have s5 : 3 * (Fintype.card V : ℤ) - 2 * (G.edgeFinset.card : ℤ) + (G.maxDegree : ℤ) ≥ 3 := by linarith [s1, s4]
+  linarith [s5]

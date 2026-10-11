@@ -1,56 +1,69 @@
 {
   "id": "C48",
-  "created_at": "2026-10-11T07:03:41.670174+00:00",
+  "created_at": "2026-10-11T18:45:59.046814+00:00",
   "generator": {
-    "version": "1.2",
-    "seed": 2024006717
+    "version": "1.2.1",
+    "seed": 2024006214
   },
   "conjecture": {
-    "formula": "if ((is_tree) and (n <= 4)), then (tau <= 2*max_deg)",
+    "formula": "if ((is_acyclic)), then (alpha >= tau)",
     "properties_premises": [
       {
-        "name": "is_tree"
+        "name": "is_acyclic"
       }
     ],
-    "numeric_premises": [
-      {
-        "text": "n <= 4",
-        "coeffs": {
-          "n": 1
-        },
-        "rel": "<=",
-        "rhs": 4
-      }
-    ],
+    "numeric_premises": [],
     "conclusion": {
-      "text": "tau <= 2*max_deg",
+      "text": "alpha >= tau",
       "coeffs": {
-        "tau": 1,
-        "max_deg": -2
+        "alpha": 1,
+        "tau": -1
       },
-      "rel": "<=",
+      "rel": ">=",
       "rhs": 0
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, n <= 4. Then tau <= 2*max_deg."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_acyclic. Then alpha >= tau."
   },
-  "primary_var": "tau",
-  "dalmatian": "unknown",
+  "primary_var": "alpha",
+  "dalmatian": "significant",
   "properties": [
-    "is_tree"
+    "is_acyclic"
   ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
+      "acyclic_chi",
       "alpha_ge_one",
-      "gallai",
-      "handshake_max",
-      "nonneg_max_deg",
-      "tree_edges"
+      "card_le_alpha_chi",
+      "gallai"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
+        "rule": "inventory",
+        "text": "-1*chi + 2 >= 0",
+        "coeffs": {
+          "chi": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "inventory": "acyclic_chi"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "-1*n + 1*P_alpha_chi >= 0",
+        "coeffs": {
+          "n": "-1",
+          "P_alpha_chi": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "card_le_alpha_chi"
+      },
+      {
+        "fid": 3,
         "rule": "inventory",
         "text": "1*alpha + -1 >= 0",
         "coeffs": {
@@ -61,72 +74,39 @@
         "inventory": "alpha_ge_one"
       },
       {
-        "fid": 2,
-        "rule": "inventory",
-        "text": "-2*m + 1*P_n_maxdeg >= 0",
-        "coeffs": {
-          "m": "-2",
-          "P_n_maxdeg": "1"
-        },
-        "const": "0",
-        "rel": ">=",
-        "inventory": "handshake_max"
-      },
-      {
-        "fid": 3,
-        "rule": "inventory",
-        "text": "1*max_deg >= 0",
-        "coeffs": {
-          "max_deg": "1"
-        },
-        "const": "0",
-        "rel": ">=",
-        "inventory": "nonneg_max_deg"
-      },
-      {
         "fid": 4,
-        "rule": "premise",
-        "text": "-1*n + 4 >= 0",
-        "coeffs": {
-          "n": "-1"
-        },
-        "const": "4",
-        "rel": ">=",
-        "note": "n <= 4"
-      },
-      {
-        "fid": 5,
         "rule": "product",
-        "text": "4*max_deg + -1*P_n_maxdeg >= 0",
+        "text": "1*chi + 2*alpha + -1*P_alpha_chi + -2 >= 0",
         "coeffs": {
-          "P_n_maxdeg": "-1",
-          "max_deg": "4"
+          "P_alpha_chi": "-1",
+          "alpha": "2",
+          "chi": "1"
         },
-        "const": "0",
+        "const": "-2",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
           3,
-          4
+          1
         ],
-        "prod_var": "P_n_maxdeg",
+        "prod_var": "P_alpha_chi",
         "prod_factors": [
           [
-            "n",
-            "upper",
-            4,
-            4
+            "alpha",
+            "lower",
+            1,
+            3
           ],
           [
-            "max_deg",
-            "lower",
-            0,
-            3
+            "chi",
+            "upper",
+            2,
+            1
           ]
         ]
       },
       {
-        "fid": 6,
+        "fid": 5,
         "rule": "inventory",
         "text": "-1*n + 1*alpha + 1*tau == 0",
         "coeffs": {
@@ -139,24 +119,12 @@
         "inventory": "gallai"
       },
       {
-        "fid": 7,
-        "rule": "inventory",
-        "text": "-1*n + 1*m + 1 == 0",
-        "coeffs": {
-          "m": "1",
-          "n": "-1"
-        },
-        "const": "1",
-        "rel": "==",
-        "inventory": "tree_edges"
-      },
-      {
-        "fid": 8,
+        "fid": 6,
         "rule": "combination",
-        "text": "2*max_deg + -1*tau >= 0",
+        "text": "1*alpha + -1*tau >= 0",
         "coeffs": {
-          "tau": "-1",
-          "max_deg": "2"
+          "alpha": "1",
+          "tau": "-1"
         },
         "const": "0",
         "rel": ">=",
@@ -164,28 +132,26 @@
         "deps": [
           1,
           2,
-          5,
-          6,
-          7
+          4,
+          5
         ],
         "mults": [
           "1",
-          "1/2",
-          "1/2",
-          "-1",
-          "1"
+          "1",
+          "1",
+          "-1"
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.2,
-    "R": 1.0,
-    "L": 0.0,
-    "score": 1.2
+    "T": 0.08860759493670886,
+    "R": 0.14285714285714285,
+    "L": 0.4649905549752772,
+    "score": 0.6964552927691289
   },
   "attained": "yes",
-  "touch": 1,
+  "touch": 7,
   "arith_sharp": "relaxed",
   "depth_type": "product_needed",
   "proof_stats": {
@@ -197,13 +163,13 @@
     "inventory_theorems": 3,
     "product_steps": 1
   },
-  "proof_cost_initial": 10.0,
-  "proof_cost": 10.0,
-  "proof_cost_expanded": 10.0,
+  "proof_cost_initial": 9.0,
+  "proof_cost": 9.0,
+  "proof_cost_expanded": 9.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.5,
+  "hardness": 4.5,
   "lean": {
     "theorem_name": "C48",
     "status": "compiled"

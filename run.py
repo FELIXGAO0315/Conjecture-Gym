@@ -626,7 +626,9 @@ def _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time
                    "no_candidate", "trivial", "decomposable", "redundant_vs_record",
                    "redundant_vs_record_main", "not_significant", "skipped_pool_checks",
                    # v1.2 graph product reasons
-                   "degenerate_premises", "product_needed_skipped", "relaxed_counter_model"):
+                   "degenerate_premises", "product_needed_skipped", "relaxed_counter_model",
+                   # v1.2.1 candidate-cap selection (§IV)
+                   "candidate_cap_sets", "candidates_capped"):
         print(f"  {reason:28s}: {stats.get(reason, 0)}")
 
     # §6.6 memory + Lean batches

@@ -212,6 +212,10 @@ INVENTORY = [
      "source": "GraphLemmas", "properties": ["is_connected", "has_cycle"], "finite": [],
      "guards": [], "param": None,
      "conclusion": {"coeffs": _lin(m=1, n=-1), "rel": ">=", "rhs": 0}},
+    # 26 — omega ≤ max_deg + 1  (v1.2.1 §VI, GraphLemmas) — linear
+    {"name": "omega_le_maxdeg", "lean_name": "PolyForge.Graph.omega_le_maxdeg_add_one_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(omega=1, max_deg=-1), "rel": "<=", "rhs": 1}},
 ]
 
 INVENTORY_BY_NAME = {e["name"]: e for e in INVENTORY}
@@ -232,6 +236,7 @@ PRODUCT_VARS = {
     "P_n_mindeg": ("n", "min_deg"),
     "P_n_maxdeg": ("n", "max_deg"),
     "N2": ("n", "n"),
+    "P_alpha_chi": ("alpha", "chi"),           # v1.2.1 §VI.1
 }
 
 PRODUCT_INVENTORY = [
@@ -251,8 +256,25 @@ PRODUCT_INVENTORY = [
     {"name": "bipartite_edges", "lean_name": "PolyForge.Graph.bipartite_four_mul_edges_int",
      "source": "GraphLemmas", "properties": ["is_bipartite"], "finite": [], "guards": [], "param": None,
      "conclusion": {"coeffs": _lin(m=4, N2=-1), "rel": "<=", "rhs": 0}},
+    # P6 — n ≤ alpha·chi  (v1.2.1 §VI.1:  n − P_alpha_chi ≤ 0)
+    {"name": "card_le_alpha_chi", "lean_name": "PolyForge.Graph.card_le_alpha_chi_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(n=1, P_alpha_chi=-1), "rel": "<=", "rhs": 0}},
 ]
 PRODUCT_INVENTORY_BY_NAME = {e["name"]: e for e in PRODUCT_INVENTORY}
+
+# ── v1.2.1 §VI.2: Turán-type conditional theorems (hypothesis omega ≤ r) ───────
+# omega ≤ r ⟹ CliqueFree(r+1) ⟹ 2r·m ≤ (r−1)·n² (= (r−1)·N2).  r = 2 is Mantel
+# (4m ≤ n²).  Conditional on a numeric clique-number cap; triggers under an
+# explicit omega bound or the omega-threshold case split (§VI.6).
+TURAN = [
+    {"name": f"turan_r{r}", "lean_name": f"PolyForge.Graph.turan_r{r}_int",
+     "source": "GraphLemmas", "properties": [], "param": None,
+     "hypothesis": {"coeffs": _lin(omega=1), "rel": "<=", "rhs": r},
+     "conclusion": {"coeffs": _lin(m=2 * r, N2=-(r - 1)), "rel": "<=", "rhs": 0}}
+    for r in (2, 3, 4, 5, 6)
+]
+TURAN_BY_NAME = {e["name"]: e for e in TURAN}
 
 # P3 — is_regular(d) : 2m = d·n is LINEAR (d a constant), so it is an ordinary
 # (parametric) INVENTORY-style entry rather than a product entry.  Its coefficient
@@ -361,6 +383,15 @@ def verify_against_pool(pool: list) -> list:
         for entry in entries:
             if entry_applicable(entry, g) and not entry_holds(entry, g):
                 fails.append((entry["name"], g.get("atlas_index")))
+        # v1.2.1 §VI.2: Turán conditionals — when the hypothesis omega ≤ r holds,
+        # the conclusion 2r·m ≤ (r−1)·n² must hold.
+        vals = _values_of(g)
+        for e in TURAN:
+            h = e["hypothesis"]
+            if _holds(h["coeffs"], h["rel"], h["rhs"], vals):
+                c = e["conclusion"]
+                if not _holds(c["coeffs"], c["rel"], c["rhs"], vals):
+                    fails.append((e["name"], g.get("atlas_index")))
     return fails
 
 
