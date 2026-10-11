@@ -4,29 +4,16 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C3 {V : Type} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.edgeFinset.card : ℤ) ≥ 6) (hn2 : (G.edgeFinset.card : ℤ) - 2 * (G.cliqueNum : ℤ) ≥ 0) :
-    2 * (G.cliqueNum : ℤ) ≤ (G.edgeFinset.card : ℤ) + 2 * (G.indepNum : ℤ) - 2 := by
-  have s1 : (G.edgeFinset.card : ℤ) - 2 * (G.cliqueNum : ℤ) + 2 * (G.indepNum : ℤ) ≥ 2 := by
-    by_cases hc1 : (3 : ℤ) ≤ (G.chromaticNumber.toNat : ℤ)
-    · -- 1*chi >= 3
-      have s2 : (Fintype.card V : ℤ) - (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
-        have hw := chi_le_n_int G
-        linarith [hw]
-      have s3 : (G.chromaticNumber.toNat : ℤ) ≥ 3 := by have hcc := hc1; omega
-      have s4 : (Fintype.card V : ℤ) ≥ 3 := by linarith [s2, s3]
-      have s5 : (G.indepNum : ℤ) ≥ 1 := by
-        have hw := alpha_ge_one_int G (by omega)
-        linarith [hw]
-      have s6 : (G.edgeFinset.card : ℤ) - 2 * (G.cliqueNum : ℤ) ≥ 0 := by linarith [hn2]
-      have s7 : (G.edgeFinset.card : ℤ) - 2 * (G.cliqueNum : ℤ) + 2 * (G.indepNum : ℤ) ≥ 2 := by linarith [s5, s6]
-      linarith [s7]
-    · -- 1*chi <= 2
-      have s8 : (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by
-        have hw := omega_le_chi_int G
-        linarith [hw]
-      have s9 : (G.edgeFinset.card : ℤ) ≥ 6 := by linarith [hn1]
-      have s10 : (G.indepNum : ℤ) ≥ 0 := by positivity
-      have s11 : -(G.chromaticNumber.toNat : ℤ) ≥ -2 := by have hcc := hc1; omega
-      have s12 : (G.edgeFinset.card : ℤ) - 2 * (G.cliqueNum : ℤ) + 2 * (G.indepNum : ℤ) ≥ 2 := by linarith [s8, s9, s10, s11]
-      linarith [s12]
-  linarith [s1]
+theorem C3 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hp1 : 2 ≤ Fintype.card V) (hp2 : G.IsTree) (hn1 : (G.diam : ℤ) ≥ 3) :
+    (G.edgeFinset.card : ℤ) ≤ (Fintype.card V : ℤ) + 2 * (G.radius.toNat : ℤ) - 5 := by
+  have s1 : -(G.diam : ℤ) + 2 * (G.radius.toNat : ℤ) ≥ 0 := by
+    have hw := diam_le_two_radius_int G (isTree_connected G hp2)
+    linarith [hw]
+  have s2 : (G.diam : ℤ) ≥ 3 := by linarith [hn1]
+  have s3 : 2 * (G.radius.toNat : ℤ) ≥ 3 := by linarith [s1, s2]
+  have s4 : (G.radius.toNat : ℤ) ≥ 2 := by have hr := s3; omega
+  have s5 : -(Fintype.card V : ℤ) + (G.edgeFinset.card : ℤ) = -1 := by
+    have hw := tree_edges_int G hp2
+    linarith [hw]
+  have s6 : (Fintype.card V : ℤ) - (G.edgeFinset.card : ℤ) + 2 * (G.radius.toNat : ℤ) ≥ 5 := by linarith [s4, s5]
+  linarith [s6]

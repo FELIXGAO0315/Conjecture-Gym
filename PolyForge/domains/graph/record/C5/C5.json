@@ -1,208 +1,312 @@
 {
   "id": "C5",
-  "created_at": "2026-10-09T02:20:31.567275+00:00",
+  "created_at": "2026-10-11T04:13:10.228539+00:00",
   "generator": {
-    "version": "1.1.1",
-    "seed": 2024006372
+    "version": "1.1.2",
+    "seed": 2024007769
   },
   "conjecture": {
-    "formula": "if ((chi <= 5) and (m - 2*min_deg >= 0)), then (chi <= alpha + 4)",
-    "properties_premises": [],
+    "formula": "if ((is_tree) and (omega >= 2*radius)), then (2*radius <= m + omega - 1)",
+    "properties_premises": [
+      {
+        "name": "is_tree"
+      }
+    ],
     "numeric_premises": [
       {
-        "text": "chi <= 5",
+        "text": "omega >= 2*radius",
         "coeffs": {
-          "chi": 1
-        },
-        "rel": "<=",
-        "rhs": 5
-      },
-      {
-        "text": "m >= 2*min_deg",
-        "coeffs": {
-          "m": 1,
-          "min_deg": -2
+          "omega": 1,
+          "radius": -2
         },
         "rel": ">=",
         "rhs": 0
       }
     ],
     "conclusion": {
-      "text": "chi <= alpha + 4",
+      "text": "2*radius <= m + omega - 1",
       "coeffs": {
-        "chi": 1,
-        "alpha": -1
+        "radius": 2,
+        "m": -1,
+        "omega": -1
       },
       "rel": "<=",
-      "rhs": 4
+      "rhs": -1
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose chi <= 5, m - 2*min_deg >= 0. Then chi <= alpha + 4."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, omega >= 2*radius. Then 2*radius <= m + omega - 1."
   },
-  "primary_var": "chi",
-  "dalmatian": "significant",
-  "properties": [],
+  "primary_var": "radius",
+  "dalmatian": "unknown",
+  "properties": [
+    "is_tree"
+  ],
   "conclusion_property": null,
   "proof": {
     "inventory_used": [
       "alpha_ge_one",
-      "chi_le_n",
-      "nonneg_alpha"
+      "diam_le_two_radius",
+      "gallai",
+      "nonneg_tau",
+      "omega_ge_one",
+      "omega_le_n",
+      "radius_le_diam",
+      "tree_edges"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
         "rule": "case_split",
-        "text": "-1*chi + 1*alpha + 4 >= 0",
+        "text": "1*m + 1*omega + -2*radius + -1 >= 0",
         "coeffs": {
-          "chi": "-1",
-          "alpha": "1"
+          "radius": "-2",
+          "m": "1",
+          "omega": "1"
         },
-        "const": "4",
+        "const": "-1",
         "rel": ">=",
         "tactic": "by_cases",
-        "split_var": "chi",
-        "split_threshold": 3,
+        "split_var": "bnb:diam",
+        "split_threshold": 1,
         "split_coeffs": {
-          "chi": "1"
+          "diam": "1"
         },
-        "split_kind": "conditional",
+        "split_kind": "bnb",
         "cases": [
           {
-            "assume": "1*chi >= 3",
+            "assume": "1*diam >= 1",
             "steps": [
               {
                 "fid": 2,
                 "rule": "inventory",
-                "text": "1*n + -1*chi >= 0",
+                "text": "1*n + -1*omega >= 0",
                 "coeffs": {
-                  "chi": "-1",
+                  "omega": "-1",
                   "n": "1"
                 },
                 "const": "0",
                 "rel": ">=",
-                "inventory": "chi_le_n"
+                "inventory": "omega_le_n"
               },
               {
                 "fid": 3,
-                "rule": "assumption",
-                "text": "1*chi + -3 >= 0",
+                "rule": "inventory",
+                "text": "-1*diam + 2*radius >= 0",
                 "coeffs": {
-                  "chi": "1"
+                  "diam": "-1",
+                  "radius": "2"
                 },
-                "const": "-3",
+                "const": "0",
                 "rel": ">=",
-                "note": "1*chi >= 3"
+                "inventory": "diam_le_two_radius"
               },
               {
                 "fid": 4,
-                "rule": "combination",
-                "text": "1*n + -3 >= 0",
+                "rule": "assumption",
+                "text": "1*diam + -1 >= 0",
                 "coeffs": {
-                  "n": "1"
-                },
-                "const": "-3",
-                "rel": ">=",
-                "tactic": "linarith",
-                "deps": [
-                  2,
-                  3
-                ],
-                "mults": [
-                  "1",
-                  "1"
-                ]
-              },
-              {
-                "fid": 5,
-                "rule": "conditional",
-                "text": "1*alpha + -1 >= 0",
-                "coeffs": {
-                  "alpha": "1"
+                  "diam": "1"
                 },
                 "const": "-1",
                 "rel": ">=",
-                "inventory": "alpha_ge_one",
+                "note": "1*diam >= 1"
+              },
+              {
+                "fid": 5,
+                "rule": "combination",
+                "text": "1*radius + -1/2 >= 0",
+                "coeffs": {
+                  "radius": "1"
+                },
+                "const": "-1/2",
+                "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
+                  3,
                   4
+                ],
+                "mults": [
+                  "1/2",
+                  "1/2"
                 ]
               },
               {
                 "fid": 6,
-                "rule": "premise",
-                "text": "-1*chi + 5 >= 0",
+                "rule": "rounding",
+                "text": "1*radius + -1 >= 0",
                 "coeffs": {
-                  "chi": "-1"
+                  "radius": "1"
                 },
-                "const": "5",
+                "const": "-1",
                 "rel": ">=",
-                "note": "chi <= 5"
+                "tactic": "omega",
+                "deps": [
+                  5
+                ]
               },
               {
                 "fid": 7,
-                "rule": "combination",
-                "text": "-1*chi + 1*alpha + 4 >= 0",
+                "rule": "premise",
+                "text": "1*omega + -2*radius >= 0",
                 "coeffs": {
-                  "chi": "-1",
-                  "alpha": "1"
+                  "omega": "1",
+                  "radius": "-2"
                 },
-                "const": "4",
+                "const": "0",
+                "rel": ">=",
+                "note": "omega >= 2*radius"
+              },
+              {
+                "fid": 8,
+                "rule": "inventory",
+                "text": "-1*n + 1*m + 1 == 0",
+                "coeffs": {
+                  "m": "1",
+                  "n": "-1"
+                },
+                "const": "1",
+                "rel": "==",
+                "inventory": "tree_edges"
+              },
+              {
+                "fid": 9,
+                "rule": "combination",
+                "text": "1*m + 1*omega + -2*radius + -1 >= 0",
+                "coeffs": {
+                  "radius": "-2",
+                  "m": "1",
+                  "omega": "1"
+                },
+                "const": "-1",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
-                  5,
-                  6
+                  2,
+                  6,
+                  7,
+                  8
                 ],
                 "mults": [
                   "1",
+                  "2",
+                  "2",
                   "1"
                 ]
               }
             ]
           },
           {
-            "assume": "1*chi <= 2",
+            "assume": "1*diam <= 0",
             "steps": [
               {
-                "fid": 8,
+                "fid": 10,
                 "rule": "inventory",
-                "text": "1*alpha >= 0",
+                "text": "1*omega + -1 >= 0",
+                "coeffs": {
+                  "omega": "1"
+                },
+                "const": "-1",
+                "rel": ">=",
+                "inventory": "omega_ge_one"
+              },
+              {
+                "fid": 11,
+                "rule": "inventory",
+                "text": "1*alpha + -1 >= 0",
                 "coeffs": {
                   "alpha": "1"
+                },
+                "const": "-1",
+                "rel": ">=",
+                "inventory": "alpha_ge_one"
+              },
+              {
+                "fid": 12,
+                "rule": "inventory",
+                "text": "1*diam + -1*radius >= 0",
+                "coeffs": {
+                  "radius": "-1",
+                  "diam": "1"
                 },
                 "const": "0",
                 "rel": ">=",
-                "inventory": "nonneg_alpha"
+                "inventory": "radius_le_diam"
               },
               {
-                "fid": 9,
-                "rule": "assumption",
-                "text": "-1*chi + 2 >= 0",
+                "fid": 13,
+                "rule": "inventory",
+                "text": "1*tau >= 0",
                 "coeffs": {
-                  "chi": "-1"
+                  "tau": "1"
                 },
-                "const": "2",
+                "const": "0",
                 "rel": ">=",
-                "note": "1*chi <= 2"
+                "inventory": "nonneg_tau"
               },
               {
-                "fid": 10,
-                "rule": "combination",
-                "text": "-1*chi + 1*alpha + 2 >= 0",
+                "fid": 14,
+                "rule": "assumption",
+                "text": "-1*diam >= 0",
                 "coeffs": {
-                  "chi": "-1",
-                  "alpha": "1"
+                  "diam": "-1"
                 },
-                "const": "2",
+                "const": "0",
+                "rel": ">=",
+                "note": "1*diam <= 0"
+              },
+              {
+                "fid": 15,
+                "rule": "inventory",
+                "text": "-1*n + 1*alpha + 1*tau == 0",
+                "coeffs": {
+                  "alpha": "1",
+                  "tau": "1",
+                  "n": "-1"
+                },
+                "const": "0",
+                "rel": "==",
+                "inventory": "gallai"
+              },
+              {
+                "fid": 16,
+                "rule": "inventory",
+                "text": "-1*n + 1*m + 1 == 0",
+                "coeffs": {
+                  "m": "1",
+                  "n": "-1"
+                },
+                "const": "1",
+                "rel": "==",
+                "inventory": "tree_edges"
+              },
+              {
+                "fid": 17,
+                "rule": "combination",
+                "text": "1*m + 1*omega + -2*radius + -1 >= 0",
+                "coeffs": {
+                  "radius": "-2",
+                  "m": "1",
+                  "omega": "1"
+                },
+                "const": "-1",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
-                  8,
-                  9
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16
                 ],
                 "mults": [
                   "1",
+                  "1",
+                  "2",
+                  "1",
+                  "2",
+                  "-1",
                   "1"
                 ]
               }
@@ -213,29 +317,29 @@
     ]
   },
   "iris": {
-    "T": 0.0008045052292839903,
+    "T": 0.2857142857142857,
     "R": 1.0,
-    "L": 0.0,
-    "score": 1.000804505229284
+    "L": 0.2809757434745082,
+    "score": 1.5666900291887937
   },
   "attained": "yes",
-  "touch": 1,
+  "touch": 2,
   "depth_type": "split_needed",
   "proof_stats": {
     "case_splits": 1,
-    "case_splits_conditional": 1,
-    "case_splits_bnb": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 1,
     "max_nest_depth": 1,
-    "roundings": 0,
-    "inventory_theorems": 2
+    "roundings": 1,
+    "inventory_theorems": 8
   },
-  "proof_cost_initial": 10.5,
-  "proof_cost": 10.5,
-  "proof_cost_expanded": 10.5,
-  "shorten_rounds": 0,
+  "proof_cost_initial": 25.0,
+  "proof_cost": 24.5,
+  "proof_cost_expanded": 24.5,
+  "shorten_rounds": 1,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.5,
+  "hardness": 4.083333333333333,
   "lean": {
     "theorem_name": "C5",
     "status": "compiled"

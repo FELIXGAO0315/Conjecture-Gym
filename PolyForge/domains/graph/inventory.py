@@ -65,6 +65,8 @@ IMPLICATIONS = [
      "SimpleGraph.IsTree.isConnected / IsTree.isAcyclic (IsTree := connected ∧ acyclic)"),
     ("is_acyclic", ["is_bipartite"],
      "SimpleGraph.IsAcyclic.chromaticNumber_le_two + chromaticNumber_le_two_iff_isBipartite"),
+    ("has_cycle", ["nontrivial"],
+     "PolyForge.Graph.hasCycle_two_le_card (¬IsAcyclic ⟹ 2 ≤ card V)"),  # v1.1.2 §II.2
 ]
 # Mutual exclusion: has_cycle ⟺ ¬ is_acyclic  (SimpleGraph.girth: egirth_eq_top ↔ IsAcyclic)
 EXCLUSIVE = [("has_cycle", "is_acyclic")]
@@ -189,6 +191,27 @@ INVENTORY = [
      "source": "GraphLemmas", "properties": ["is_connected"], "finite": [],
      "guards": [], "param": None,
      "conclusion": {"coeffs": _lin(m=1, n=-1), "rel": ">=", "rhs": -1}},
+    # 21 — n ≥ 1  (graphs assumed nonempty, v1.1.2 §I)
+    {"name": "n_ge_one", "lean_name": "PolyForge.Graph.card_ge_one_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(n=1), "rel": ">=", "rhs": 1}},
+    # 22 — alpha ≤ n  (v1.1.2 §II, GraphLemmas)
+    {"name": "alpha_le_n", "lean_name": "PolyForge.Graph.alpha_le_card_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(alpha=1, n=-1), "rel": "<=", "rhs": 0}},
+    # 23 — omega ≤ n  (v1.1.2 §II, Mathlib cliqueNum_le_natCard)
+    {"name": "omega_le_n", "lean_name": "PolyForge.Graph.omega_le_card_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(omega=1, n=-1), "rel": "<=", "rhs": 0}},
+    # 24 — tau ≤ m  (v1.1.2 §II, Mathlib vertexCoverNum_le_encard_edgeSet)
+    {"name": "tau_le_m", "lean_name": "PolyForge.Graph.tau_le_edges_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(tau=1, m=-1), "rel": "<=", "rhs": 0}},
+    # 25 — is_connected ∧ has_cycle : m ≥ n  (v1.1.2 §II, GraphLemmas)
+    {"name": "conn_cycle_edges", "lean_name": "PolyForge.Graph.conn_cycle_edges_ge_card_int",
+     "source": "GraphLemmas", "properties": ["is_connected", "has_cycle"], "finite": [],
+     "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(m=1, n=-1), "rel": ">=", "rhs": 0}},
 ]
 
 INVENTORY_BY_NAME = {e["name"]: e for e in INVENTORY}
@@ -277,7 +300,8 @@ if __name__ == "__main__":
     import json
     from pathlib import Path
     pool = json.load(open(Path(__file__).resolve().parent / "data" / "graph_pool.json"))["graphs"]
+    pool = [g for g in pool if g["n"] >= 1]       # v1.1.2 §I: graphs assumed nonempty
     fails = verify_against_pool(pool)
-    print(f"graphs: {len(pool)}   inventory entries: {len(INVENTORY)}   failures: {len(fails)}")
+    print(f"graphs (n>=1): {len(pool)}   inventory entries: {len(INVENTORY)}   failures: {len(fails)}")
     for f in fails[:20]:
         print("  FAIL", f)

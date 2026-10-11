@@ -43,7 +43,7 @@ DATA = ROOT / "data" / "graph_pool.json"
 RECORD = ROOT / "record"
 LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "1.1.1"
+GENERATOR_VERSION = "1.1.2"
 MAIN_COEFFS = (1, 2)          # main-variable coefficient
 OTHER_COEFFS = (-2, -1, 1, 2)  # other-term coefficients
 MAX_COEFF = 6                 # guard on display coefficients
@@ -91,6 +91,26 @@ def property_closure(props: set) -> set:
                         out.add(c); changed = True
     # has_cycle ⟺ ¬ acyclic ; keep both consistent (don't auto-add, just record)
     return out
+
+
+def dedup_properties(props):
+    """§IV.1: drop a property premise implied by another (e.g. is_acyclic when
+    is_tree is present; is_connected when is_tree; nontrivial when has_cycle)."""
+    keep = []
+    for i, p in enumerate(props):
+        implied = False
+        for j, q in enumerate(props):
+            if i == j:
+                continue
+            if p["name"] in (property_closure({q["name"]}) - {q["name"]}):
+                # p is implied by q; if mutual, keep the earlier one
+                mutual = q["name"] in (property_closure({p["name"]}) - {p["name"]})
+                if not mutual or j < i:
+                    implied = True
+                    break
+        if not implied:
+            keep.append(p)
+    return keep
 
 
 def finite_vars(props: set) -> set:
@@ -749,8 +769,33 @@ def _render_ineq(coeffs, rel, rhs):
     return f"{lhs} {_REL_SYM[rel]} {rhs}"
 
 
+def _display_premise(pr):
+    """§IV.2: render a numeric premise with its coefficient-1 subject variable on
+    the left (positive), e.g. ``tau <= omega`` / ``chi <= 2*max_deg`` / ``n >= 3``."""
+    coeffs = {v: int(c) for v, c in pr["coeffs"].items() if int(c) != 0}
+    rel, rhs = pr["rel"], int(pr["rhs"])
+    subj = next((v for v in VARS if coeffs.get(v, 0) == 1), None)
+    if subj is None:
+        subj = next((v for v in VARS if coeffs.get(v, 0) > 0), None)
+    if subj is None:
+        return _render_ineq(coeffs, rel, rhs)
+    a = coeffs[subj]
+    left = subj if a == 1 else f"{a}*{subj}"
+    rest = {v: -coeffs[v] for v in coeffs if v != subj}
+    parts = []
+    for v in VARS:
+        rc = int(rest.get(v, 0))
+        if rc == 0:
+            continue
+        parts.append(v if rc == 1 else (f"-{v}" if rc == -1 else f"{rc}*{v}"))
+    if rhs != 0 or not parts:
+        parts.append(str(rhs))
+    rs = " + ".join(parts).replace("+ -", "- ")
+    return f"{left} {rel} {rs}"
+
+
 def _premise_text(pr):
-    return f"({_render_ineq(pr['coeffs'], pr['rel'], int(pr['rhs']))})"
+    return f"({_display_premise(pr)})"
 
 
 def display_conclusion(conclusion, primary):
@@ -802,7 +847,7 @@ def natural_language(props, numeric, conclusion, primary):
     for p in props:
         prem.append(p['name'] + (f"({p['param']})" if 'param' in p else ""))
     for pr in numeric:
-        prem.append(_render_ineq(pr["coeffs"], pr["rel"], int(pr["rhs"])))
+        prem.append(_display_premise(pr))
     intro = ("Let G be a finite simple graph with the usual invariants "
              "(n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth).")
     disp, prim = display_conclusion(conclusion, primary)
@@ -956,8 +1001,18 @@ def is_decomposable(premises, conclusion):
     ctx = cached_context(premises, dirs)            # full power (depth 3 + split + B&B)
 
     def bnd(S):
-        r = _strongest_in(ctx, {v: L[v] for v in S})
-        return r[0]["rhs"] if r else None
+        # bound on the part L_S *as written* (keeping its original coefficients).
+        # _strongest_in returns the bound on the coprime/primitive direction, so
+        # scale it back by the gcd that was divided out (v1.1.2 §III.2 fix).
+        d = {v: L[v] for v in S}
+        r = _strongest_in(ctx, d)
+        if r is None:
+            return None
+        g = 0
+        for cc in d.values():
+            g = gcd(g, abs(int(cc)))
+        g = g or 1
+        return g * r[0]["rhs"]
 
     for Aset, Bset in parts:
         bA, bB = bnd(Aset), bnd(Bset)
@@ -1109,6 +1164,7 @@ def _coeff1_var(coeffs):
 def _impl(rng, pool, existing_hashes, stats, seed, accept):
     _ctx_cache_clear()
     props, numeric = sample_premises(rng)
+    props = dedup_properties(props)                 # §IV.1: drop implied property premises
     numeric = dedup_numeric(numeric)
     numeric = minimize_numeric_redundant(numeric)
     pset = property_closure({p["name"] for p in props})
@@ -1349,7 +1405,9 @@ def assemble_data(proposal, target, supersedes):
 
 # ── pool / record loading ─────────────────────────────────────────────────────
 def load_pool():
-    pool = json.load(open(DATA))["graphs"]
+    # v1.1.2 §I.2: graphs are assumed nonempty — skip the 0-vertex graph on load
+    # (the dataset file is kept intact).
+    pool = [g for g in json.load(open(DATA))["graphs"] if g["n"] >= 1]
     return (pool, pool, pool)   # (objs, features-placeholder, obj_vars-placeholder)
 
 

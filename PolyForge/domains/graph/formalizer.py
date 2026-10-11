@@ -45,13 +45,13 @@ WRAPPER = {
     "omega_le_chi": ("omega_le_chi_int", [], None),
     "chi_le_n": ("chi_le_n_int", [], None),
     "min_le_max": ("min_le_max_int", [], None),
-    "max_lt_card": ("max_lt_card_int", [], "n1"),
+    "max_lt_card": ("max_lt_card_int'", [], None),         # v1.1.2: nonempty-unconditional
     "max_le_edges": ("max_le_edges_int", [], None),
-    "tau_le_card_sub_one": ("tau_le_card_sub_one_int", [], "n1"),
+    "tau_le_card_sub_one": ("tau_le_card_sub_one_int'", [], None),
     "gallai": ("gallai_int", [], None),
-    "chi_ge_one": ("chi_ge_one_int", [], "n1"),
-    "omega_ge_one": ("omega_ge_one_int", [], "n1"),
-    "alpha_ge_one": ("alpha_ge_one_int", [], "n1"),
+    "chi_ge_one": ("chi_ge_one_int'", [], None),
+    "omega_ge_one": ("omega_ge_one_int'", [], None),
+    "alpha_ge_one": ("alpha_ge_one_int'", [], None),
     "radius_le_diam": ("radius_le_diam_int", ["is_connected"], None),
     "diam_le_two_radius": ("diam_le_two_radius_int", ["is_connected"], None),
     "tree_edges": ("tree_edges_int", ["is_tree"], None),
@@ -60,8 +60,8 @@ WRAPPER = {
     "girth_le_diam": ("girth_le_diam_int", ["is_connected", "has_cycle"], None),
     "girth_ge_three": ("girth_ge_three_int", ["has_cycle"], None),
     "connected_min_deg": ("connected_min_deg_int", ["is_connected"], "n2"),
-    "regular_max": ("regular_max_int", ["is_regular"], "n1"),
-    "regular_min": ("regular_min_int", ["is_regular"], "n1"),
+    "regular_max": ("regular_max_int'", ["is_regular"], None),
+    "regular_min": ("regular_min_int'", ["is_regular"], None),
     "edge_conn_min_deg": ("edge_conn_min_deg_int", ["is_k_edge_connected"], "n2"),
     "bipartite_chi": ("bipartite_chi_int", ["is_bipartite"], None),
     "not_bipartite_chi": ("not_bipartite_chi_int", ["not_bipartite"], None),
@@ -69,6 +69,12 @@ WRAPPER = {
     "diam_ge_one": ("diam_ge_one_int", ["is_connected"], "n2"),
     "radius_ge_one": ("radius_ge_one_int", ["is_connected"], "n2"),
     "connected_edges": ("connected_edges_int", ["is_connected"], None),
+    # v1.1.2 elementary facts
+    "n_ge_one": ("card_ge_one_int", [], None),
+    "alpha_le_n": ("alpha_le_card_int", [], None),
+    "omega_le_n": ("omega_le_card_int", [], None),
+    "tau_le_m": ("tau_le_edges_int", [], None),
+    "conn_cycle_edges": ("conn_cycle_edges_ge_card_int", ["is_connected", "has_cycle"], None),
 }
 
 
@@ -140,6 +146,8 @@ def _prop_term(req, prop_hyps):
             return f"(isAcyclic_bipartite G {prop_hyps['is_acyclic']})"
         if "is_tree" in prop_hyps:
             return f"(isAcyclic_bipartite G (isTree_acyclic G {prop_hyps['is_tree']}))"
+    if req == "nontrivial" and "has_cycle" in prop_hyps:        # §II.2: has_cycle ⟹ 2 ≤ card
+        return f"(hasCycle_two_le_card G {prop_hyps['has_cycle']})"
     raise KeyError(f"cannot discharge property {req} from {list(prop_hyps)}")
 
 
@@ -286,6 +294,22 @@ def _display_goal(conclusion, primary):
     return f"{left} {rel} {_render_affine(rest, rhs)}"
 
 
+def _prem_hyp(pr):
+    """§IV.2: render a numeric premise with its (coefficient-1) subject variable
+    alone on the left with a positive coefficient, in ℤ."""
+    coeffs = {v: int(c) for v, c in pr["coeffs"].items() if int(c) != 0}
+    rel, rhs = pr["rel"], int(pr["rhs"])
+    subj = next((v for v in VARS if coeffs.get(v, 0) == 1), None)
+    if subj is None:
+        subj = next((v for v in VARS if coeffs.get(v, 0) > 0), None)
+    if subj is None:
+        return _ineq(coeffs, rel, rhs)
+    a = coeffs[subj]
+    left = _Z[subj] if a == 1 else f"{a} * {_Z[subj]}"
+    rest = {v: -coeffs[v] for v in coeffs if v != subj}
+    return f"{left} {_REL[rel]} {_render_affine(rest, rhs)}"
+
+
 def build_theorem(name, premises, conclusion, proof_steps, used_inventory=None, display=False):
     props = premises["props"]
     numeric = premises["numeric"]
@@ -299,7 +323,7 @@ def build_theorem(name, premises, conclusion, proof_steps, used_inventory=None, 
     text2hyp = {}
     for j, pr in enumerate(numeric, 1):
         hn = f"hn{j}"
-        hyp_decls.append(f"({hn} : {_ineq(pr['coeffs'], pr['rel'], int(pr['rhs']))})")
+        hyp_decls.append(f"({hn} : {_prem_hyp(pr)})")
         text2hyp[pr.get("text", "")] = hn
     sig = (" " + " ".join(hyp_decls)) if hyp_decls else ""
     goal = _display_goal(conclusion, primary)
@@ -310,7 +334,7 @@ def build_theorem(name, premises, conclusion, proof_steps, used_inventory=None, 
     target = proof_steps[-1]["fid"] if proof_steps else None
     closing = f"  linarith [s{target}]" if target is not None else "  omega"
     body = "\n".join(lines + [closing])
-    return (f"theorem {name} {{V : Type}} [Fintype V] [DecidableEq V] "
+    return (f"theorem {name} {{V : Type}} [Fintype V] [DecidableEq V] [Nonempty V] "
             f"(G : SimpleGraph V) [DecidableRel G.Adj]{sig} :\n"
             f"    {goal} := by\n{body}\n")
 

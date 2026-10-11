@@ -79,9 +79,11 @@ def set_active_inventory(properties: set, params: dict):
     bipartite/not_bipartite chi facts are added here too (§II.3)."""
     global INVENTORY, CONDITIONAL_THEOREMS, INVENTORY_BY_NAME
     inv, cond = [], []
-    # entries whose Lean wrapper needs Nonempty V (n ≥ 1) / Nontrivial V (n ≥ 2);
-    # imposed here (not in the verified inventory.py) so proofs stay dischargeable.
-    _needs_n1 = {"regular_max", "regular_min"}
+    # v1.1.2 §I: graphs are assumed nonempty ([Nonempty V]), so every former
+    # "n ≥ 1" guard is always satisfied — such entries are now UNCONDITIONAL and
+    # their Lean wrappers use the nonempty-unconditional (…_int') forms.
+    # edge_conn still needs Nontrivial V (n ≥ 2), supplied by the `nontrivial`
+    # property (which `has_cycle` now implies, §II.2).
     _needs_nontrivial = {"edge_conn_min_deg"}
     for e in INV.INVENTORY:
         if not set(e["properties"]).issubset(properties):
@@ -90,18 +92,7 @@ def set_active_inventory(properties: set, params: dict):
             continue
         pv = params.get(e["properties"][0]) if (e["param"] and e["properties"]) else None
         rec = _entry_to_fact(e, pv)
-        guards = list(e["guards"])
-        if e["name"] in _needs_n1 and not guards:
-            guards = [{"coeffs": {"n": 1}, "rel": ">=", "rhs": 1}]
-        if guards:                                 # numeric guard  →  conditional theorem
-            g = guards[0]
-            cond.append({"name": e["name"], "lean_name": e["lean_name"],
-                         "kind": "conditional",
-                         "hypothesis": {"coeffs": {k: int(v) for k, v in g["coeffs"].items()},
-                                        "rel": g["rel"], "rhs": int(g["rhs"])},
-                         "conclusion": rec["conclusion"]})
-        else:
-            inv.append(rec)
+        inv.append(rec)                            # unconditional (n ≥ 1 always holds)
     # bipartite / not_bipartite → numeric chi fact (§II.3)
     if "is_bipartite" in properties:
         inv.append({"name": "bipartite_chi", "lean_name": "PolyForge.Graph.bipartite_chi_int",

@@ -302,6 +302,95 @@ theorem connected_edges_int (h : G.Connected) :
     (Fintype.card V : ℤ) - 1 ≤ (G.edgeFinset.card : ℤ) := by
   have := card_edgeFinset_ge_card_sub_one G h; omega
 
+/-! ### v1.1.2 §I: nonempty-unconditional ℤ wrappers (graphs assumed [Nonempty V]) -/
+
+theorem card_ge_one_int [Nonempty V] : (1 : ℤ) ≤ (Fintype.card V : ℤ) := by
+  have h0 : 1 ≤ Fintype.card V := Fintype.card_pos
+  exact_mod_cast h0
+
+theorem max_lt_card_int' [Nonempty V] :
+    (G.maxDegree : ℤ) ≤ (Fintype.card V : ℤ) - 1 := by
+  have := G.maxDegree_lt_card_verts; omega
+
+theorem tau_le_card_sub_one_int' [Nonempty V] :
+    (G.vertexCoverNum.toNat : ℤ) ≤ (Fintype.card V : ℤ) - 1 := by
+  have := vertexCoverNum_toNat_le_card_sub_one G
+  have h1 : 1 ≤ Fintype.card V := Fintype.card_pos
+  omega
+
+theorem chi_ge_one_int' [Nonempty V] : (1 : ℤ) ≤ (G.chromaticNumber.toNat : ℤ) := by
+  exact_mod_cast one_le_chromaticNumber_toNat G
+
+theorem omega_ge_one_int' [Nonempty V] : (1 : ℤ) ≤ (G.cliqueNum : ℤ) := by
+  exact_mod_cast one_le_cliqueNum G
+
+theorem alpha_ge_one_int' [Nonempty V] : (1 : ℤ) ≤ (G.indepNum : ℤ) := by
+  exact_mod_cast one_le_indepNum G
+
+theorem regular_max_int' [Nonempty V] {d : ℕ} (h : G.IsRegularOfDegree d) :
+    (G.maxDegree : ℤ) = (d : ℤ) := by
+  have := h.maxDegree_eq; omega
+
+theorem regular_min_int' [Nonempty V] {d : ℕ} (h : G.IsRegularOfDegree d) :
+    (G.minDegree : ℤ) = (d : ℤ) := by
+  have := h.minDegree_eq; omega
+
+/-! ### v1.1.2 §II: elementary facts -/
+
+-- alpha ≤ n  (independence number ≤ vertices)
+theorem indepNum_le_card : G.indepNum ≤ Fintype.card V := by
+  have h : Gᶜ.cliqueNum = G.indepNum := cliqueNum_compl
+  have h2 := Gᶜ.cliqueNum_le_natCard
+  rw [Nat.card_eq_fintype_card, h] at h2; exact h2
+
+theorem alpha_le_card_int : (G.indepNum : ℤ) ≤ (Fintype.card V : ℤ) := by
+  have := indepNum_le_card G; omega
+
+-- omega ≤ n  (clique number ≤ vertices)
+theorem omega_le_card_int : (G.cliqueNum : ℤ) ≤ (Fintype.card V : ℤ) := by
+  have := G.cliqueNum_le_natCard; rw [Nat.card_eq_fintype_card] at this; omega
+
+-- tau ≤ m  (vertex-cover number ≤ edges)
+theorem vertexCoverNum_toNat_le_edges : G.vertexCoverNum.toNat ≤ G.edgeFinset.card := by
+  have h := G.vertexCoverNum_le_encard_edgeSet
+  have henc : G.edgeSet.encard = (G.edgeFinset.card : ℕ∞) := by
+    rw [Set.encard_eq_coe_toFinset_card]; rfl
+  rw [henc] at h
+  exact (ENat.toNat_le_toNat h (ENat.natCast_ne_top _)).trans_eq (ENat.toNat_coe _)
+
+theorem tau_le_edges_int : (G.vertexCoverNum.toNat : ℤ) ≤ (G.edgeFinset.card : ℤ) := by
+  have := vertexCoverNum_toNat_le_edges G; omega
+
+-- has_cycle ⟹ nontrivial  (a graph with a cycle has ≥ 2 vertices)
+theorem hasCycle_two_le_card (h : ¬ G.IsAcyclic) : 2 ≤ Fintype.card V := by
+  by_contra hc
+  haveI : Subsingleton V := Fintype.card_le_one_iff_subsingleton.mp (by omega)
+  have hbot : G = ⊥ := by
+    ext a b; simp only [bot_adj, iff_false]
+    exact fun hab => hab.ne (Subsingleton.elim a b)
+  exact h (hbot ▸ isAcyclic_bot)
+
+theorem hasCycle_two_le_card_int (h : ¬ G.IsAcyclic) : (2 : ℤ) ≤ (Fintype.card V : ℤ) := by
+  have := hasCycle_two_le_card G h; omega
+
+-- is_connected ∧ has_cycle ⟹ m ≥ n
+theorem conn_cycle_card_le_edges (hconn : G.Connected) (hcyc : ¬ G.IsAcyclic) :
+    Fintype.card V ≤ G.edgeFinset.card := by
+  have hle := card_edgeFinset_ge_card_sub_one G hconn
+  by_contra hlt
+  rw [not_le] at hlt
+  have heq : G.edgeFinset.card + 1 = Fintype.card V := by omega
+  have htree : G.IsTree := by
+    rw [isTree_iff_connected_and_card]
+    refine ⟨hconn, ?_⟩
+    rw [Nat.card_eq_fintype_card, Nat.card_eq_fintype_card, ← edgeFinset_card]
+    exact heq
+  exact hcyc htree.isAcyclic
+
+theorem conn_cycle_edges_ge_card_int (hconn : G.Connected) (hcyc : ¬ G.IsAcyclic) :
+    (Fintype.card V : ℤ) ≤ (G.edgeFinset.card : ℤ) := by
+  have := conn_cycle_card_le_edges G hconn hcyc; omega
+
 /-! ### property-implication discharge (§II.2, used by the formalizer) -/
 
 theorem isTree_connected (h : G.IsTree) : G.Connected := h.connected
