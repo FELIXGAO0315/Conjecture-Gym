@@ -630,7 +630,9 @@ def _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time
              # v1.2.1 candidate-cap selection (§IV)
              "candidate_cap_sets", "candidates_capped",
              # v1.3.1 graph quality reasons (§II / §III)
-             "instance_family_duplicate", "decomposable_split", "decomposition_timeout")
+             "instance_family_duplicate", "decomposable_split", "decomposition_timeout",
+             # v1.3.2 graph quality reasons (§I weakened promotion)
+             "weakened_promoted", "weakened_depth_limit")
     for reason in known:
         print(f"  {reason:28s}: {stats.get(reason, 0)}")
     # any remaining nonzero stat keys the domain reported but the list above omits

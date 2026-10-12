@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## PolyForge (v1.3.1)
+## PolyForge (v1.3.2)
 
 PolyForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about a mathematical subject, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -142,6 +142,21 @@ Two further filters cut low-value graph conjectures:
   of `omega − m ≤ 1` and `2·min_deg − m ≤ 0` and dropped (`decomposable_split`). A
   linear-relaxation bound prunes hopeless splits before the full engine runs; a
   per-candidate time budget guards against pathological cases (`decomposition_timeout`).
+- **Weakened forms promoted to their core (v1.3.2).** A conclusion `L ≥ c` is a
+  *weakened* form when it is a valid inequality `A ≥ b_A` on (possibly) the same
+  variables plus a single-variable bound `k·v ≥ b_B` with `b_A + b_B ≥ c` (`A = L − k·v`,
+  `A` nonzero and not proportional to `L`). For example `min_deg ≥ 2 ⟹ 3m − n ≥ 6`
+  is `m − n ≥ 0` padded with `2m ≥ 6`. Rather than discard it, PolyForge **promotes**
+  the cleaner core `A ≥ b_A` back through the full pipeline (premise minimisation,
+  proof reconstruction, every filter) and drops the padded original
+  (`weakened_promoted`). A promoted core may itself be weakened at most once more
+  (then `weakened_depth_limit`). The recorded JSON carries `promoted_from` (the
+  original conclusion) and `instance_of`. The weakened check shares its split tree,
+  bound cache and time budget with the coefficient-split check.
+- **Degeneracy (v1.3.2).** A premise set is dropped (`degenerate_premises`) when the
+  full engine proves any of `n ≤ 4`, `m ≤ 4`, `max_deg ≤ 1` (only a handful of small
+  graphs remain — essentially a finite enumeration) or `chi ≥ n` (a complete graph,
+  whose invariants are all fixed by `n`). The firing condition is recorded.
 
 ### Core training environment (v1.3)
 
@@ -193,8 +208,8 @@ processes — RSS counts the shared pages once per process, while `MemAvailable`
 charged only once. Measured on this project, each additional REPL process actually
 costs ~0.8 GB. So the default process count is sized by `MemAvailable` minus a 20%
 headroom divided by that measured marginal cost, capped at CPU cores − 2 (rather
-than the far smaller RSS-based estimate). Throughput scales roughly linearly to ~4
-processes and then flattens on a 16-core host.
+than the far smaller RSS-based estimate). Measured throughput plateaus between 4 and
+8 processes, so the default is additionally **capped at 8** (v1.3.2).
 
 Build the REPL once with `PolyForge/env/setup_repl.sh` (it pins the repl commit and
 the `v4.34.0` toolchain used by the graph Lean project). Example:
@@ -217,6 +232,7 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v1.3.2** — Weakened forms (a valid inequality on the same variables plus a single-variable bound) are replaced by their cleaner core, which is re-run through the full pipeline; degeneracy covers n ≤ 4, m ≤ 4, Δ ≤ 1 and complete graphs (χ ≥ n); verifier default capped at 8 processes.
 - **v1.3.1** — Verifier sized by measured unique memory (shared .olean pages no longer double-counted), import configuration benchmarked; one representative per family of single-fact instances; decomposability with coefficient splitting of a shared variable.
 - **v1.3** — Core training environment: stable task format, batched Lean verifier with layered anti-cheating checks (fixed statement, environment diff, elaborated type match, standard axioms only, heartbeat limits), RL reward function, pass@k evaluation, skeleton-based train/test split, SFT export; natural-language proofs now end at the displayed statement.
 - **v1.2.2** — Canonical forms modulo active identities (Gallai, tree, regular) for deduplication and all filters, shortest equivalent form displayed; degeneracy check with full deductive power; relational premises restricted to naturally comparable pairs; diameter and cycle bounds added.

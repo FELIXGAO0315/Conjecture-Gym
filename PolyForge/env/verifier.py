@@ -72,13 +72,18 @@ def _meminfo_gb():
     return total, avail
 
 
+# v1.3.2 §III: throughput plateaus between 4 and 8 processes (measured in v1.3.1),
+# so the default is additionally capped at 8 regardless of available memory / cores.
+_MAX_DEFAULT_NPROCS = 8
+
+
 def default_nprocs() -> int:
     try:
         cores = os.cpu_count() or 2
         total, avail = _meminfo_gb()
         budget = avail - _MEM_HEADROOM_FRACTION * total
         by_mem = int(budget / _MARGINAL_GB_PER_PROC)
-        return max(1, min(cores - 2, by_mem))
+        return max(1, min(cores - 2, by_mem, _MAX_DEFAULT_NPROCS))
     except Exception:
         return 1
 

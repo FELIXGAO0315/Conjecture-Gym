@@ -44,7 +44,7 @@ DATA = ROOT / "data" / "graph_pool.json"
 RECORD = ROOT / "record"
 LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "1.3.1"
+GENERATOR_VERSION = "1.3.2"
 MAIN_COEFFS = (1, 2)          # main-variable coefficient
 # v1.2 §III.5: other-term coefficients widened to |·| ≤ 3 so conclusions like
 # 2m ≥ 3n (handshake under min_deg ≥ 3) can be expressed.
@@ -1444,57 +1444,123 @@ def _decomp_coeff_parts(L):
                 yield (v, a, b, partA, partB)
 
 
-def is_decomposable_coeff(premises, conclusion, time_budget=DECOMP_SPLIT_TIME_BUDGET):
-    """v1.3.1 §III: is the conclusion ``L ≥ c`` decomposable when a single shared
-    variable's coefficient is split across the two parts?  Returns
-    ``(decomposable, info, timed_out)``.
-
-    For each split, a cheap LP relaxation (with product envelopes) gives an upper
-    estimate of each part's achievable bound; if the two estimates already sum
-    below ``c`` the split cannot succeed and is pruned.  Surviving splits are bounded
-    with full deduction power (the same engine used at generation); if the two full
-    bounds sum to ≥ ``c`` the conclusion is decomposable.  Part bounds are cached."""
-    L = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
-    c = int(conclusion["rhs"])
-    if len(L) < 3:
-        return False, None, False
+def _bound_helpers(premises):
+    """Build the full-power split tree for ``premises`` once and return cached
+    ``lp_lo`` / ``full_lo`` bounders for a linear form (minimisation; with product
+    envelopes).  Shared by the coefficient-split (v1.3.1 §III) and weakened-form
+    (v1.3.2 §I) checks so the tree and every bound are computed at most once per
+    premise set."""
     tree = _build_split_tree(_premise_forms(premises), [], D.DEFAULT_SPLIT_DEPTH, products=True)
     mats = tree["mats"]
     lp_cache, full_cache = {}, {}
 
     def _key(part):
-        return tuple(sorted(part.items()))
+        return tuple(sorted((k, int(v)) for k, v in part.items() if int(v) != 0))
 
     def lp_lo(part):
         k = _key(part)
+        if not k:
+            return 0.0
         if k not in lp_cache:
-            st, val, _ = _lp(_cvec(part), mats)
+            st, val, _ = _lp(_cvec(dict(k)), mats)
             lp_cache[k] = val if st == "opt" else None
         return lp_cache[k]
 
     def full_lo(part):
         k = _key(part)
+        if not k:
+            return 0
         if k not in full_cache:
-            st, val = _vint(tree, _cvec(part), D.DEFAULT_SPLIT_DEPTH)
+            st, val = _vint(tree, _cvec(dict(k)), D.DEFAULT_SPLIT_DEPTH)
             full_cache[k] = val if st == "opt" else None
         return full_cache[k]
 
-    t0 = perf_counter()
+    return lp_lo, full_lo
+
+
+def _coeff_split_decomposable(L, c, lp_lo, full_lo, deadline):
+    """v1.3.1 §III core: True if ``L ≥ c`` splits across a shared variable's
+    coefficient into two parts (each with fewer variables than ``L``) whose full
+    bounds sum to ≥ ``c``.  Returns ``(decomposable, timed_out)``."""
+    if len(L) < 3:
+        return False, False
     for (v, a, b, partA, partB) in _decomp_coeff_parts(L):
-        if perf_counter() - t0 > time_budget:
-            return False, None, True                     # timed out → conservatively keep
+        if perf_counter() > deadline:
+            return False, True
         la, lb = lp_lo(partA), lp_lo(partB)
         if la is None or lb is None:
             continue
-        if la + lb < c - _LP_TOL:                         # §III.3 prune: can't reach c
+        if la + lb < c - _LP_TOL:
             continue
         fa, fb = full_lo(partA), full_lo(partB)
         if fa is None or fb is None:
             continue
         if fa + fb >= c:
-            return True, {"shared": v, "a": a, "b": b, "partA": dict(partA),
-                          "partB": dict(partB), "bound_A": fa, "bound_B": fb}, False
-    return False, None, False
+            return True, False
+    return False, False
+
+
+def _proportional(A, L):
+    """True if ``A`` is a scalar multiple of ``L`` (same support, equal ratios)."""
+    if set(A) != set(L):
+        return False
+    ratios = {Fraction(int(A[v]), int(L[v])) for v in A}
+    return len(ratios) == 1
+
+
+def _weakened(L, c, lp_lo, full_lo, deadline):
+    """v1.3.2 §I: is ``L ≥ c`` a *weakened* form — a valid inequality ``A ≥ b_A`` on
+    (possibly) the same variables plus a single-variable bound ``k·v ≥ b_B`` with
+    ``b_A + b_B ≥ c``?  ``A = L − k·v`` (``A`` nonzero and not proportional to ``L``);
+    ``B = k·v``.  Variables and ``k`` are enumerated in a fixed order and the first
+    valid split is returned.  Returns ``(is_weak, core_coeffs, b_A, info, timed_out)``;
+    the promotable core is ``A ≥ b_A``."""
+    for v in VARS:
+        if v not in L:
+            continue
+        cv = int(L[v])
+        for k in range(-DECOMP_SPLIT_MAX_COEFF, DECOMP_SPLIT_MAX_COEFF + 1):
+            if k == 0 or abs(cv - k) > DECOMP_SPLIT_MAX_COEFF:
+                continue
+            A = {vv: (cv - k if vv == v else int(L[vv])) for vv in L}
+            A = {vv: cc for vv, cc in A.items() if cc != 0}
+            if not A or _proportional(A, L):
+                continue
+            if perf_counter() > deadline:
+                return False, None, None, None, True
+            la, lb = lp_lo(A), lp_lo({v: k})
+            if la is None or lb is None:
+                continue
+            if la + lb < c - _LP_TOL:
+                continue
+            fa, fb = full_lo(A), full_lo({v: k})
+            if fa is None or fb is None:
+                continue
+            if fa + fb >= c:
+                return True, A, int(fa), {"v": v, "k": k, "A": dict(A), "b_A": int(fa),
+                                          "b_B": int(fb)}, False
+    return False, None, None, None, False
+
+
+def is_decomposable_coeff(premises, conclusion, time_budget=DECOMP_SPLIT_TIME_BUDGET):
+    """Thin wrapper (kept for tests): ``(decomposable, info, timed_out)``."""
+    L = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
+    c = int(conclusion["rhs"])
+    lp_lo, full_lo = _bound_helpers(premises)
+    dec, timed = _coeff_split_decomposable(L, c, lp_lo, full_lo, perf_counter() + time_budget)
+    return dec, None, timed
+
+
+def is_weakened(premises, conclusion, time_budget=DECOMP_SPLIT_TIME_BUDGET):
+    """Thin wrapper (kept for tests): ``(is_weak, core_candidate, info, timed_out)``
+    where ``core_candidate`` is the promotable ``A ≥ b_A`` as a conclusion dict."""
+    L = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
+    c = int(conclusion["rhs"])
+    lp_lo, full_lo = _bound_helpers(premises)
+    weak, core_coeffs, b_A, info, timed = _weakened(L, c, lp_lo, full_lo,
+                                                     perf_counter() + time_budget)
+    core = {"coeffs": core_coeffs, "rel": ">=", "rhs": int(b_A)} if weak else None
+    return weak, core, info, timed
 
 
 # ── v1.3.1 §II: single-substantive-fact instances and family limiting ─────────
@@ -1554,9 +1620,11 @@ def family_duplicate_vs(records, fam, new_metrics):
 
 # ── degenerate-premise filter (v1.2 §V) ───────────────────────────────────────
 def premises_degenerate(premises):
-    """True if the premises force the graph into a degenerate small regime — the
-    engine (full power, incl. products) proves max_deg ≤ 1, m ≤ 1 or n ≤ 3.  Such
-    premises only admit tiny/edgeless graphs, so the conjecture is discarded."""
+    """v1.3.2 §II: return the degeneracy condition the premises force (or ``None``).
+    The full engine (incl. products) must prove one of ``n ≤ 4``, ``m ≤ 4``,
+    ``max_deg ≤ 1`` (only tiny / near-edgeless graphs remain — essentially a finite
+    enumeration), or ``chi ≥ n`` (a complete graph, whose invariants are all fixed by
+    ``n`` — no mathematical content)."""
     pf = _premise_forms(premises)
     tree = _build_split_tree(pf, [], D.DEFAULT_SPLIT_DEPTH, products=True)
 
@@ -1564,11 +1632,15 @@ def premises_degenerate(premises):
         s, v = _vint(tree, _cvec({var: -1}), D.DEFAULT_SPLIT_DEPTH)
         return None if s != "opt" else -v            # upper bound = −(min of −var)
 
-    for var, thr in (("max_deg", 1), ("m", 1), ("n", 3)):
+    for var, thr in (("n", 4), ("m", 4), ("max_deg", 1)):
         u = upper(var)
         if u is not None and u <= thr:
-            return True
-    return False
+            return f"{var}<={thr}"
+    # complete graph: premises force chi ≥ n (and chi ≤ n always), i.e. chi = n
+    s, lo = _vint(tree, _cvec({"chi": 1, "n": -1}), D.DEFAULT_SPLIT_DEPTH)
+    if s == "opt" and lo >= 0:
+        return "chi>=n"
+    return None
 
 
 # ── logical redundancy vs record (§V) ─────────────────────────────────────────
@@ -1722,10 +1794,13 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
     usable = finite_vars(pset)
     DED.set_active_inventory(pset, params)
 
-    # §V (v1.2) degenerate-premise filter: after premise minimisation, discard a
-    # premise set that forces a degenerate small graph (max_deg ≤ 1, m ≤ 1, n ≤ 3).
-    if premises_degenerate(numeric):
+    # §V (v1.2) / v1.3.2 §II degenerate-premise filter: discard a premise set that
+    # forces a degenerate regime (n ≤ 4, m ≤ 4, max_deg ≤ 1, or a complete graph
+    # chi ≥ n), recording which condition fired.
+    _deg = premises_degenerate(numeric)
+    if _deg is not None:
         stats["degenerate_premises"] += 1
+        stats[f"degenerate_{_deg}"] += 1
         return None
 
     covered = pool_covered(props, numeric)
@@ -1747,7 +1822,13 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         stats["candidate_cap_sets"] += 1
         candidates = candidates[:MAX_CANDIDATES_PER_SET]
 
-    for cand in candidates:
+    # v1.3.2 §I: process candidates from a queue so a weakened conclusion can be
+    # replaced in place by its cleaner core (promotion), which re-enters the SAME
+    # pipeline.  Each item is (candidate, promote_depth, promoted_from) — promoted
+    # cores (depth ≥ 1) do not count against the candidate cap.
+    queue = [(cand, 0, None) for cand in candidates]
+    while queue:
+        cand, _promote_depth, _promoted_from = queue.pop(0)
         # restore the FULL-premise active inventory for the linear-derivability gate
         # (per-candidate minimisation below re-points it at the pruned set).
         DED.set_active_inventory(pset, params)
@@ -1792,12 +1873,31 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         if is_decomposable(c_numeric, canon):
             stats["decomposable"] += 1
             continue
-        # v1.3.1 §III: decomposability with a shared variable's coefficient split
-        dec2, _dec_info, dec_timed = is_decomposable_coeff(c_numeric, canon)
-        if dec_timed:
-            stats["decomposition_timeout"] += 1
+        # v1.3.1 §III + v1.3.2 §I: coefficient-split decomposability and weakened-form
+        # detection share one split tree / bound cache under one time budget.
+        _canon_L = {v: int(x) for v, x in canon["coeffs"].items() if int(x) != 0}
+        _c = int(canon["rhs"])
+        _lp_lo, _full_lo = _bound_helpers(c_numeric)
+        _deadline = perf_counter() + DECOMP_SPLIT_TIME_BUDGET
+        dec2, dec_timed = _coeff_split_decomposable(_canon_L, _c, _lp_lo, _full_lo, _deadline)
         if dec2:
             stats["decomposable_split"] += 1
+            continue
+        weak, _wcore, _b_A, _winfo, weak_timed = _weakened(_canon_L, _c, _lp_lo, _full_lo, _deadline)
+        if dec_timed or weak_timed:
+            stats["decomposition_timeout"] += 1
+        if weak:
+            # v1.3.2 §I.2: promote the cleaner core ``A ≥ b_A`` back into the pipeline.
+            if _promote_depth >= 2:
+                stats["weakened_depth_limit"] += 1
+                continue
+            stats["weakened_promoted"] += 1
+            canon_disp, canon_prim = display_conclusion(canon, None)
+            parent = {"text": _render_isolated(canon_disp, canon_prim),
+                      "coeffs": {k: int(v) for k, v in canon_disp["coeffs"].items()},
+                      "rel": canon_disp["rel"], "rhs": int(canon_disp["rhs"])}
+            core = {"coeffs": dict(_wcore), "rel": ">=", "rhs": int(_b_A)}
+            queue.insert(0, (core, _promote_depth + 1, parent))
             continue
         skel = conjecture_skeleton(c_props, c_numeric, canon)
         # §V logical-redundancy pre-check against the run-start snapshot (canonical)
@@ -1895,6 +1995,7 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         return {
             "seed": seed, "props": c_props, "numeric": c_numeric, "conclusion": conclusion,
             "instance_of": instance_of,
+            "promoted_from": _promoted_from,
             # aliases consumed by the generic run.py driver: ``disp`` is the internal
             # (>=) DISPLAY form (the formalizer/assembler orient it by ``primary``);
             # ``gen_conclusion`` is what the proof steps actually prove (pre-identity).
@@ -2196,6 +2297,7 @@ def assemble_data(proposal, target, supersedes):
         "properties": proposal["properties"],
         "conclusion_property": proposal["conclusion_property"],
         "instance_of": proposal.get("instance_of"),
+        "promoted_from": proposal.get("promoted_from"),
         "proof": {"inventory_used": proposal["inv_used"], "lemmas_used": proposal["lemma_refs"],
                   "steps": steps},
         "iris": proposal["iris"],

@@ -1,191 +1,150 @@
 {
   "id": "C42",
-  "created_at": "2026-10-12T17:01:37.952688+00:00",
+  "created_at": "2026-10-12T19:51:23.480675+00:00",
   "generator": {
-    "version": "1.3.1",
-    "seed": 2024006200
+    "version": "1.3.2",
+    "seed": 2024006233
   },
   "rendered_with": "1.3",
   "conjecture": {
-    "formula": "if ((chi <= 3)), then (3*alpha >= n)",
-    "properties_premises": [],
-    "numeric_premises": [
+    "formula": "if ((has_cycle)), then (2*m >= 3*min_deg)",
+    "properties_premises": [
       {
-        "text": "chi <= 3",
-        "coeffs": {
-          "chi": 1
-        },
-        "rel": "<=",
-        "rhs": 3
+        "name": "has_cycle"
       }
     ],
+    "numeric_premises": [],
     "conclusion": {
-      "text": "3*alpha >= n",
+      "text": "2*m >= 3*min_deg",
       "coeffs": {
-        "alpha": 3,
-        "n": -1
+        "m": 2,
+        "min_deg": -3
       },
       "rel": ">=",
       "rhs": 0
     },
     "canonical_form": {
-      "text": "3*alpha >= n",
+      "text": "3*min_deg <= 2*m",
       "coeffs": {
-        "alpha": 3,
-        "n": -1
+        "m": -2,
+        "min_deg": 3
       },
-      "rel": ">=",
+      "rel": "<=",
       "rhs": 0
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose chi <= 3. Then 3*alpha >= n."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose has_cycle. Then 2*m >= 3*min_deg."
   },
-  "primary_var": "alpha",
+  "primary_var": "m",
   "dalmatian": "significant",
-  "properties": [],
+  "properties": [
+    "has_cycle"
+  ],
   "conclusion_property": null,
   "instance_of": null,
+  "promoted_from": null,
   "proof": {
     "inventory_used": [
-      "alpha_ge_one",
-      "card_le_alpha_chi",
-      "gallai"
+      "cycle_three_le_card",
+      "handshake_min",
+      "nonneg_min_deg"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
         "rule": "inventory",
-        "text": "-1*n + 1*P_alpha_chi >= 0",
+        "text": "2*m + -1*P_n_mindeg >= 0",
         "coeffs": {
-          "n": "-1",
-          "P_alpha_chi": "1"
+          "P_n_mindeg": "-1",
+          "m": "2"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "card_le_alpha_chi"
+        "inventory": "handshake_min"
       },
       {
         "fid": 2,
-        "rule": "premise",
-        "text": "-1*chi + 3 >= 0",
+        "rule": "inventory",
+        "text": "1*n + -3 >= 0",
         "coeffs": {
-          "chi": "-1"
+          "n": "1"
         },
-        "const": "3",
+        "const": "-3",
         "rel": ">=",
-        "note": "chi <= 3"
+        "inventory": "cycle_three_le_card"
       },
       {
         "fid": 3,
         "rule": "inventory",
-        "text": "1*alpha + -1 >= 0",
+        "text": "1*min_deg >= 0",
         "coeffs": {
-          "alpha": "1"
+          "min_deg": "1"
         },
-        "const": "-1",
+        "const": "0",
         "rel": ">=",
-        "inventory": "alpha_ge_one"
+        "inventory": "nonneg_min_deg"
       },
       {
         "fid": 4,
         "rule": "product",
-        "text": "1*chi + 3*alpha + -1*P_alpha_chi + -3 >= 0",
+        "text": "-3*min_deg + 1*P_n_mindeg >= 0",
         "coeffs": {
-          "P_alpha_chi": "-1",
-          "alpha": "3",
-          "chi": "1"
+          "P_n_mindeg": "1",
+          "min_deg": "-3"
         },
-        "const": "-3",
+        "const": "0",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
-          3,
-          2
+          2,
+          3
         ],
-        "prod_var": "P_alpha_chi",
+        "prod_var": "P_n_mindeg",
         "prod_factors": [
           [
-            "alpha",
+            "n",
             "lower",
-            1,
-            3
-          ],
-          [
-            "chi",
-            "upper",
             3,
             2
+          ],
+          [
+            "min_deg",
+            "lower",
+            0,
+            3
           ]
         ]
       },
       {
         "fid": 5,
-        "rule": "inventory",
-        "text": "-1*n + 1*alpha + 1*tau == 0",
-        "coeffs": {
-          "alpha": "1",
-          "tau": "1",
-          "n": "-1"
-        },
-        "const": "0",
-        "rel": "==",
-        "inventory": "gallai"
-      },
-      {
-        "fid": 6,
         "rule": "combination",
-        "text": "1*n + 1*alpha + -2*tau >= 0",
+        "text": "2*m + -3*min_deg >= 0",
         "coeffs": {
-          "alpha": "1",
-          "n": "1",
-          "tau": "-2"
+          "m": "2",
+          "min_deg": "-3"
         },
         "const": "0",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
-          2,
-          4,
-          5
+          4
         ],
         "mults": [
           "1",
-          "1",
-          "1",
-          "-2"
+          "1"
         ]
-      },
-      {
-        "fid": 7,
-        "rule": "identity_rewrite",
-        "text": "3*alpha >= n",
-        "coeffs": {
-          "alpha": 3,
-          "n": -1
-        },
-        "rel": ">=",
-        "rhs": 0,
-        "tactic": "linarith",
-        "deps": [
-          6
-        ],
-        "identities": [
-          "gallai"
-        ],
-        "identities_human": "the Gallai identity `alpha + tau = n`",
-        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`."
       }
     ]
   },
   "iris": {
-    "T": 0.018028846153846152,
-    "R": 0.13333333333333333,
-    "L": 0.4409585518440985,
-    "score": 0.5923207313312779
+    "T": 0.0008525149190110827,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.000852514919011
   },
   "attained": "yes",
-  "touch": 15,
+  "touch": 1,
   "arith_sharp": "relaxed",
   "depth_type": "product_needed",
   "proof_stats": {
@@ -194,16 +153,16 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 0,
-    "inventory_theorems": 2,
+    "inventory_theorems": 1,
     "product_steps": 1
   },
-  "proof_cost_initial": 7.5,
-  "proof_cost": 7.5,
-  "proof_cost_expanded": 7.5,
+  "proof_cost_initial": 5.5,
+  "proof_cost": 5.5,
+  "proof_cost_expanded": 5.5,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.875,
+  "hardness": 2.75,
   "lean": {
     "theorem_name": "C42",
     "status": "compiled"

@@ -1,54 +1,65 @@
 {
   "id": "C11",
-  "created_at": "2026-10-12T16:54:22.928537+00:00",
+  "created_at": "2026-10-12T19:42:33.357283+00:00",
   "generator": {
-    "version": "1.3.1",
-    "seed": 2024006096
+    "version": "1.3.2",
+    "seed": 2024006100
   },
   "rendered_with": "1.3",
   "conjecture": {
-    "formula": "if ((min_deg >= 2)), then (n <= 3*m - 6)",
-    "properties_premises": [],
-    "numeric_premises": [
+    "formula": "if ((nontrivial) and (is_k_edge_connected(2))), then (chi <= m)",
+    "properties_premises": [
       {
-        "text": "min_deg >= 2",
-        "coeffs": {
-          "min_deg": 1
-        },
-        "rel": ">=",
-        "rhs": 2
+        "name": "nontrivial"
+      },
+      {
+        "name": "is_k_edge_connected",
+        "param": 2
       }
     ],
+    "numeric_premises": [],
     "conclusion": {
-      "text": "n <= 3*m - 6",
+      "text": "chi <= m",
       "coeffs": {
-        "m": -3,
-        "n": 1
+        "chi": 1,
+        "m": -1
       },
       "rel": "<=",
-      "rhs": -6
+      "rhs": 0
     },
     "canonical_form": {
-      "text": "3*m >= n + 6",
+      "text": "m >= chi",
       "coeffs": {
-        "n": -1,
-        "m": 3
+        "chi": -1,
+        "m": 1
       },
       "rel": ">=",
-      "rhs": 6
+      "rhs": 0
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose min_deg >= 2. Then n <= 3*m - 6."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose nontrivial, is_k_edge_connected(2). Then chi <= m."
   },
-  "primary_var": "n",
+  "primary_var": "chi",
   "dalmatian": "significant",
-  "properties": [],
+  "properties": [
+    "nontrivial",
+    "is_k_edge_connected"
+  ],
   "conclusion_property": null,
   "instance_of": null,
+  "promoted_from": {
+    "text": "2*m >= chi + 3",
+    "coeffs": {
+      "chi": -1,
+      "m": 2
+    },
+    "rel": ">=",
+    "rhs": 3
+  },
   "proof": {
     "inventory_used": [
+      "chi_le_n",
+      "edge_conn_min_deg",
       "handshake_min",
-      "max_lt_card",
-      "min_le_max",
       "n_ge_one"
     ],
     "lemmas_used": [],
@@ -56,40 +67,28 @@
       {
         "fid": 1,
         "rule": "inventory",
-        "text": "1*max_deg + -1*min_deg >= 0",
+        "text": "1*n + -1*chi >= 0",
         "coeffs": {
-          "min_deg": "-1",
-          "max_deg": "1"
+          "chi": "-1",
+          "n": "1"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "min_le_max"
+        "inventory": "chi_le_n"
       },
       {
         "fid": 2,
         "rule": "inventory",
-        "text": "1*n + -1*max_deg + -1 >= 0",
-        "coeffs": {
-          "max_deg": "-1",
-          "n": "1"
-        },
-        "const": "-1",
-        "rel": ">=",
-        "inventory": "max_lt_card"
-      },
-      {
-        "fid": 3,
-        "rule": "premise",
         "text": "1*min_deg + -2 >= 0",
         "coeffs": {
           "min_deg": "1"
         },
         "const": "-2",
         "rel": ">=",
-        "note": "min_deg >= 2"
+        "inventory": "edge_conn_min_deg"
       },
       {
-        "fid": 4,
+        "fid": 3,
         "rule": "inventory",
         "text": "2*m + -1*P_n_mindeg >= 0",
         "coeffs": {
@@ -101,7 +100,7 @@
         "inventory": "handshake_min"
       },
       {
-        "fid": 5,
+        "fid": 4,
         "rule": "inventory",
         "text": "1*n + -1 >= 0",
         "coeffs": {
@@ -112,7 +111,7 @@
         "inventory": "n_ge_one"
       },
       {
-        "fid": 6,
+        "fid": 5,
         "rule": "product",
         "text": "-2*n + -1*min_deg + 1*P_n_mindeg + 2 >= 0",
         "coeffs": {
@@ -124,8 +123,8 @@
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
-          5,
-          3
+          2,
+          4
         ],
         "prod_var": "P_n_mindeg",
         "prod_factors": [
@@ -133,49 +132,47 @@
             "n",
             "lower",
             1,
-            5
+            4
           ],
           [
             "min_deg",
             "lower",
             2,
-            3
+            2
           ]
         ]
       },
       {
-        "fid": 7,
+        "fid": 6,
         "rule": "combination",
-        "text": "-1*n + 3*m + -6 >= 0",
+        "text": "1*m + -1*chi >= 0",
         "coeffs": {
-          "n": "-1",
-          "m": "3"
+          "chi": "-1",
+          "m": "1"
         },
-        "const": "-6",
+        "const": "0",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
           2,
           3,
-          4,
-          6
+          5
         ],
         "mults": [
-          "2",
-          "2",
-          "7/2",
-          "3/2",
-          "3/2"
+          "1",
+          "1/2",
+          "1/2",
+          "1/2"
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.0017035775127768314,
+    "T": 0.0017331022530329288,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.0017035775127767
+    "score": 1.001733102253033
   },
   "attained": "yes",
   "touch": 1,
@@ -190,13 +187,13 @@
     "inventory_theorems": 3,
     "product_steps": 1
   },
-  "proof_cost_initial": 9.5,
-  "proof_cost": 9.5,
-  "proof_cost_expanded": 9.5,
+  "proof_cost_initial": 9.0,
+  "proof_cost": 9.0,
+  "proof_cost_expanded": 9.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.375,
+  "hardness": 4.5,
   "lean": {
     "theorem_name": "C11",
     "status": "compiled"
