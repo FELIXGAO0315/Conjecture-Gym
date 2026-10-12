@@ -50,17 +50,34 @@ DEFAULT_MAX_HEARTBEATS = 400000
 DEFAULT_TIMEOUT = 60.0            # wall-clock seconds per submission
 DEFAULT_RESTART_EVERY = 200       # recycle a REPL process after this many checks
 
-# A resident REPL with Mathlib loaded uses ~6.5 GB RSS, so the default process
-# count is sized from total RAM (≈7 GB/process) capped by the core count.
-_MEM_PER_PROC_GB = 7.0
+# v1.3.1 §I: a resident REPL reports ~6.5 GB RSS, but almost all of that is the
+# memory-mapped Mathlib .olean files, which the kernel shares across processes and
+# reports once per process in RSS (double counting) while charging it only once to
+# MemAvailable.  Measured on this project, each additional REPL process actually
+# costs ~0.8 GB of MemAvailable (benchmarked at 1/2/4/8 processes).  So we size the
+# pool by MemAvailable minus a 20% headroom, divided by that measured marginal cost,
+# capped by the core count.
+_MARGINAL_GB_PER_PROC = 0.9        # measured marginal (MemAvailable) per process, rounded up
+_MEM_HEADROOM_FRACTION = 0.20      # keep at least this fraction of total RAM free
+
+
+def _meminfo_gb():
+    total = avail = None
+    with open("/proc/meminfo") as f:
+        for l in f:
+            if l.startswith("MemTotal"):
+                total = int(l.split()[1]) / 1024 / 1024
+            elif l.startswith("MemAvailable"):
+                avail = int(l.split()[1]) / 1024 / 1024
+    return total, avail
 
 
 def default_nprocs() -> int:
     try:
         cores = os.cpu_count() or 2
-        with open("/proc/meminfo") as f:
-            total_kb = int(next(l for l in f if l.startswith("MemTotal")).split()[1])
-        by_mem = int((total_kb / 1024 / 1024) / _MEM_PER_PROC_GB)
+        total, avail = _meminfo_gb()
+        budget = avail - _MEM_HEADROOM_FRACTION * total
+        by_mem = int(budget / _MARGINAL_GB_PER_PROC)
         return max(1, min(cores - 2, by_mem))
     except Exception:
         return 1

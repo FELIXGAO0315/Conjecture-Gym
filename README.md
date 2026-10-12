@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## PolyForge (v1.3)
+## PolyForge (v1.3.1)
 
 PolyForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about a mathematical subject, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -123,6 +123,26 @@ if ((is_tree) and (n >= 10)), then (m >= 9)
 if ((not_bipartite)), then (chi >= 3)
 ```
 
+### Generation quality (v1.3.1)
+
+Two further filters cut low-value graph conjectures:
+
+- **One representative per instance family.** A conjecture whose proof rests on a
+  single *substantive* Inventory fact (everything except the base scaffolding —
+  variable non-negativity, `n ≥ 1`, `chi/omega/alpha ≥ 1`, and the property-closure
+  implications) is an *instance* of that fact; the JSON records it as `instance_of`
+  (else `null`). Parametric instances that differ only in constants — e.g.
+  `n ≥ 4 ⟹ 2·min_deg ≤ m`, `n ≥ 6 ⟹ 3·min_deg ≤ m`, … — are grouped into a
+  *family* (the fact + the constant-free premise skeleton + the canonical
+  conclusion's variable set and direction), and only the best representative per
+  family is kept (the rest are dropped as `instance_family_duplicate`).
+- **Coefficient-split decomposability.** The decomposability check now also splits a
+  shared variable's coefficient `c_v = a + b` (both nonzero, |·| ≤ 3) across the two
+  parts, so a conclusion like `omega − 2m + 2·min_deg ≤ 1` is recognised as the sum
+  of `omega − m ≤ 1` and `2·min_deg − m ≤ 0` and dropped (`decomposable_split`). A
+  linear-relaxation bound prunes hopeless splits before the full engine runs; a
+  per-candidate time budget guards against pathological cases (`decomposition_timeout`).
+
 ### Core training environment (v1.3)
 
 Beyond generating conjectures, PolyForge ships its own **executable RL
@@ -167,6 +187,15 @@ standard axioms (`propext`, `Quot.sound`, `Classical.choice`); otherwise 0.
   set by its hardest tier (hard 0.4, medium 0.2, easy 0.1), decided by the skeleton
   hash so the split is reproducible.
 
+**Process count (v1.3.1).** A resident REPL reports ~6.5 GB RSS, but almost all of
+that is the memory-mapped Mathlib `.olean` files, which the kernel shares across
+processes — RSS counts the shared pages once per process, while `MemAvailable` is
+charged only once. Measured on this project, each additional REPL process actually
+costs ~0.8 GB. So the default process count is sized by `MemAvailable` minus a 20%
+headroom divided by that measured marginal cost, capped at CPU cores − 2 (rather
+than the far smaller RSS-based estimate). Throughput scales roughly linearly to ~4
+processes and then flattens on a 16-core host.
+
 Build the REPL once with `PolyForge/env/setup_repl.sh` (it pins the repl commit and
 the `v4.34.0` toolchain used by the graph Lean project). Example:
 
@@ -188,6 +217,7 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v1.3.1** — Verifier sized by measured unique memory (shared .olean pages no longer double-counted), import configuration benchmarked; one representative per family of single-fact instances; decomposability with coefficient splitting of a shared variable.
 - **v1.3** — Core training environment: stable task format, batched Lean verifier with layered anti-cheating checks (fixed statement, environment diff, elaborated type match, standard axioms only, heartbeat limits), RL reward function, pass@k evaluation, skeleton-based train/test split, SFT export; natural-language proofs now end at the displayed statement.
 - **v1.2.2** — Canonical forms modulo active identities (Gallai, tree, regular) for deduplication and all filters, shortest equivalent form displayed; degeneracy check with full deductive power; relational premises restricted to naturally comparable pairs; diameter and cycle bounds added.
 - **v1.2.1** — Fixed premise minimization and term dropping (a dropped term must still imply the original conclusion); always-true premises rejected at sampling; added n ≤ α·χ, Turán/Mantel bounds with a triangle-free case split, ω ≤ Δ + 1. (Diameter and cycle bounds were deferred here and added in v1.2.2.)

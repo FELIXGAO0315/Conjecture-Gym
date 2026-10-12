@@ -18,6 +18,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from fractions import Fraction
 from math import gcd, ceil as _ceil
+from time import perf_counter
 import itertools as _it
 
 import numpy as np
@@ -43,7 +44,7 @@ DATA = ROOT / "data" / "graph_pool.json"
 RECORD = ROOT / "record"
 LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "1.2.2"
+GENERATOR_VERSION = "1.3.1"
 MAIN_COEFFS = (1, 2)          # main-variable coefficient
 # v1.2 §III.5: other-term coefficients widened to |·| ≤ 3 so conclusions like
 # 2m ≥ 3n (handshake under min_deg ≥ 3) can be expressed.
@@ -1404,6 +1405,153 @@ def is_decomposable(premises, conclusion):
     return False
 
 
+# ── v1.3.1 §III: decomposability with coefficient splitting ───────────────────
+# Default per-candidate wall budget for the coefficient-split search.  The split
+# space is tiny (≤4 conclusion variables ⇒ a handful of (shared-var, a+b, A|B)
+# combinations), and each part's bound is cached, so 1.0 s is far more than any
+# real candidate needs; it is only a guard against a pathological LP.  Timed-out
+# candidates are conservatively kept (counted ``decomposition_timeout``).
+DECOMP_SPLIT_TIME_BUDGET = 1.0
+DECOMP_SPLIT_MAX_COEFF = 3
+
+
+def _decomp_coeff_parts(L):
+    """Yield ``(shared, a, b, partA, partB)``: ways to split one variable's
+    coefficient ``L[shared] = a + b`` (``a``, ``b`` nonzero, |·| ≤ 3) and partition
+    the OTHER variables into A, B so that each part has ≥ 1 variable and strictly
+    fewer than |L| variables (so with one shared variable every part has ≥ 2 vars)."""
+    vars_ = list(L)
+    nvar = len(vars_)
+    if nvar < 3:                                  # need each part < nvar and the shared in both
+        return
+    for v in vars_:
+        others = [w for w in vars_ if w != v]
+        no = len(others)
+        for a in range(-DECOMP_SPLIT_MAX_COEFF, DECOMP_SPLIT_MAX_COEFF + 1):
+            if a == 0:
+                continue
+            b = L[v] - a
+            if b == 0 or abs(b) > DECOMP_SPLIT_MAX_COEFF:
+                continue
+            for mask in range(1, (1 << no) - 1):   # non-empty proper subsets → both groups non-empty
+                gA = bin(mask).count("1")
+                if gA > nvar - 2 or (no - gA) > nvar - 2:
+                    continue                        # keep each part strictly below |L| variables
+                groupA = [others[i] for i in range(no) if mask & (1 << i)]
+                groupB = [others[i] for i in range(no) if not (mask & (1 << i))]
+                partA = {v: a, **{w: L[w] for w in groupA}}
+                partB = {v: b, **{w: L[w] for w in groupB}}
+                yield (v, a, b, partA, partB)
+
+
+def is_decomposable_coeff(premises, conclusion, time_budget=DECOMP_SPLIT_TIME_BUDGET):
+    """v1.3.1 §III: is the conclusion ``L ≥ c`` decomposable when a single shared
+    variable's coefficient is split across the two parts?  Returns
+    ``(decomposable, info, timed_out)``.
+
+    For each split, a cheap LP relaxation (with product envelopes) gives an upper
+    estimate of each part's achievable bound; if the two estimates already sum
+    below ``c`` the split cannot succeed and is pruned.  Surviving splits are bounded
+    with full deduction power (the same engine used at generation); if the two full
+    bounds sum to ≥ ``c`` the conclusion is decomposable.  Part bounds are cached."""
+    L = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
+    c = int(conclusion["rhs"])
+    if len(L) < 3:
+        return False, None, False
+    tree = _build_split_tree(_premise_forms(premises), [], D.DEFAULT_SPLIT_DEPTH, products=True)
+    mats = tree["mats"]
+    lp_cache, full_cache = {}, {}
+
+    def _key(part):
+        return tuple(sorted(part.items()))
+
+    def lp_lo(part):
+        k = _key(part)
+        if k not in lp_cache:
+            st, val, _ = _lp(_cvec(part), mats)
+            lp_cache[k] = val if st == "opt" else None
+        return lp_cache[k]
+
+    def full_lo(part):
+        k = _key(part)
+        if k not in full_cache:
+            st, val = _vint(tree, _cvec(part), D.DEFAULT_SPLIT_DEPTH)
+            full_cache[k] = val if st == "opt" else None
+        return full_cache[k]
+
+    t0 = perf_counter()
+    for (v, a, b, partA, partB) in _decomp_coeff_parts(L):
+        if perf_counter() - t0 > time_budget:
+            return False, None, True                     # timed out → conservatively keep
+        la, lb = lp_lo(partA), lp_lo(partB)
+        if la is None or lb is None:
+            continue
+        if la + lb < c - _LP_TOL:                         # §III.3 prune: can't reach c
+            continue
+        fa, fb = full_lo(partA), full_lo(partB)
+        if fa is None or fb is None:
+            continue
+        if fa + fb >= c:
+            return True, {"shared": v, "a": a, "b": b, "partA": dict(partA),
+                          "partB": dict(partB), "bound_A": fa, "bound_B": fb}, False
+    return False, None, False
+
+
+# ── v1.3.1 §II: single-substantive-fact instances and family limiting ─────────
+# Base facts are the elementary scaffolding the task excludes from "substantive"
+# facts: variable non-negativity, n ≥ 1, chi/omega/alpha ≥ 1.  (Property→property
+# implication rules live in the property closure, not the proof's inventory list.)
+BASE_FACTS = ({f"nonneg_{v}" for v in DED.NONNEG_VARS}
+              | {"n_ge_one", "chi_ge_one", "omega_ge_one", "alpha_ge_one"})
+
+
+def substantive_facts(inv_used):
+    """The substantive Inventory facts in a proof (all used facts minus base
+    facts).  Product facts count; envelopes/rounding/case splits are not facts."""
+    return sorted(set(inv_used) - BASE_FACTS)
+
+
+def instance_of_fact(inv_used):
+    """The single substantive fact a proof rests on, or ``None`` if it uses zero or
+    more than one.  Such single-fact conjectures are parametric *instances*."""
+    s = substantive_facts(inv_used)
+    return s[0] if len(s) == 1 else None
+
+
+def family_key(instance_of, props, numeric, canon):
+    """v1.3.1 §II.3: the family key of an instance — its substantive fact, the
+    premise skeleton (property names + constant-free premise shapes) and the
+    canonical conclusion's variable set and direction (constants/coefficients of
+    the conclusion ignored)."""
+    prem = frozenset((p["name"],) for p in props)
+    num = frozenset((_skel_lhs(pr["coeffs"]), pr["rel"], "*") for pr in numeric)
+    cvars = frozenset(v for v, cc in canon["coeffs"].items() if int(cc) != 0)
+    return ("FAM", instance_of, prem, num, (cvars, canon["rel"]))
+
+
+def _record_family_key(data):
+    """Family key of an existing record, or ``None`` if it is not an instance."""
+    io = instance_of_fact(data.get("proof", {}).get("inventory_used", []))
+    if io is None:
+        return None
+    props, numeric, canon = _record_props_canon(data)
+    return family_key(io, props, numeric, canon)
+
+
+def _record_metrics(data):
+    return {"attained": data.get("attained", "yes"), "touch": data.get("touch"),
+            "hardness": data.get("hardness", 0.0)}
+
+
+def family_duplicate_vs(records, fam, new_metrics):
+    """True if some record is a same-family instance that is NOT worse than the new
+    one (so the new instance loses the family slot)."""
+    for data in records:
+        if _record_family_key(data) == fam and not skeleton_better(new_metrics, _record_metrics(data)):
+            return True
+    return False
+
+
 # ── degenerate-premise filter (v1.2 §V) ───────────────────────────────────────
 def premises_degenerate(premises):
     """True if the premises force the graph into a degenerate small regime — the
@@ -1644,6 +1792,13 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         if is_decomposable(c_numeric, canon):
             stats["decomposable"] += 1
             continue
+        # v1.3.1 §III: decomposability with a shared variable's coefficient split
+        dec2, _dec_info, dec_timed = is_decomposable_coeff(c_numeric, canon)
+        if dec_timed:
+            stats["decomposition_timeout"] += 1
+        if dec2:
+            stats["decomposable_split"] += 1
+            continue
         skel = conjecture_skeleton(c_props, c_numeric, canon)
         # §V logical-redundancy pre-check against the run-start snapshot (canonical)
         if is_redundant_vs_records(c_pset, c_numeric, canon, _W_SNAPSHOT_RECORDS):
@@ -1725,8 +1880,21 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         # (envelope) sense — the counter-model gate cannot certify true optimality.
         arith_sharp = "relaxed" if proof_stats.get("product_steps", 0) > 0 else "exact"
         disp_oriented, _ = display_conclusion(disp_internal, prim)   # for property tag
+        # v1.3.1 §II: instance detection (single substantive fact) + family limiting.
+        # An instance uses the family key as its dedup skeleton, so the generic driver
+        # keeps one representative per family (choosing the better via skeleton_better)
+        # and replaces the loser; worse instances vs the run-start snapshot are dropped
+        # here (worker pre-check), the main process re-checks vs this-run instances.
+        instance_of = instance_of_fact(inv_used)
+        if instance_of is not None:
+            fam = family_key(instance_of, c_props, c_numeric, canon)
+            if family_duplicate_vs(_W_SNAPSHOT_RECORDS, fam, new_metrics):
+                stats["instance_family_duplicate"] += 1
+                continue
+            skel = fam
         return {
             "seed": seed, "props": c_props, "numeric": c_numeric, "conclusion": conclusion,
+            "instance_of": instance_of,
             # aliases consumed by the generic run.py driver: ``disp`` is the internal
             # (>=) DISPLAY form (the formalizer/assembler orient it by ``primary``);
             # ``gen_conclusion`` is what the proof steps actually prove (pre-identity).
@@ -1843,6 +2011,15 @@ def main_commit_check(prop, committed, snapshot, pool):
     ``(ok, reason)``; also finalises ``prop["dalmatian"]``."""
     pset = property_closure(set(prop["properties"]))
     canon = prop.get("canonical", prop["conclusion"])
+    # v1.3.1 §II: instance-family re-check vs snapshot + this-run instances.  A worse
+    # same-family instance is dropped here; a better one passes and the generic driver
+    # replaces the recorded representative (both share the family-key skeleton).
+    io = prop.get("instance_of")
+    if io is not None:
+        fam = family_key(io, prop["props"], prop["numeric"], canon)
+        existing = list(snapshot) + [c["data"] for c in committed]
+        if family_duplicate_vs(existing, fam, prop["metrics"]):
+            return False, "instance_family_duplicate"
     # §V main re-check: redundancy vs this-run records (excluding a same-skeleton one)
     recs = [c["data"] for c in committed if c["skeleton"] != prop["skeleton"]]
     if is_redundant_vs_records(pset, prop["numeric"], canon, recs):
@@ -1988,8 +2165,11 @@ def assemble_data(proposal, target, supersedes):
     canon = proposal.get("canonical", disp_internal)
     canon_disp, canon_prim = display_conclusion(canon, None)
     disp_text = _render_isolated(disp, prim)
-    # v1.3 §I: make the rendered proof end at the displayed conclusion.
-    steps = proposal["tb"]
+    # v1.3 §I: make the *recorded* proof end at the displayed conclusion.  The
+    # bridging step is display-only (the Lean proof closes to the display form with
+    # its own identity wrappers), so it must NOT be appended to ``proposal["tb"]``,
+    # which the formalizer compiles — work on a shallow copy of the step list.
+    steps = list(proposal["tb"])
     apply_bridging(steps, {"coeffs": disp["coeffs"], "rel": disp["rel"], "rhs": disp["rhs"]},
                    props, disp_text)
     return {
@@ -2015,8 +2195,9 @@ def assemble_data(proposal, target, supersedes):
         "dalmatian": proposal.get("dalmatian", "unknown"),
         "properties": proposal["properties"],
         "conclusion_property": proposal["conclusion_property"],
+        "instance_of": proposal.get("instance_of"),
         "proof": {"inventory_used": proposal["inv_used"], "lemmas_used": proposal["lemma_refs"],
-                  "steps": proposal["tb"]},
+                  "steps": steps},
         "iris": proposal["iris"],
         "attained": proposal["attained"], "touch": proposal["touch"],
         "arith_sharp": proposal.get("arith_sharp", "exact"),
@@ -2097,7 +2278,10 @@ def build_skeleton_index(record_dir, features):
         data = json.load(open(j))
         cj = data["conjecture"]
         props, numeric, canon = _record_props_canon(data)
-        skel = conjecture_skeleton(props, numeric, canon)
+        # v1.3.1 §II: instances dedup by family key (so a new better instance of the
+        # same family supersedes the recorded one via the generic skeleton machinery).
+        io = instance_of_fact(data.get("proof", {}).get("inventory_used", []))
+        skel = family_key(io, props, numeric, canon) if io else conjecture_skeleton(props, numeric, canon)
         idx[skel] = {"name": d.name, "attained": data.get("attained", "yes"),
                      "touch": data.get("touch"), "hardness": data["hardness"],
                      "formula": cj["formula"], "supersedes": data.get("supersedes", [])}

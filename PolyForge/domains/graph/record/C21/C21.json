@@ -1,10 +1,11 @@
 {
   "id": "C21",
-  "created_at": "2026-10-11T22:31:31.944919+00:00",
+  "created_at": "2026-10-12T16:55:40.559053+00:00",
   "generator": {
-    "version": "1.2.2",
+    "version": "1.3.1",
     "seed": 2024006125
   },
+  "rendered_with": "1.3",
   "conjecture": {
     "formula": "if ((is_tree)), then (chi >= -2*alpha + diam + 3)",
     "properties_premises": [
@@ -41,6 +42,7 @@
     "is_tree"
   ],
   "conclusion_property": null,
+  "instance_of": null,
   "proof": {
     "inventory_used": [
       "acyclic_chi",
@@ -182,6 +184,5 @@
   "lean": {
     "theorem_name": "C21",
     "status": "compiled"
-  },
-  "rendered_with": "1.3"
+  }
 }

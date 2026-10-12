@@ -26,7 +26,8 @@ from pathlib import Path
 
 from . import tasks as T
 from . import ENV_VERSION
-from .verifier import (DEFAULT_MAX_HEARTBEATS, DEFAULT_TIMEOUT, STANDARD_AXIOMS)
+from .verifier import (DEFAULT_MAX_HEARTBEATS, DEFAULT_TIMEOUT, STANDARD_AXIOMS,
+                       default_nprocs)
 
 _REPL_COMMIT = "193cf4bb9a22bb3fc6d25774f0fe6a70db1fd6ee"   # tag v4.34.0
 _REPL_TAG = "v4.34.0"
@@ -104,6 +105,8 @@ def export(domain: str, out_dir: Path, split_seed: int = _DEFAULT_SPLIT_SEED) ->
             "max_heartbeats": DEFAULT_MAX_HEARTBEATS,
             "timeout_seconds": DEFAULT_TIMEOUT,
             "standard_axioms": sorted(STANDARD_AXIOMS),
+            "default_nprocs": default_nprocs(),
+            "repl_header": cfg.repl_preamble,
         },
         "difficulty": {
             "metric": "hardness",

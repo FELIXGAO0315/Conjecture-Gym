@@ -614,22 +614,29 @@ def _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time
 
     # §6.5 discards
     print("discards by reason:")
-    for reason in ("empty_premises", "no_p6_canonical", "p6_upper_bound",
-                   "p6_padding", "too_many_terms", "proof_reconstruct_failed",
-                   "premise_weakening", "linear_only", "not_attained",
-                   "too_shallow", "duplicate", "premise_minimized_duplicate",
-                   "same_skeleton_worse", "lemma_protected", "recheck_failed",
-                   "depth_mismatch", "rounding_only_skipped", "split_needed_skipped",
-                   "too_slow", "lemma_bound_helped", "lemma_dropped_dependency",
-                   "compile_failed",
-                   # graph-domain reasons (v1.1 / v1.1.1)
-                   "no_candidate", "trivial", "decomposable", "redundant_vs_record",
-                   "redundant_vs_record_main", "not_significant", "skipped_pool_checks",
-                   # v1.2 graph product reasons
-                   "degenerate_premises", "product_needed_skipped", "relaxed_counter_model",
-                   # v1.2.1 candidate-cap selection (§IV)
-                   "candidate_cap_sets", "candidates_capped"):
+    known = ("empty_premises", "no_p6_canonical", "p6_upper_bound",
+             "p6_padding", "too_many_terms", "proof_reconstruct_failed",
+             "premise_weakening", "linear_only", "not_attained",
+             "too_shallow", "duplicate", "premise_minimized_duplicate",
+             "same_skeleton_worse", "lemma_protected", "recheck_failed",
+             "depth_mismatch", "rounding_only_skipped", "split_needed_skipped",
+             "too_slow", "lemma_bound_helped", "lemma_dropped_dependency",
+             "compile_failed",
+             # graph-domain reasons (v1.1 / v1.1.1)
+             "no_candidate", "trivial", "decomposable", "redundant_vs_record",
+             "redundant_vs_record_main", "not_significant", "skipped_pool_checks",
+             # v1.2 graph product reasons
+             "degenerate_premises", "product_needed_skipped", "relaxed_counter_model",
+             # v1.2.1 candidate-cap selection (§IV)
+             "candidate_cap_sets", "candidates_capped",
+             # v1.3.1 graph quality reasons (§II / §III)
+             "instance_family_duplicate", "decomposable_split", "decomposition_timeout")
+    for reason in known:
         print(f"  {reason:28s}: {stats.get(reason, 0)}")
+    # any remaining nonzero stat keys the domain reported but the list above omits
+    for reason in sorted(stats):
+        if reason not in known and stats.get(reason):
+            print(f"  {reason:28s}: {stats[reason]}")
 
     # §6.6 memory + Lean batches
     print(f"peak memory (process tree) : {peak_bytes / (1024**3):.2f} GiB")

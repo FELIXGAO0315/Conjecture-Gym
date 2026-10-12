@@ -385,6 +385,10 @@ def build_theorem(name, premises, conclusion, proof_steps, used_inventory=None, 
     sig = (" " + " ".join(hyp_decls)) if hyp_decls else ""
     goal = _display_goal(conclusion, primary)
 
+    # v1.3.1: the display-only ``identity_rewrite`` step (v1.3 §I) belongs to the
+    # recorded/markdown proof, not the Lean proof — the closing block below already
+    # rewrites to the display goal via the identity wrappers.  Skip it defensively.
+    proof_steps = [s for s in proof_steps if s.get("rule") != "identity_rewrite"]
     lines = []
     for s in proof_steps:
         _emit_step(s, lines, "  ", text2hyp, prop_hyps, {})
