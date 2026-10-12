@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import random
+import shutil
 from collections import defaultdict
 from datetime import datetime, timezone
 from fractions import Fraction
@@ -44,7 +45,7 @@ DATA = ROOT / "data" / "graph_pool.json"
 RECORD = ROOT / "record"
 LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "1.3.2"
+GENERATOR_VERSION = "1.4"
 MAIN_COEFFS = (1, 2)          # main-variable coefficient
 # v1.2 §III.5: other-term coefficients widened to |·| ≤ 3 so conclusions like
 # 2m ≥ 3n (handshake under min_deg ≥ 3) can be expressed.
@@ -1509,12 +1510,23 @@ def _proportional(A, L):
 
 
 def _weakened(L, c, lp_lo, full_lo, deadline):
-    """v1.3.2 §I: is ``L ≥ c`` a *weakened* form — a valid inequality ``A ≥ b_A`` on
-    (possibly) the same variables plus a single-variable bound ``k·v ≥ b_B`` with
-    ``b_A + b_B ≥ c``?  ``A = L − k·v`` (``A`` nonzero and not proportional to ``L``);
-    ``B = k·v``.  Variables and ``k`` are enumerated in a fixed order and the first
-    valid split is returned.  Returns ``(is_weak, core_coeffs, b_A, info, timed_out)``;
-    the promotable core is ``A ≥ b_A``."""
+    """v1.3.2 §I / v1.4 §II: is ``L ≥ c`` a *weakened* form — a valid inequality
+    ``A ≥ b_A`` on (possibly) the same variables plus a single-variable bound
+    ``k·v ≥ b_B`` with ``b_A + b_B ≥ c``?  ``A = L − k·v`` (``A`` nonzero and not
+    proportional to ``L``); ``B = k·v``.
+
+    v1.4 §II — *cleanest core*: among ALL valid splits, pick the one whose core
+    ``A`` is cleanest, in order: (1) fewest variables in ``A``; (2) smallest sum of
+    ``|coeff|`` over ``A``; (3) the fixed enumeration order (variable order in
+    ``VARS``, then ``k`` ascending).  Selecting the cleanest core up front means a
+    padded conclusion reaches its true core in a single promotion step rather than
+    peeling one layer at a time (e.g. ``min_deg ≥ 2 ⟹ 3m − n ≥ 6`` goes straight to
+    ``m ≥ n``, not via ``3m − 2n ≥ 3``).
+
+    Returns ``(is_weak, core_coeffs, b_A, info, timed_out)``; the promotable core is
+    ``A ≥ b_A``."""
+    best = None            # (len_A, sum_abs_A, order, A, b_A, info)
+    order = 0
     for v in VARS:
         if v not in L:
             continue
@@ -1528,6 +1540,7 @@ def _weakened(L, c, lp_lo, full_lo, deadline):
                 continue
             if perf_counter() > deadline:
                 return False, None, None, None, True
+            order += 1
             la, lb = lp_lo(A), lp_lo({v: k})
             if la is None or lb is None:
                 continue
@@ -1537,9 +1550,14 @@ def _weakened(L, c, lp_lo, full_lo, deadline):
             if fa is None or fb is None:
                 continue
             if fa + fb >= c:
-                return True, A, int(fa), {"v": v, "k": k, "A": dict(A), "b_A": int(fa),
-                                          "b_B": int(fb)}, False
-    return False, None, None, None, False
+                key = (len(A), sum(abs(int(cc)) for cc in A.values()), order)
+                if best is None or key < best[0]:
+                    best = (key, dict(A), int(fa),
+                            {"v": v, "k": k, "A": dict(A), "b_A": int(fa), "b_B": int(fb)})
+    if best is None:
+        return False, None, None, None, False
+    _key, A, b_A, info = best
+    return True, A, b_A, info, False
 
 
 def is_decomposable_coeff(premises, conclusion, time_budget=DECOMP_SPLIT_TIME_BUDGET):
@@ -1682,6 +1700,228 @@ def is_redundant_vs_records(pset, numeric, conclusion, records, exclude_skeleton
         if _find_fact(ctx, conclusion) is not None:
             return True
     return False
+
+
+# ── v1.4 §I: reverse pruning — keep the record a non-redundant basis ──────────
+# The forward logical-redundancy check (``is_redundant_vs_records``) only compares a
+# NEW conjecture against records collected EARLIER, so a redundant conjecture that was
+# recorded before the cleaner ones that subsume it stays in the record forever.  Reverse
+# pruning closes this gap: after a new record R is committed, every EXISTING record S is
+# re-examined and dropped (``pruned_by_newer``) if, now that R is present, S's conclusion
+# follows — with the SAME no-case-split criterion as the forward check (linear
+# combination, integer rounding and product/McCormick envelopes; no case split) — from
+# the Inventory together with {R} ∪ {the other records whose premises are implied by S's
+# premises}.  S itself never participates in its own derivation.  The check is run only
+# when R is relevant to S (R's premises are implied by S's premises), so most S are
+# filtered out by the cheap premise-implication test before any solving.
+def _record_premise_view(data):
+    """A record's reverse-pruning view: its id, property premises (+ closure/params),
+    numeric premises, displayed conclusion (used as an available fact) and canonical
+    conclusion (used as the derivation target).  Comparison is on the canonical/standard
+    form (§I.2), matching ``is_redundant_vs_records``."""
+    cj = data["conjecture"]
+    props = [{"name": p["name"], **({"param": p["param"]} if "param" in p else {})}
+             for p in cj.get("properties_premises", [])]
+    pset = property_closure({p["name"] for p in props})
+    params = {p["name"]: p.get("param") for p in props if "param" in p}
+    numeric = cj.get("numeric_premises", [])
+    concl = cj["conclusion"]
+    disp = {"coeffs": {k: int(v) for k, v in concl["coeffs"].items()},
+            "rel": concl["rel"], "rhs": int(concl["rhs"])}
+    _, _, canon = _record_props_canon(data)
+    return {"id": data["id"], "props": props, "pset": pset, "params": params,
+            "numeric": numeric, "disp": disp, "canon": canon}
+
+
+def _reverse_derive(S_numeric, S_canon, avail):
+    """Can S's canonical conclusion be derived — with NO case split (depth 0:
+    linear combination + rounding + product envelopes), consistent with the forward
+    redundancy check — from S's numeric premises, the conclusions of the ``avail``
+    records and the Inventory?  The active inventory must already be set to S's
+    property closure.  Returns the list of ``avail`` record ids actually used in the
+    derivation (possibly empty if the Inventory alone suffices), or ``None`` if S is
+    not derivable."""
+    d0 = {v: int(c) for v, c in S_canon["coeffs"].items() if int(c) != 0}
+    if not d0 or not avail:
+        # No qualifying records ⇒ not redundant, matching ``is_redundant_vs_records``
+        # (with an empty record it returns False: redundancy always needs ≥1 other
+        # record whose premises are implied by S's).
+        return None
+    extra = [dict(pr) for pr in S_numeric]
+    tags = []
+    for (eid, concl) in avail:
+        tag = f"__REC__{eid}"
+        extra.append({"coeffs": {k: int(v) for k, v in concl["coeffs"].items()},
+                      "rel": concl["rel"], "rhs": int(concl["rhs"]), "text": tag})
+        tags.append((eid, tag))
+    ctx = Context(premises=extra, depth=0, use_conditional_split=False, use_bnb=False,
+                  use_lemmas=False, extra_directions=[d0, _neg(d0)])
+    ctx.saturate()
+    fact = _find_fact(ctx, S_canon)
+    if fact is None:
+        return None
+    tb = traceback(ctx, fact)
+    used_notes = set()
+
+    def collect(steps):
+        for s in steps:
+            if s.get("rule") == "premise":
+                used_notes.add(s.get("note", ""))
+            elif s.get("rule") == "case_split":
+                for cse in s["cases"]:
+                    collect(cse["steps"])
+
+    collect(tb)
+    return [eid for (eid, tag) in tags if tag in used_notes]
+
+
+def _reverse_prune_targets(new_data, records):
+    R = _record_premise_view(new_data)
+    views = [_record_premise_view(d) for d in records]
+    R_names = {p["name"] for p in R["props"]}
+    victims = []
+    for S in views:
+        if S["id"] == R["id"]:
+            continue
+        # §I guard: only examine S when R is relevant — R's premises are implied by
+        # S's premises (cheap property-subset test first, then numeric entailment).
+        if not R_names.issubset(S["pset"]):
+            continue
+        DED.set_active_inventory(S["pset"], S["params"])
+        base_S = _premise_forms(S["numeric"]) + _unconditional_forms()
+        base_S += _triggerable_conditionals(base_S)
+        if not all(_entailed_prem(base_S, pr) for pr in R["numeric"]):
+            continue
+        # available = {R} ∪ {records (≠ S) whose premises are implied by S's premises}
+        avail = []
+        for E in views:
+            if E["id"] == S["id"]:
+                continue
+            if not {p["name"] for p in E["props"]}.issubset(S["pset"]):
+                continue
+            if not all(_entailed_prem(base_S, pr) for pr in E["numeric"]):
+                continue
+            avail.append((E["id"], E["disp"]))
+        used = _reverse_derive(S["numeric"], S["canon"], avail)
+        if used is not None:
+            victims.append((S["id"], used))
+    return victims
+
+
+def reverse_prune_targets(new_data, records):
+    """Records in ``records`` (the full current record, INCLUDING ``new_data``) made
+    redundant by ``new_data`` — ``[(victim_id, [used_record_id, …]), …]``.  Rebuilds
+    the active inventory per candidate and restores the caller's afterwards."""
+    saved = (DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME)
+    try:
+        return _reverse_prune_targets(new_data, records)
+    finally:
+        DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME = saved
+
+
+def basis_redundant(records):
+    """§V.1 completeness audit: every record derivable (no case split) from the OTHER
+    records whose premises are implied by its own, plus the Inventory.  Returns
+    ``[(record_id, [used_ids]), …]`` — the redundant records that must be pruned.  Uses
+    the same depth-0 criterion as reverse pruning (``_reverse_derive`` treats an empty
+    qualifying set as not-redundant, matching ``is_redundant_vs_records``)."""
+    saved = (DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME)
+    try:
+        views = [_record_premise_view(d) for d in records]
+        out = []
+        for S in views:
+            DED.set_active_inventory(S["pset"], S["params"])
+            base_S = _premise_forms(S["numeric"]) + _unconditional_forms()
+            base_S += _triggerable_conditionals(base_S)
+            avail = []
+            for E in views:
+                if E["id"] == S["id"]:
+                    continue
+                if not {p["name"] for p in E["props"]}.issubset(S["pset"]):
+                    continue
+                if not all(_entailed_prem(base_S, pr) for pr in E["numeric"]):
+                    continue
+                avail.append((E["id"], E["disp"]))
+            used = _reverse_derive(S["numeric"], S["canon"], avail)
+            if used is not None:
+                out.append((S["id"], used))
+        return out
+    finally:
+        DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME = saved
+
+
+def basis_duplicates(records):
+    """§V.1: pairs of records sharing the same standard form (identical
+    ``conjecture_hash`` — canonical premises + canonical conclusion)."""
+    seen, dups = {}, []
+    for d in records:
+        props, numeric, canon = _record_props_canon(d)
+        h = conjecture_hash(props, numeric, canon)
+        if h in seen:
+            dups.append((seen[h], d["id"]))
+        else:
+            seen[h] = d["id"]
+    return dups
+
+
+def apply_reverse_prune(record_dir, new_data):
+    """§I: run reverse pruning against the on-disk record (authoritative current set),
+    delete each redundant record's directory, and return ``[(victim_id, used_ids), …]``.
+    Reading the record from disk keeps the view correct after replacements/earlier
+    prunes."""
+    records = load_records(record_dir)
+    victims = reverse_prune_targets(new_data, records)
+    for vid, _used in victims:
+        vdir = record_dir / vid
+        if vdir.exists():
+            shutil.rmtree(vdir)
+    return victims
+
+
+# ── v1.4 §I.4: record renumbering (run at each segment end) ───────────────────
+def _rewrite_record_name(src_dir, old, new):
+    """Rewrite a staged record directory so its id becomes ``new``: update the JSON
+    ``id`` / ``lean.theorem_name``, rebuild the markdown, and rename the theorem in the
+    Lean file.  The export task_id is the hash of the name-neutralised Lean statement,
+    so renumbering never changes it (§I.4)."""
+    data = json.loads((src_dir / f"{old}.json").read_text())
+    data["id"] = new
+    if isinstance(data.get("lean"), dict):
+        data["lean"]["theorem_name"] = new
+    (src_dir / f"{new}.json").write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    (src_dir / f"{old}.json").unlink()
+    (src_dir / f"{new}.md").write_text(CG.build_md(data))
+    (src_dir / f"{old}.md").unlink(missing_ok=True)
+    lean = (src_dir / f"{old}.lean").read_text()
+    lean = lean.replace(f"theorem {old} ", f"theorem {new} ", 1)
+    (src_dir / f"{new}.lean").write_text(lean)
+    (src_dir / f"{old}.lean").unlink()
+
+
+def renumber_records(record_dir):
+    """Compact the record's C-numbers to a contiguous ``C1..Cn`` in ascending id order
+    (§I.4: deletions during a run leave gaps; renumber at segment end).  Uses a staged
+    two-phase rename to avoid collisions.  Returns ``{old: new}`` for every renamed
+    record."""
+    if not record_dir.exists():
+        return {}
+    dirs = sorted([d for d in record_dir.iterdir()
+                   if d.is_dir() and d.name.startswith("C") and d.name[1:].isdigit()
+                   and (d / f"{d.name}.json").exists()],
+                  key=lambda d: int(d.name[1:]))
+    mapping = {d.name: f"C{i}" for i, d in enumerate(dirs, start=1)}
+    if all(old == new for old, new in mapping.items()):
+        return {}
+    for d in dirs:                                   # phase 1: stage all under .rn_*
+        d.rename(record_dir / f".rn_{d.name}")
+    changed = {}
+    for old, new in mapping.items():                 # phase 2: rewrite + place
+        src = record_dir / f".rn_{old}"
+        if old != new:
+            _rewrite_record_name(src, old, new)
+            changed[old] = new
+        src.rename(record_dir / new)
+    return changed
 
 
 # ── Dalmatian significance (§VI, IRIS binary significance) ────────────────────

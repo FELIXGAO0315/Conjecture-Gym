@@ -272,6 +272,9 @@ def main(argv):
     write_index_log = []                     # (name, idx, depth_type, mode) in commit order
     committed = []                           # {"skeleton","data"} for records written this run
     _main_commit_check = getattr(domain, "main_commit_check", None)
+    _reverse_prune = getattr(domain, "reverse_prune", None)   # v1.4 §I
+    pruned_log = []                          # (victim, by_record, [used_ids]) in prune order
+    rp_timing = {"rp": 0.0, "commit": 0.0}   # §I.5 reverse-prune vs commit wall-clock
     compile_failed_idx = []                  # premise indices whose Lean compile failed
     protected = set()                        # §6 (v0.7): C-names cited in some lemmas_used
 
@@ -356,6 +359,24 @@ def main(argv):
             committed.append({"skeleton": skel, "data": data})
             for r in prop["lemma_refs"]:             # §6: protect the lemmas it depends on
                 protected.add(r)
+            # v1.4 §I: reverse pruning — now that this record is in the record, drop
+            # any older record it makes redundant.  Runs in the main process in strict
+            # commit order, so the result is independent of the worker count.
+            if _reverse_prune is not None:
+                _t_rp = time.time()
+                victims = _reverse_prune(data)
+                rp_timing["rp"] += time.time() - _t_rp
+                for vid, used in victims:
+                    for hh in [hh for hh, nn in existing_hashes.items() if nn == vid]:
+                        del existing_hashes[hh]
+                    for kk in [kk for kk, vv in skel_index.items() if vv.get("name") == vid]:
+                        del skel_index[kk]
+                    committed[:] = [c for c in committed if c["data"]["id"] != vid]
+                    protected.discard(vid)
+                    stats["pruned_by_newer"] += 1
+                    pruned_log.append((vid, target_name, used))
+                    print(f"    {vid} pruned_by_newer (by {target_name}); "
+                          f"derived from {', '.join(used) if used else 'Inventory only'}")
             if mode == "replace":
                 replaced += 1
                 write_index_log.append((target_name, idx, dt, "replace"))
@@ -396,7 +417,10 @@ def main(argv):
                     stats["compile_failed"] += 1
                     compile_failed_idx.append(idx)
                     continue                     # slot stays open for the next passer
-                if commit(idx, prop):
+                _t_commit = time.time()
+                filled = commit(idx, prop)
+                rp_timing["commit"] += time.time() - _t_commit
+                if filled:
                     done["flag"] = True
             pending.clear()
             queue_start["t"] = None
@@ -517,12 +541,44 @@ def main(argv):
 
     added = phase1[0] + (phase2[0] if phase2 else 0)
     replaced = phase1[1] + (phase2[1] if phase2 else 0)
+    pruned = stats.get("pruned_by_newer", 0)
+
+    # v1.4 §I.4: renumber the record to contiguous ids at segment end (deletions during
+    # the run leave gaps; renumbering is deterministic — sorted by id — so it does not
+    # affect reproducibility, and export task_ids are name-neutral).
+    _renum = getattr(domain, "renumber_records", None)
+    if _renum is not None:
+        changed = _renum()
+        if changed:
+            print(f"\nrenumbered {len(changed)} records to contiguous ids")
+
     # §rule 1/2: premise-index → record map and the indices skipped by a Lean
     # compile failure (so the record = first-N-passing-by-index can be audited).
     print("\npremise-index → record (commit order):")
     print("  " + (", ".join(f"{n}=idx{ix}({md})" for n, ix, _dt, md in write_index_log)
                   or "(none)"))
     print(f"compile-failure-skipped premise indices: {compile_failed_idx or 'none'}")
+
+    # v1.4 §I: reverse-pruning report
+    if _reverse_prune is not None:
+        print(f"\nreverse pruning: {pruned} records pruned_by_newer")
+        for vid, by, used in pruned_log:
+            print(f"  {vid} <- pruned by {by}; derived from "
+                  f"{', '.join(used) if used else 'Inventory only'}")
+        rp, ct = rp_timing["rp"], rp_timing["commit"]
+        frac = (rp / ct) if ct > 0 else 0.0
+        print(f"reverse-prune wall-clock: {rp:.2f}s over commits totalling {ct:.2f}s "
+              f"({frac*100:.1f}% of commit time)")
+        if frac > 0.5:
+            print("  NOTE: average reverse-prune time exceeded half of a commit's total "
+                  "time (§I.5).")
+
+    _, final_total, _ = _init_depth_counts(domain.record_dir)
+    hit_time_limit = bool(minutes is not None and elapsed >= minutes * 60.0 * 0.999)
+    print(f"\nSEGMENT STATS  written={added}  replaced={replaced}  pruned={pruned}  "
+          f"net={added - pruned}  record_total={final_total}  premise_groups={sampled}  "
+          f"elapsed_s={elapsed:.1f}  hit_time_limit={hit_time_limit}")
+
     _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time_total,
                    writes_by_depth, new_skel_segments, batch_count,
                    batch_time_total, bisection_total, mem.peak, n_workers,

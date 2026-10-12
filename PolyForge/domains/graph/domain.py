@@ -80,6 +80,22 @@ class GraphDomain(Domain):
     def main_commit_check(self, prop, committed):
         return G.main_commit_check(prop, committed, self.snapshot_records, self.pool)
 
+    # ── v1.4 §I: reverse pruning (main process, commit order) ──────────────────
+    def reverse_prune(self, new_data):
+        """Drop every existing record made redundant by the just-committed
+        ``new_data``.  Returns ``[(victim_id, used_ids), …]``.  Keeps the main-process
+        snapshot (read by ``main_commit_check``) consistent with the on-disk record."""
+        victims = G.apply_reverse_prune(self.record_dir, new_data)
+        if victims:
+            drop = {vid for vid, _ in victims}
+            self.snapshot_records = [d for d in self.snapshot_records
+                                     if d.get("id") not in drop]
+        return victims
+
+    # ── v1.4 §I.4: renumber records to contiguous ids (segment end) ────────────
+    def renumber_records(self):
+        return G.renumber_records(self.record_dir)
+
     # ── per-premise-set pipeline ───────────────────────────────────────────────
     def process_premise_set(self, rng, stats, seed, accept):
         return G.process_premise_set(rng, self.pool, self.hashes, stats, seed, accept)

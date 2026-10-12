@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## PolyForge (v1.3.2)
+## PolyForge (v1.4)
 
 PolyForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about a mathematical subject, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -93,7 +93,27 @@ remaining 15%.
 Options: `--seed S` (base seed), `--workers W` (number of worker processes;
 default auto-sized from cores and memory). Generation runs across worker
 processes but results are consumed in strict premise-index order, so the record
-is independent of the worker count.
+is independent of the worker count. When both `N` and `--minutes M` are given the
+run stops at whichever comes first (target `N` reached or budget `M` elapsed).
+
+**Reproducible multi-segment production run (v1.4).** The graph record is built by a
+sequence of segments with fixed seeds, each targeting 120 records with a 120-minute cap:
+
+```bash
+python -m run polyforge graph 120 --minutes 120 --seed 2024   # segment 1 (record cleared first)
+python -m run polyforge graph 120 --minutes 120 --seed 2025   # segment 2 (accumulates), …
+```
+
+Seeds run `2024, 2025, 2026, …`. The first segment starts from an empty record; each later
+segment accumulates on the previous one's record. Because commits (and reverse pruning)
+happen in the main process in premise-index order, a segment's content depends only on its
+seed and the earlier segments' results — **not** on machine speed — *unless* the segment
+hits its 120-minute cap, in which case its content does depend on speed. A driver
+(`run_production.py`, kept outside the repo) backs up the record before each segment,
+records per-segment statistics in `progress.json`, resumes from the first unfinished
+segment after an interruption (restoring the segment's pre-run backup and re-running it),
+and stops early once a segment hits the time limit or its net gain falls below 20% of the
+first segment's (the conjecture space has saturated).
 
 ### Axiom base
 
@@ -153,10 +173,41 @@ Two further filters cut low-value graph conjectures:
   (then `weakened_depth_limit`). The recorded JSON carries `promoted_from` (the
   original conclusion) and `instance_of`. The weakened check shares its split tree,
   bound cache and time budget with the coefficient-split check.
+  **Cleanest core first (v1.4).** When several weakenings `A ≥ b_A` are valid,
+  PolyForge now selects the **cleanest** core — fewest variables in `A`, then the
+  smallest sum of `|coefficients|`, then the fixed variable/`k` enumeration order — so
+  the padded conclusion reaches its true core in a *single* promotion step instead of
+  peeling one layer at a time (e.g. `min_deg ≥ 2 ⟹ 3m − n ≥ 6` goes straight to
+  `m ≥ n`, not via `3m − 2n ≥ 3`).
 - **Degeneracy (v1.3.2).** A premise set is dropped (`degenerate_premises`) when the
   full engine proves any of `n ≤ 4`, `m ≤ 4`, `max_deg ≤ 1` (only a handful of small
   graphs remain — essentially a finite enumeration) or `chi ≥ n` (a complete graph,
   whose invariants are all fixed by `n`). The firing condition is recorded.
+
+### Reverse pruning — a non-redundant basis regardless of discovery order (v1.4)
+
+The forward logical-redundancy check only compares a **new** conjecture against records
+collected **earlier**, so a redundant conjecture that happens to be recorded *before* the
+cleaner ones that subsume it stays in the record forever. For example
+`is_bipartite ⟹ m ≥ 2n − 3α` (= `τ ≤ m` plus `n ≤ 2α`, via the Gallai identity) becomes
+redundant once both halves are present, but if it was recorded first it is never
+revisited. Over a long run this order-dependent redundancy accumulates.
+
+**Reverse pruning** closes the gap. After the main process commits a new record `R`, every
+existing record `S` is re-examined and dropped (`pruned_by_newer`) when — now that `R` is
+present — `S`'s conclusion follows, under `S`'s premises and **without a case split**
+(linear combination, integer rounding and product/McCormick envelopes — the *same*
+criterion as the forward redundancy check), from the Inventory together with
+`{R} ∪ {the other records whose premises are implied by S's premises}` (`S` itself never
+participates). The check runs only when `R` is relevant to `S` (`R`'s premises are implied
+by `S`'s), so a cheap premise-implication test filters out most `S` before any solving.
+Reverse pruning runs in the main process in strict commit order, so the record is
+independent of the worker count. Deletions during a run leave gaps in the `C{n}` numbering;
+the record is **renumbered** to a contiguous `C1..Cn` (ascending id order) at the end of
+each run — export `task_id`s are the hash of the name-neutralised Lean statement, so they
+are unaffected. A final **basis-completeness audit** over the whole record guarantees the
+two invariants: no two records share a standard form, and no record is derivable (no case
+split) from the others whose premises are implied by its own, plus the Inventory.
 
 ### Core training environment (v1.3)
 
@@ -232,6 +283,7 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v1.4** — Reverse pruning keeps the record a non-redundant basis regardless of discovery order; weakened forms promoted to their cleanest core in one step; reproducible multi-segment production run of the graph domain.
 - **v1.3.2** — Weakened forms (a valid inequality on the same variables plus a single-variable bound) are replaced by their cleaner core, which is re-run through the full pipeline; degeneracy covers n ≤ 4, m ≤ 4, Δ ≤ 1 and complete graphs (χ ≥ n); verifier default capped at 8 processes.
 - **v1.3.1** — Verifier sized by measured unique memory (shared .olean pages no longer double-counted), import configuration benchmarked; one representative per family of single-fact instances; decomposability with coefficient splitting of a shared variable.
 - **v1.3** — Core training environment: stable task format, batched Lean verifier with layered anti-cheating checks (fixed statement, environment diff, elaborated type match, standard axioms only, heartbeat limits), RL reward function, pass@k evaluation, skeleton-based train/test split, SFT export; natural-language proofs now end at the displayed statement.
