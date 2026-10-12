@@ -444,5 +444,6 @@
   "lean": {
     "theorem_name": "C95",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

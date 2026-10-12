@@ -186,5 +186,6 @@
   "lean": {
     "theorem_name": "C24",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

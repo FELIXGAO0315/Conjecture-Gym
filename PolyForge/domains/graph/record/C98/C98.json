@@ -203,5 +203,6 @@
   "lean": {
     "theorem_name": "C98",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

@@ -403,5 +403,6 @@
   "lean": {
     "theorem_name": "C89",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

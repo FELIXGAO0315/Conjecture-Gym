@@ -182,5 +182,6 @@
   "lean": {
     "theorem_name": "C21",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

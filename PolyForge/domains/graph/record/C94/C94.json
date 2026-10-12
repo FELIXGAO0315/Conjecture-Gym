@@ -358,6 +358,27 @@
             ]
           }
         ]
+      },
+      {
+        "fid": 18,
+        "rule": "identity_rewrite",
+        "text": "n >= -2*chi + 10",
+        "coeffs": {
+          "chi": 2,
+          "n": 1
+        },
+        "rel": ">=",
+        "rhs": 10,
+        "tactic": "linarith",
+        "deps": [
+          1
+        ],
+        "identities": [
+          "gallai",
+          "regular"
+        ],
+        "identities_human": "the Gallai identity `alpha + tau = n`; the regular-degree identities `2*m = d*n` and `max_deg = min_deg = d`",
+        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`; the regular-degree identities `2*m = d*n` and `max_deg = min_deg = d`."
       }
     ]
   },
@@ -390,5 +411,6 @@
   "lean": {
     "theorem_name": "C94",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

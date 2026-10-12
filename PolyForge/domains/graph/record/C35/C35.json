@@ -256,5 +256,6 @@
   "lean": {
     "theorem_name": "C35",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

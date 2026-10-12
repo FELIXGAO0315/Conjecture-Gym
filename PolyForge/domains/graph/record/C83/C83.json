@@ -1230,5 +1230,6 @@
   "lean": {
     "theorem_name": "C83",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

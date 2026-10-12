@@ -230,5 +230,6 @@
   "lean": {
     "theorem_name": "C40",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

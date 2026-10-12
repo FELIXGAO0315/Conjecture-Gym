@@ -254,5 +254,6 @@
   "lean": {
     "theorem_name": "C34",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

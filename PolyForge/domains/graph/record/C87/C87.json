@@ -168,5 +168,6 @@
   "lean": {
     "theorem_name": "C87",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

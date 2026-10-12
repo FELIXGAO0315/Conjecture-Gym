@@ -357,5 +357,6 @@
   "lean": {
     "theorem_name": "C91",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

@@ -375,5 +375,6 @@
   "lean": {
     "theorem_name": "C65",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

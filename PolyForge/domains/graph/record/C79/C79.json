@@ -231,5 +231,6 @@
   "lean": {
     "theorem_name": "C79",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

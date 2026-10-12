@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## PolyForge (v1.2.2)
+## PolyForge (v1.3)
 
 PolyForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about a mathematical subject, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -47,6 +47,13 @@ Conjecture-Gym/
     ├── scoring/
     │   ├── iris.py             # IRIS core: T + R + L over domain feature vectors
     │   └── hardness.py         # proof difficulty / statement length
+    ├── env/                    # core training environment (v1.3, domain-agnostic)
+    │   ├── tasks.py            #   task format, task_id, skeleton, difficulty, split
+    │   ├── verifier.py         #   resident-REPL verifier + layered anti-cheat checks
+    │   ├── reward.py           #   RL reward_fn + proof extraction
+    │   ├── evaluate.py         #   pass@1 / pass@k evaluation
+    │   ├── export.py           #   tasks/train/test/sft/metadata/README export
+    │   └── setup_repl.sh       #   build the pinned Lean REPL (git-ignored vendor/)
     └── domains/
         ├── base.py            # the Domain interface
         ├── hex/               # the p₆ domain (original HexForge content)
@@ -116,12 +123,72 @@ if ((is_tree) and (n >= 10)), then (m >= 9)
 if ((not_bipartite)), then (chi >= 3)
 ```
 
+### Core training environment (v1.3)
+
+Beyond generating conjectures, PolyForge ships its own **executable RL
+environment** (`PolyForge/env/`) so the record can be used to train and evaluate
+theorem-proving models directly. The tooling is domain-agnostic; v1.3 wires up
+the **graph** domain only (the hex domain's Inventory uses `sorry`-as-axiom
+placeholders, so its theorems cannot pass the standard-axioms check). Scoring
+matches openai-math: a proof earns **reward 1** iff its statement is exactly the
+reference statement, the Lean kernel accepts it, and it depends only on the
+standard axioms (`propext`, `Quot.sound`, `Classical.choice`); otherwise 0.
+
+- **Task format** (`env/tasks.py`). Each record becomes a task with a stable
+  `task_id` (`graph-<12 hex>`, the hash of the name-neutralised, whitespace-
+  normalised Lean statement — so the same statement always gets the same id), a
+  fixed `lean_header` + `lean_statement` (ending in `:= by`), the `reference_proof`
+  (the tactic block after `by`), the natural-language proof, a difficulty tier
+  (hardness tertiles), a `skeleton` (property premises + constant-free premise
+  shapes + canonical-conclusion variable set and direction), and a `train`/`test`
+  split.
+- **Verifier** (`env/verifier.py`). A submission is *only* the proof; the verifier
+  prepends the fixed header and statement so the statement cannot be altered. It
+  runs a resident Lean REPL (leanprover-community/repl, tag `v4.34.0`) that loads
+  Mathlib + `GraphLemmas` once and reuses that environment for every submission,
+  with multiple processes in parallel and automatic restart/crash-recovery.
+  Layered anti-cheating, any failing layer ⇒ reward 0: a **static** scan (no
+  top-level commands, `set_option`, `sorry`/`admit`, `#`-commands), a
+  **compile** check under configurable `maxHeartbeats` and a wall-clock timeout,
+  an **environment diff** (the proof may add only the target theorem and its
+  auto-generated, name-prefixed helpers), an elaborated-**type** match against the
+  cached reference statement, and an **axiom** check (standard axioms only).
+- **Reward** (`env/reward.py`). `reward_fn(task_ids, completions)` for TRL/verl:
+  it extracts the proof from the **last** ```` ```lean ```` block of each
+  completion (dropping a leading `by`; no block ⇒ reward 0), then calls the
+  batched verifier.
+- **Evaluation** (`env/evaluate.py`). pass@1 and pass@k (unbiased estimator) over
+  a `predictions.jsonl`, broken down by difficulty and split, with a status
+  distribution.
+- **Export** (`env/export.py`). `python -m PolyForge.env.export graph --out <dir>`
+  writes `tasks.jsonl`, `train.jsonl`, `test.jsonl`, an SFT file `sft_train.jsonl`,
+  `metadata.json`, and a `README.md`. The train/test split groups by skeleton (no
+  skeleton straddles the split) and sends a whole group to test with a probability
+  set by its hardest tier (hard 0.4, medium 0.2, easy 0.1), decided by the skeleton
+  hash so the split is reproducible.
+
+Build the REPL once with `PolyForge/env/setup_repl.sh` (it pins the repl commit and
+the `v4.34.0` toolchain used by the graph Lean project). Example:
+
+```bash
+bash PolyForge/env/setup_repl.sh
+python -m PolyForge.env.export graph --out /tmp/polyforge_graph_env
+python -m PolyForge.env.verifier graph --task <task_id> --proof proof.lean
+python -m PolyForge.env.evaluate graph predictions.jsonl --nprocs 2
+```
+
+Natural-language proofs now end at the displayed statement: when the generation
+form differs from the displayed form, the markdown and JSON `proof.steps` carry
+the final identity-rewrite step (re-rendered records are tagged
+`"rendered_with": "1.3"`).
+
 ### Versioning
 
 Each major version has eight minor versions, x.0 through x.7, after which the major version increments: 0.0 → … → 0.7 → 1.0 → … → 1.7 → 2.0 → … → 2.7. A third component (e.g. 0.6.1) marks a patch within a minor version.
 
 ### Changelog
 
+- **v1.3** — Core training environment: stable task format, batched Lean verifier with layered anti-cheating checks (fixed statement, environment diff, elaborated type match, standard axioms only, heartbeat limits), RL reward function, pass@k evaluation, skeleton-based train/test split, SFT export; natural-language proofs now end at the displayed statement.
 - **v1.2.2** — Canonical forms modulo active identities (Gallai, tree, regular) for deduplication and all filters, shortest equivalent form displayed; degeneracy check with full deductive power; relational premises restricted to naturally comparable pairs; diameter and cycle bounds added.
 - **v1.2.1** — Fixed premise minimization and term dropping (a dropped term must still imply the original conclusion); always-true premises rejected at sampling; added n ≤ α·χ, Turán/Mantel bounds with a triangle-free case split, ω ≤ Δ + 1. (Diameter and cycle bounds were deferred here and added in v1.2.2.)
 - **v1.2** — Graph domain stage 2a: products as auxiliary variables with McCormick envelopes and a new product inference step; handshake-based degree bounds, edge bounds, bipartite edge bound; linear derivability excludes products; degenerate-premise filter.

@@ -688,5 +688,6 @@
   "lean": {
     "theorem_name": "C76",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

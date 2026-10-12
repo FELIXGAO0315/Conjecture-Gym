@@ -1384,5 +1384,6 @@
   "lean": {
     "theorem_name": "C51",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

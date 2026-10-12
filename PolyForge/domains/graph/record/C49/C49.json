@@ -198,5 +198,6 @@
   "lean": {
     "theorem_name": "C49",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

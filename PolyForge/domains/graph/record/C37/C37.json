@@ -212,5 +212,6 @@
   "lean": {
     "theorem_name": "C37",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

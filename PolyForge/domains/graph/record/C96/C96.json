@@ -356,5 +356,6 @@
   "lean": {
     "theorem_name": "C96",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

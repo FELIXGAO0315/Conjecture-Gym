@@ -232,5 +232,6 @@
   "lean": {
     "theorem_name": "C86",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

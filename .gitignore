@@ -1,3 +1,7 @@
 .lake/
 __pycache__/
 *.pyc
+# vendored Lean REPL build (rebuilt via PolyForge/env/setup_repl.sh; commit pinned there)
+PolyForge/env/vendor/
+# exported RL environment artifacts (written outside the repo via --out; ignore if placed inside)
+PolyForge/env/export_out/

@@ -976,6 +976,27 @@
             ]
           }
         ]
+      },
+      {
+        "fid": 50,
+        "rule": "identity_rewrite",
+        "text": "3*alpha >= -2*chi + 11",
+        "coeffs": {
+          "alpha": 3,
+          "chi": 2
+        },
+        "rel": ">=",
+        "rhs": 11,
+        "tactic": "linarith",
+        "deps": [
+          1
+        ],
+        "identities": [
+          "gallai",
+          "regular"
+        ],
+        "identities_human": "the Gallai identity `alpha + tau = n`; the regular-degree identities `2*m = d*n` and `max_deg = min_deg = d`",
+        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`; the regular-degree identities `2*m = d*n` and `max_deg = min_deg = d`."
       }
     ]
   },
@@ -1008,5 +1029,6 @@
   "lean": {
     "theorem_name": "C90",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

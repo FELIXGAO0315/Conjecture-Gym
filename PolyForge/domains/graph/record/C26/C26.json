@@ -323,6 +323,26 @@
             ]
           }
         ]
+      },
+      {
+        "fid": 17,
+        "rule": "identity_rewrite",
+        "text": "chi >= -alpha + 4",
+        "coeffs": {
+          "alpha": 1,
+          "chi": 1
+        },
+        "rel": ">=",
+        "rhs": 4,
+        "tactic": "linarith",
+        "deps": [
+          1
+        ],
+        "identities": [
+          "gallai"
+        ],
+        "identities_human": "the Gallai identity `alpha + tau = n`",
+        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`."
       }
     ]
   },
@@ -355,5 +375,6 @@
   "lean": {
     "theorem_name": "C26",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

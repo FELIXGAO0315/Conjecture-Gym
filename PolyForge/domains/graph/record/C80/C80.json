@@ -200,5 +200,6 @@
   "lean": {
     "theorem_name": "C80",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

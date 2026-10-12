@@ -249,5 +249,6 @@
   "lean": {
     "theorem_name": "C92",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

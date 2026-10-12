@@ -183,5 +183,6 @@
   "lean": {
     "theorem_name": "C30",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

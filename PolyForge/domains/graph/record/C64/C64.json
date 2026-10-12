@@ -213,5 +213,6 @@
   "lean": {
     "theorem_name": "C64",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

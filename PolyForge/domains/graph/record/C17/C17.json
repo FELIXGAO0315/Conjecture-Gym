@@ -364,5 +364,6 @@
   "lean": {
     "theorem_name": "C17",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

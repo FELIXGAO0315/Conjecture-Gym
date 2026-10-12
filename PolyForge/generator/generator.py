@@ -214,6 +214,10 @@ def _steps_md(steps: list, depth: int) -> list:
                              for (v, k, b, _d) in s.get("prod_factors", []))
             lines.append(f"{ind}- Product step (`mul_nonneg`) on {pv} "
                          f"from ({facs}): `{s['text']}`.")
+        elif rule == "identity_rewrite":
+            ids = s.get("identities_human", "the active Inventory identities")
+            lines.append(f"{ind}- Rewrite the proven form to the displayed conclusion "
+                         f"using {ids} (`linarith`): `{s['text']}`.")
         elif rule == "case_split":
             lines.append(f"{ind}- Case split (`by_cases`) on "
                          f"`{s['split_var']}` at threshold {s['split_threshold']}: "

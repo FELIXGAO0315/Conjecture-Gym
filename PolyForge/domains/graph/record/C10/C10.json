@@ -378,5 +378,6 @@
   "lean": {
     "theorem_name": "C10",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

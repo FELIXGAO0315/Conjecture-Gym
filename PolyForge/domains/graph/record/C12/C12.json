@@ -216,5 +216,6 @@
   "lean": {
     "theorem_name": "C12",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

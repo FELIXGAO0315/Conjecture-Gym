@@ -500,5 +500,6 @@
   "lean": {
     "theorem_name": "C56",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

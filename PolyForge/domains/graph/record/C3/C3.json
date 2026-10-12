@@ -283,5 +283,6 @@
   "lean": {
     "theorem_name": "C3",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

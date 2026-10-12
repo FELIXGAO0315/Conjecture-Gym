@@ -453,5 +453,6 @@
   "lean": {
     "theorem_name": "C84",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

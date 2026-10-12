@@ -695,6 +695,27 @@
             ]
           }
         ]
+      },
+      {
+        "fid": 35,
+        "rule": "identity_rewrite",
+        "text": "2*min_deg <= -2*n + 5*alpha + 2",
+        "coeffs": {
+          "alpha": -5,
+          "min_deg": 2,
+          "n": 2
+        },
+        "rel": "<=",
+        "rhs": 2,
+        "tactic": "linarith",
+        "deps": [
+          1
+        ],
+        "identities": [
+          "gallai"
+        ],
+        "identities_human": "the Gallai identity `alpha + tau = n`",
+        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`."
       }
     ]
   },
@@ -727,5 +748,6 @@
   "lean": {
     "theorem_name": "C23",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }

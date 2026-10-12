@@ -1857,6 +1857,126 @@ def main_commit_check(prop, committed, snapshot, pool):
     return True, None
 
 
+# ── v1.3 §I: displayed-form bridging step for md / json proof rendering ───────
+# The proof steps derive the *generation* form; the recorded statement shows the
+# *displayed* form.  When the two differ (an active Inventory identity rewrites the
+# conclusion — Gallai α+τ=n, the tree identity, the regular-degree identities), the
+# Lean proof closes the gap with one extra linear-combination step over the identity
+# wrappers.  Prior to v1.3 that step was absent from the markdown proof and the JSON
+# ``proof.steps`` (they ended at the generation form), so a reader saw "statement is
+# A, proof derives B".  These helpers append the missing step so the rendered proof
+# ends exactly at the displayed statement.  The reasoning/filtering pipeline is
+# unchanged; this is purely a rendering fix.
+RENDERED_WITH = "1.3"
+
+
+def _max_fid(steps) -> int:
+    m = 0
+    for s in steps:
+        m = max(m, int(s["fid"]))
+        if s.get("rule") == "case_split":
+            for cse in s["cases"]:
+                m = max(m, _max_fid(cse["steps"]))
+    return m
+
+
+def _affine_key(coeffs, rel, rhs):
+    """Normalise ``Σ coeffs·v REL rhs`` to a canonical (coprime, ``>=``-oriented)
+    key so two inequalities are compared up to scaling and orientation."""
+    c = {v: int(x) for v, x in coeffs.items() if int(x) != 0}
+    rhs = int(rhs)
+    if rel == "<=":
+        c = {v: -x for v, x in c.items()}
+        rhs = -rhs
+        rel = ">="
+    g = 0
+    for x in c.values():
+        g = gcd(g, abs(x))
+    g = gcd(g, abs(rhs))
+    if g > 1:
+        c = {v: x // g for v, x in c.items()}
+        rhs //= g
+    return (tuple(sorted(c.items())), rel, rhs)
+
+
+def _identities_for(props):
+    """The active Inventory identities the Lean proof introduces when closing to
+    the displayed form (Gallai always; tree / regular when premised)."""
+    names = {p["name"] for p in props}
+    ids = [("gallai", "the Gallai identity `alpha + tau = n`")]
+    if "is_tree" in names:
+        ids.append(("tree", "the tree identity `m = n - 1`"))
+    if "is_regular" in names:
+        ids.append(("regular",
+                    "the regular-degree identities `2*m = d*n` and `max_deg = min_deg = d`"))
+    return ids
+
+
+def _bridging_step(proof_steps, disp_concl, props, disp_text):
+    """Return the identity-rewrite step bridging the proven (generation) form to
+    the displayed conclusion, or ``None`` if the two already coincide."""
+    if not proof_steps:
+        return None
+    last = proof_steps[-1]
+    if last.get("rule") == "identity_rewrite":       # already bridged — recompute afresh
+        return None
+    gen_rel = last.get("rel")
+    if gen_rel == "==":
+        return None
+    gen_coeffs = {v: int(c) for v, c in last.get("coeffs", {}).items()}
+    gen_rhs = -int(last.get("const", 0))
+    gen_key = _affine_key(gen_coeffs, gen_rel, gen_rhs)
+    disp_key = _affine_key(disp_concl["coeffs"], disp_concl["rel"], disp_concl["rhs"])
+    if gen_key == disp_key:
+        return None
+    ids = _identities_for(props)
+    human = "; ".join(h for _, h in ids)
+    return {
+        "fid": _max_fid(proof_steps) + 1,
+        "rule": "identity_rewrite",
+        "text": disp_text,
+        "coeffs": {v: int(c) for v, c in disp_concl["coeffs"].items() if int(c) != 0},
+        "rel": disp_concl["rel"],
+        "rhs": int(disp_concl["rhs"]),
+        "tactic": "linarith",
+        "deps": [int(last["fid"])],
+        "identities": [n for n, _ in ids],
+        "identities_human": human,
+        "note": f"Rewrite the proven form to the displayed conclusion using {human}.",
+    }
+
+
+def rerender_record(data):
+    """v1.3 §I.3: re-render an existing record's markdown/JSON proof steps and
+    natural-language statement to end at the displayed form, without touching the
+    proposition or the Lean file.  Mutates and returns ``data``; sets
+    ``rendered_with``.  Idempotent."""
+    cj = data["conjecture"]
+    props = cj.get("properties_premises", [])
+    numeric = cj.get("numeric_premises", [])
+    primary = data.get("primary_var")
+    concl = cj["conclusion"]
+    disp_concl = {"coeffs": {k: int(v) for k, v in concl["coeffs"].items()},
+                  "rel": concl["rel"], "rhs": int(concl["rhs"])}
+    # §I.2: keep natural_language consistent with the displayed form.
+    cj["natural_language"] = natural_language(props, numeric, disp_concl, primary)
+    # §I.1: append/refresh the displayed-form bridging step.
+    apply_bridging(data["proof"]["steps"], disp_concl, props, concl["text"])
+    data["rendered_with"] = RENDERED_WITH
+    return data
+
+
+def apply_bridging(steps, disp_concl, props, disp_text):
+    """Mutate ``steps`` in place so the proof ends at the displayed form: drop any
+    stale top-level bridging step, then append a fresh one when needed.  Idempotent."""
+    while steps and steps[-1].get("rule") == "identity_rewrite":
+        steps.pop()
+    br = _bridging_step(steps, disp_concl, props, disp_text)
+    if br is not None:
+        steps.append(br)
+    return steps
+
+
 # ── record assembly ───────────────────────────────────────────────────────────
 def assemble_data(proposal, target, supersedes):
     props, numeric = proposal["props"], proposal["numeric"]
@@ -1867,10 +1987,16 @@ def assemble_data(proposal, target, supersedes):
     disp, prim = display_conclusion(disp_internal, primary)
     canon = proposal.get("canonical", disp_internal)
     canon_disp, canon_prim = display_conclusion(canon, None)
+    disp_text = _render_isolated(disp, prim)
+    # v1.3 §I: make the rendered proof end at the displayed conclusion.
+    steps = proposal["tb"]
+    apply_bridging(steps, {"coeffs": disp["coeffs"], "rel": disp["rel"], "rhs": disp["rhs"]},
+                   props, disp_text)
     return {
         "id": target,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "generator": {"version": GENERATOR_VERSION, "seed": proposal["seed"]},
+        "rendered_with": RENDERED_WITH,
         "conjecture": {
             "formula": formula_string(props, numeric, disp_internal, primary),
             "properties_premises": [{"name": p["name"], **({"param": p["param"]} if "param" in p else {})} for p in props],

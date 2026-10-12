@@ -199,5 +199,6 @@
   "lean": {
     "theorem_name": "C8",
     "status": "compiled"
-  }
+  },
+  "rendered_with": "1.3"
 }
