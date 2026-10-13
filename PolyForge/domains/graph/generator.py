@@ -45,7 +45,7 @@ DATA = ROOT / "data" / "graph_pool.json"
 RECORD = ROOT / "record"
 LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "1.4"
+GENERATOR_VERSION = "1.4.1"
 MAIN_COEFFS = (1, 2)          # main-variable coefficient
 # v1.2 §III.5: other-term coefficients widened to |·| ≤ 3 so conclusions like
 # 2m ≥ 3n (handshake under min_deg ≥ 3) can be expressed.
@@ -1674,32 +1674,146 @@ def _entailed_prem(constraints, pr):
             and _entailed_prem(constraints, {"coeffs": pr["coeffs"], "rel": "<=", "rhs": pr["rhs"]}))
 
 
-def is_redundant_vs_records(pset, numeric, conclusion, records, exclude_skeleton=None):
-    """A new conjecture is redundant if some existing record E — whose premises are
-    implied by the new premises (properties ⊆ closure, numeric LP-entailed) — plus
-    the Inventory derive the new conclusion with NO case split (linear + rounding)."""
-    base = _premise_forms(numeric) + _unconditional_forms()
-    base += _triggerable_conditionals(base)
-    d0 = {v: int(c) for v, c in conclusion["coeffs"].items() if int(c) != 0}
-    for E in records:
-        if exclude_skeleton is not None and E.get("_skeleton") == exclude_skeleton:
-            continue
-        cj = E["conjecture"]
-        eprops = [p["name"] for p in cj.get("properties_premises", [])]
-        if not set(eprops).issubset(pset):
-            continue
-        enum = cj.get("numeric_premises", [])
-        if not all(_entailed_prem(base, pr) for pr in enum):
-            continue
-        econcl = cj["conclusion"]
-        extra = list(numeric) + [{"coeffs": {k: int(v) for k, v in econcl["coeffs"].items()},
-                                  "rel": econcl["rel"], "rhs": int(econcl["rhs"])}]
-        ctx = Context(premises=extra, depth=0, use_conditional_split=False, use_bnb=False,
-                      use_lemmas=False, extra_directions=[d0, _neg(d0)])
-        ctx.saturate()
-        if _find_fact(ctx, conclusion) is not None:
-            return True
-    return False
+# ── v1.4.1 §I: restricted redundancy criterion (linear combination + rounding) ─
+# v1.4 let the redundancy judgment use products / McCormick envelopes / product facts
+# — exactly the reasoning generation treats as NON-trivial (a conjecture is
+# ``product_needed`` precisely because it needs a product).  That inconsistency made
+# every one-product, no-split conjecture "Inventory-derivable", so each was deleted as
+# soon as a premise-compatible record appeared — deleting the most valuable facts
+# (``min_deg ≥ 3 ⟹ 2m ≥ 3n``, ``is_bipartite ⟹ n ≤ 2α``, …).  v1.4.1 makes the
+# judgment RESTRICTED: linear combination and integer rounding only, over the linear
+# Inventory (NO product variables / facts, NO Turán-style product conditional, NO case
+# split, NO branch-and-bound) plus the existing records' conclusions — consistent with
+# how products are valued at generation.  Premise implication uses the same restriction.
+# The SAME function serves the forward check, reverse pruning and the basis audit (§I.5).
+_PRODUCT_VAR_SET = set(DED.PRODUCT_VARS)
+
+
+def _has_product(coeffs):
+    return any(v in _PRODUCT_VAR_SET for v in coeffs)
+
+
+class _restricted_inventory:
+    """Context manager installing the linear-only view of the currently-active
+    inventory (§I.1): linear Inventory facts and linear conditional theorems only — no
+    product facts, no product-variable facts/conditionals (e.g. Turán via ``N2``).
+    ``DED.set_active_inventory(pset, params)`` must have been called first."""
+    def __enter__(self):
+        self._saved = (DED.INVENTORY, DED.PRODUCT_FACTS,
+                       DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME)
+        lin = [e for e in DED.INVENTORY if not _has_product(e["conclusion"]["coeffs"])]
+        cond = [e for e in DED.CONDITIONAL_THEOREMS
+                if not _has_product(e["conclusion"]["coeffs"])
+                and not _has_product(e["hypothesis"]["coeffs"])]
+        DED.INVENTORY = lin
+        DED.PRODUCT_FACTS = []
+        DED.CONDITIONAL_THEOREMS = cond
+        DED.INVENTORY_BY_NAME = {e["name"]: e for e in (lin + cond)}
+        return self
+
+    def __exit__(self, *a):
+        (DED.INVENTORY, DED.PRODUCT_FACTS,
+         DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME) = self._saved
+        return False
+
+
+def _restricted_derive(numeric, goal, extra_facts):
+    """Within the installed restricted inventory, is ``goal`` ({coeffs, rel '>=', rhs})
+    derivable from the ``numeric`` premises, the ``extra_facts`` (``[(tag, concl), …]``)
+    and the linear Inventory by linear combination + rounding only (no case split, no
+    products)?  Returns the list of ``extra_facts`` tags actually used (possibly empty),
+    or ``None`` if not derivable."""
+    d0 = {v: int(c) for v, c in goal["coeffs"].items() if int(c) != 0}
+    if not d0:
+        return None
+    extra = [dict(pr) for pr in numeric]
+    tags = []
+    for (tag, concl) in extra_facts:
+        extra.append({"coeffs": {k: int(v) for k, v in concl["coeffs"].items()},
+                      "rel": concl["rel"], "rhs": int(concl["rhs"]), "text": tag})
+        tags.append(tag)
+    ctx = Context(premises=extra, depth=0, use_conditional_split=False, use_bnb=False,
+                  use_lemmas=False, extra_directions=[d0, _neg(d0)])
+    ctx.saturate()
+    fact = _find_fact(ctx, goal)
+    if fact is None:
+        return None
+    used = {s.get("note", "") for s in traceback(ctx, fact) if s.get("rule") == "premise"}
+    return [t for t in tags if t in used]
+
+
+def _restricted_entails(numeric, pr):
+    """Restricted premise implication (§I.3): does ``numeric`` + the restricted Inventory
+    derive premise ``pr`` by linear combination + rounding (no products)?  The restricted
+    inventory must be installed."""
+    ge = _as_ge_goal(pr)
+    if ge is not None:
+        return _restricted_derive(numeric, ge, []) is not None
+    g1 = {"coeffs": dict(pr["coeffs"]), "rel": ">=", "rhs": pr["rhs"]}
+    g2 = {"coeffs": {v: -c for v, c in pr["coeffs"].items()}, "rel": ">=", "rhs": -pr["rhs"]}
+    return (_restricted_derive(numeric, g1, []) is not None
+            and _restricted_derive(numeric, g2, []) is not None)
+
+
+_IMPL_CACHE = {}        # (premkey(A), premkey(B)) -> bool : A's premises imply B's (restricted)
+
+
+def clear_impl_cache():
+    _IMPL_CACHE.clear()
+
+
+def _premises_imply(A, B):
+    """True if view ``A``'s premises imply view ``B``'s premises under the restricted
+    criterion (property-closure subset + restricted numeric entailment).  §II: cached by
+    the content-based premise keys, so the result is reused across commits and is
+    identical with or without the cache."""
+    if not {p["name"] for p in B["props"]}.issubset(A["pset"]):
+        return False
+    key = (premise_key(A["props"], A["numeric"]), premise_key(B["props"], B["numeric"]))
+    hit = _IMPL_CACHE.get(key)
+    if hit is not None:
+        return hit
+    DED.set_active_inventory(A["pset"], A["params"])
+    with _restricted_inventory():
+        ok = all(_restricted_entails(A["numeric"], pr) for pr in B["numeric"])
+    _IMPL_CACHE[key] = ok
+    return ok
+
+
+def _redundant_restricted(S, candidates):
+    """Unified restricted redundancy test (§I.4).  ``S`` is the view under test;
+    ``candidates`` are the other record views.  Step 1: if S's conclusion is derivable
+    from S's premises + the restricted Inventory ALONE, S is NOT redundant (generation
+    already classified it — linear → discarded, rounding → supplement).  Step 2: add the
+    records whose premises S's premises imply; if S's conclusion is then derivable, S is
+    redundant (it genuinely needs an existing record).  Returns
+    ``(is_redundant, [used_record_id, …])``; S itself never participates."""
+    avail_views = [E for E in candidates if E["id"] != S["id"] and _premises_imply(S, E)]
+    DED.set_active_inventory(S["pset"], S["params"])
+    with _restricted_inventory():
+        if _restricted_derive(S["numeric"], S["canon"], []) is not None:
+            return (False, [])                       # step 1: Inventory alone suffices
+        if not avail_views:
+            return (False, [])
+        avail = [(f"__REC__{E['id']}", E["disp"]) for E in avail_views]
+        used = _restricted_derive(S["numeric"], S["canon"], avail)
+    if used is None:
+        return (False, [])
+    return (True, [t[len("__REC__"):] for t in used])
+
+
+def is_redundant_vs_records(props, numeric, conclusion, records, exclude_skeleton=None):
+    """Forward redundancy check (§I.5, restricted criterion): the new conjecture (property
+    premises ``props``, numeric premises ``numeric``, canonical ``conclusion``) is redundant
+    iff — by linear combination + rounding only — it is NOT derivable from the Inventory
+    alone but IS derivable once the premise-compatible existing ``records`` are added."""
+    pset = property_closure({p["name"] for p in props})
+    params = {p["name"]: p.get("param") for p in props if "param" in p}
+    S = {"id": None, "props": props, "pset": pset, "params": params,
+         "numeric": numeric, "canon": conclusion, "disp": conclusion}
+    cands = [_record_premise_view(E) for E in records
+             if not (exclude_skeleton is not None and E.get("_skeleton") == exclude_skeleton)]
+    return _redundant_restricted(S, cands)[0]
 
 
 # ── v1.4 §I: reverse pruning — keep the record a non-redundant basis ──────────
@@ -1733,85 +1847,28 @@ def _record_premise_view(data):
             "numeric": numeric, "disp": disp, "canon": canon}
 
 
-def _reverse_derive(S_numeric, S_canon, avail):
-    """Can S's canonical conclusion be derived — with NO case split (depth 0:
-    linear combination + rounding + product envelopes), consistent with the forward
-    redundancy check — from S's numeric premises, the conclusions of the ``avail``
-    records and the Inventory?  The active inventory must already be set to S's
-    property closure.  Returns the list of ``avail`` record ids actually used in the
-    derivation (possibly empty if the Inventory alone suffices), or ``None`` if S is
-    not derivable."""
-    d0 = {v: int(c) for v, c in S_canon["coeffs"].items() if int(c) != 0}
-    if not d0 or not avail:
-        # No qualifying records ⇒ not redundant, matching ``is_redundant_vs_records``
-        # (with an empty record it returns False: redundancy always needs ≥1 other
-        # record whose premises are implied by S's).
-        return None
-    extra = [dict(pr) for pr in S_numeric]
-    tags = []
-    for (eid, concl) in avail:
-        tag = f"__REC__{eid}"
-        extra.append({"coeffs": {k: int(v) for k, v in concl["coeffs"].items()},
-                      "rel": concl["rel"], "rhs": int(concl["rhs"]), "text": tag})
-        tags.append((eid, tag))
-    ctx = Context(premises=extra, depth=0, use_conditional_split=False, use_bnb=False,
-                  use_lemmas=False, extra_directions=[d0, _neg(d0)])
-    ctx.saturate()
-    fact = _find_fact(ctx, S_canon)
-    if fact is None:
-        return None
-    tb = traceback(ctx, fact)
-    used_notes = set()
-
-    def collect(steps):
-        for s in steps:
-            if s.get("rule") == "premise":
-                used_notes.add(s.get("note", ""))
-            elif s.get("rule") == "case_split":
-                for cse in s["cases"]:
-                    collect(cse["steps"])
-
-    collect(tb)
-    return [eid for (eid, tag) in tags if tag in used_notes]
-
-
 def _reverse_prune_targets(new_data, records):
     R = _record_premise_view(new_data)
     views = [_record_premise_view(d) for d in records]
-    R_names = {p["name"] for p in R["props"]}
     victims = []
     for S in views:
         if S["id"] == R["id"]:
             continue
-        # §I guard: only examine S when R is relevant — R's premises are implied by
-        # S's premises (cheap property-subset test first, then numeric entailment).
-        if not R_names.issubset(S["pset"]):
+        # §I guard: only examine S when R is usable under S — S's premises imply R's
+        # (restricted premise implication; cached).  Skips most S before any derivation.
+        if not _premises_imply(S, R):
             continue
-        DED.set_active_inventory(S["pset"], S["params"])
-        base_S = _premise_forms(S["numeric"]) + _unconditional_forms()
-        base_S += _triggerable_conditionals(base_S)
-        if not all(_entailed_prem(base_S, pr) for pr in R["numeric"]):
-            continue
-        # available = {R} ∪ {records (≠ S) whose premises are implied by S's premises}
-        avail = []
-        for E in views:
-            if E["id"] == S["id"]:
-                continue
-            if not {p["name"] for p in E["props"]}.issubset(S["pset"]):
-                continue
-            if not all(_entailed_prem(base_S, pr) for pr in E["numeric"]):
-                continue
-            avail.append((E["id"], E["disp"]))
-        used = _reverse_derive(S["numeric"], S["canon"], avail)
-        if used is not None:
+        red, used = _redundant_restricted(S, views)
+        if red:
             victims.append((S["id"], used))
     return victims
 
 
 def reverse_prune_targets(new_data, records):
     """Records in ``records`` (the full current record, INCLUDING ``new_data``) made
-    redundant by ``new_data`` — ``[(victim_id, [used_record_id, …]), …]``.  Rebuilds
-    the active inventory per candidate and restores the caller's afterwards."""
+    redundant by ``new_data`` under the restricted criterion (§I) —
+    ``[(victim_id, [used_record_id, …]), …]``.  Rebuilds the active inventory per
+    candidate and restores the caller's afterwards."""
     saved = (DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME)
     try:
         return _reverse_prune_targets(new_data, records)
@@ -1820,30 +1877,17 @@ def reverse_prune_targets(new_data, records):
 
 
 def basis_redundant(records):
-    """§V.1 completeness audit: every record derivable (no case split) from the OTHER
-    records whose premises are implied by its own, plus the Inventory.  Returns
-    ``[(record_id, [used_ids]), …]`` — the redundant records that must be pruned.  Uses
-    the same depth-0 criterion as reverse pruning (``_reverse_derive`` treats an empty
-    qualifying set as not-redundant, matching ``is_redundant_vs_records``)."""
+    """§V.1 completeness audit (restricted criterion): every record that is redundant —
+    derivable by linear combination + rounding from the OTHER records whose premises its
+    own premises imply, plus the linear Inventory, while NOT derivable from the Inventory
+    alone.  Returns ``[(record_id, [used_ids]), …]``."""
     saved = (DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME)
     try:
         views = [_record_premise_view(d) for d in records]
         out = []
         for S in views:
-            DED.set_active_inventory(S["pset"], S["params"])
-            base_S = _premise_forms(S["numeric"]) + _unconditional_forms()
-            base_S += _triggerable_conditionals(base_S)
-            avail = []
-            for E in views:
-                if E["id"] == S["id"]:
-                    continue
-                if not {p["name"] for p in E["props"]}.issubset(S["pset"]):
-                    continue
-                if not all(_entailed_prem(base_S, pr) for pr in E["numeric"]):
-                    continue
-                avail.append((E["id"], E["disp"]))
-            used = _reverse_derive(S["numeric"], S["canon"], avail)
-            if used is not None:
+            red, used = _redundant_restricted(S, views)
+            if red:
                 out.append((S["id"], used))
         return out
     finally:
@@ -2141,7 +2185,7 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             continue
         skel = conjecture_skeleton(c_props, c_numeric, canon)
         # §V logical-redundancy pre-check against the run-start snapshot (canonical)
-        if is_redundant_vs_records(c_pset, c_numeric, canon, _W_SNAPSHOT_RECORDS):
+        if is_redundant_vs_records(c_props, c_numeric, canon, _W_SNAPSHOT_RECORDS):
             stats["redundant_vs_record"] += 1
             continue
         tb = traceback(ctx_m, fact)
@@ -2363,7 +2407,7 @@ def main_commit_check(prop, committed, snapshot, pool):
             return False, "instance_family_duplicate"
     # §V main re-check: redundancy vs this-run records (excluding a same-skeleton one)
     recs = [c["data"] for c in committed if c["skeleton"] != prop["skeleton"]]
-    if is_redundant_vs_records(pset, prop["numeric"], canon, recs):
+    if is_redundant_vs_records(prop["props"], prop["numeric"], canon, recs):
         return False, "redundant_vs_record_main"
     # §VI Dalmatian significance vs all existing (snapshot + this-run); canonical form
     existing = list(snapshot) + [c["data"] for c in committed]

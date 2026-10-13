@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## PolyForge (v1.4)
+## PolyForge (v1.4.1)
 
 PolyForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about a mathematical subject, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -96,24 +96,25 @@ processes but results are consumed in strict premise-index order, so the record
 is independent of the worker count. When both `N` and `--minutes M` are given the
 run stops at whichever comes first (target `N` reached or budget `M` elapsed).
 
-**Reproducible multi-segment production run (v1.4).** The graph record is built by a
-sequence of segments with fixed seeds, each targeting 120 records with a 120-minute cap:
+**Reproducible multi-segment production run (v1.4.1).** The graph record is built by a
+sequence of segments with fixed seeds, each targeting 80 records with a 150-minute cap:
 
 ```bash
-python -m run polyforge graph 120 --minutes 120 --seed 2024   # segment 1 (record cleared first)
-python -m run polyforge graph 120 --minutes 120 --seed 2025   # segment 2 (accumulates), …
+python -m run polyforge graph 80 --minutes 150 --seed 2024   # segment 1 (record cleared first)
+python -m run polyforge graph 80 --minutes 150 --seed 2025   # segment 2 (accumulates), …
 ```
 
 Seeds run `2024, 2025, 2026, …`. The first segment starts from an empty record; each later
 segment accumulates on the previous one's record. Because commits (and reverse pruning)
 happen in the main process in premise-index order, a segment's content depends only on its
 seed and the earlier segments' results — **not** on machine speed — *unless* the segment
-hits its 120-minute cap, in which case its content does depend on speed. A driver
-(`run_production.py`, kept outside the repo) backs up the record before each segment,
-records per-segment statistics in `progress.json`, resumes from the first unfinished
-segment after an interruption (restoring the segment's pre-run backup and re-running it),
-and stops early once a segment hits the time limit or its net gain falls below 20% of the
-first segment's (the conjecture space has saturated).
+hits its time cap, in which case its content does depend on speed. A driver (kept outside
+the repo) backs up the record before each segment, records per-segment statistics in
+`progress.json`, and resumes from the first unfinished segment after an interruption
+(restoring the segment's pre-run backup and re-running it). **Stop rule (v1.4.1):** after a
+segment, stop iff its net gain (new writes − reverse-pruned) falls below 20% of the first
+segment's net, **or** two *consecutive* segments hit the time cap. A single time-limited
+segment does not stop the run (a time cap is not by itself evidence of saturation).
 
 ### Axiom base
 
@@ -184,30 +185,48 @@ Two further filters cut low-value graph conjectures:
   graphs remain — essentially a finite enumeration) or `chi ≥ n` (a complete graph,
   whose invariants are all fixed by `n`). The firing condition is recorded.
 
-### Reverse pruning — a non-redundant basis regardless of discovery order (v1.4)
+### Redundancy and reverse pruning — a non-redundant basis (v1.4 / v1.4.1)
 
 The forward logical-redundancy check only compares a **new** conjecture against records
-collected **earlier**, so a redundant conjecture that happens to be recorded *before* the
-cleaner ones that subsume it stays in the record forever. For example
-`is_bipartite ⟹ m ≥ 2n − 3α` (= `τ ≤ m` plus `n ≤ 2α`, via the Gallai identity) becomes
-redundant once both halves are present, but if it was recorded first it is never
-revisited. Over a long run this order-dependent redundancy accumulates.
+collected **earlier**, so a redundant conjecture recorded *before* the cleaner ones that
+subsume it stays in the record forever. **Reverse pruning** closes the gap: after the main
+process commits a new record `R`, every existing record `S` is re-examined and dropped
+(`pruned_by_newer`) when `S` has become redundant now that `R` is present. The check runs
+in the main process in strict commit order (so the record is worker-count-independent),
+and only when `R` is usable under `S` (a cheap, cached premise-implication test filters out
+most `S` first). The **same** redundancy test serves the forward check
+(`redundant_vs_record`), reverse pruning, and the final basis-completeness audit.
 
-**Reverse pruning** closes the gap. After the main process commits a new record `R`, every
-existing record `S` is re-examined and dropped (`pruned_by_newer`) when — now that `R` is
-present — `S`'s conclusion follows, under `S`'s premises and **without a case split**
-(linear combination, integer rounding and product/McCormick envelopes — the *same*
-criterion as the forward redundancy check), from the Inventory together with
-`{R} ∪ {the other records whose premises are implied by S's premises}` (`S` itself never
-participates). The check runs only when `R` is relevant to `S` (`R`'s premises are implied
-by `S`'s), so a cheap premise-implication test filters out most `S` before any solving.
-Reverse pruning runs in the main process in strict commit order, so the record is
-independent of the worker count. Deletions during a run leave gaps in the `C{n}` numbering;
-the record is **renumbered** to a contiguous `C1..Cn` (ascending id order) at the end of
-each run — export `task_id`s are the hash of the name-neutralised Lean statement, so they
-are unaffected. A final **basis-completeness audit** over the whole record guarantees the
-two invariants: no two records share a standard form, and no record is derivable (no case
-split) from the others whose premises are implied by its own, plus the Inventory.
+**Redundancy means derivable from existing records (v1.4.1).** A proposition `S` is
+redundant iff, using **linear combination and integer rounding only** — *no* products,
+McCormick envelopes, product-variable facts (including the Turán conditional), case splits
+or branch-and-bound — `S`'s conclusion is
+
+1. **not** derivable from `S`'s premises and the (linear) Inventory **alone** — if it were,
+   `S` is not redundant: generation already classifies it (linearly derivable ⇒ discarded;
+   rounding ⇒ the supplement tier); **but**
+2. **is** derivable once the conclusions of the existing records whose premises are implied
+   by `S`'s premises are added (`S` itself never participates).
+
+So redundancy requires that an existing record is genuinely *used*. **Premise implication**
+(does `S`'s premises imply `R`'s?) is judged under the same restriction — property-closure
+containment plus linear-combination/rounding entailment, **never** a product.
+
+Why exclude products? Generation treats a product as *non-trivial* reasoning — a conjecture
+is `product_needed` precisely because it needs one. v1.4 let the redundancy judgment use
+products, so every one-product, no-split fact counted as "Inventory-derivable" and was
+deleted as soon as any premise-compatible record appeared — deleting the most valuable
+facts (`min_deg ≥ 3 ⟹ 2m ≥ 3n`, `is_bipartite ⟹ n ≤ 2α`, …). v1.4.1 restores consistency:
+products are non-trivial everywhere, so such facts are kept unless a *record* (not just the
+Inventory) makes them redundant.
+
+Record-to-record premise implications are **cached** (keyed by the content of the premises)
+and reused across commits, so reverse pruning stays cheap as the record grows; the cache is
+a pure memo and never changes the result. Deletions during a run leave gaps in the `C{n}`
+numbering; the record is **renumbered** to a contiguous `C1..Cn` (ascending id order) at the
+end of each run — export `task_id`s are the hash of the name-neutralised Lean statement, so
+they are unaffected. A final **basis-completeness audit** guarantees the two invariants: no
+two records share a standard form, and no record is redundant in the sense above.
 
 ### Core training environment (v1.3)
 
@@ -283,6 +302,7 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v1.4.1** — Redundancy (forward check, reverse pruning, basis audit) now means derivable from existing records by linear combination and rounding only, with premise implication under the same restriction, consistent with how product reasoning is valued at generation time; cached premise implication; production run re-done with a saturation-based stop rule.
 - **v1.4** — Reverse pruning keeps the record a non-redundant basis regardless of discovery order; weakened forms promoted to their cleanest core in one step; reproducible multi-segment production run of the graph domain.
 - **v1.3.2** — Weakened forms (a valid inequality on the same variables plus a single-variable bound) are replaced by their cleaner core, which is re-run through the full pipeline; degeneracy covers n ≤ 4, m ≤ 4, Δ ≤ 1 and complete graphs (χ ≥ n); verifier default capped at 8 processes.
 - **v1.3.1** — Verifier sized by measured unique memory (shared .olean pages no longer double-counted), import configuration benchmarked; one representative per family of single-fact instances; decomposability with coefficient splitting of a shared variable.
