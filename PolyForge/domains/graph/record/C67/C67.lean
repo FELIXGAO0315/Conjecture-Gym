@@ -4,39 +4,83 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C67 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hp1 : ¬ G.IsBipartite) (hp2 : G.IsRegularOfDegree 3) (hn1 : (G.chromaticNumber.toNat : ℤ) ≤ 6) :
-    (G.chromaticNumber.toNat : ℤ) ≥ -(G.indepNum : ℤ) + 5 := by
-  have s1 : (Fintype.card V : ℤ) - (G.maxDegree : ℤ) ≥ 1 := by
-    have hw := max_lt_card_int' G
-    try push_cast at hw
-    linarith [hw]
-  have s2 : (G.chromaticNumber.toNat : ℤ) ≥ 3 := by
-    have hw := not_bipartite_chi_int G hp1
-    try push_cast at hw
-    linarith [hw]
-  have s3 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
-    have hw := card_le_alpha_chi_int G
-    try push_cast at hw
-    linarith [hw]
-  have s4 : (G.indepNum : ℤ) ≥ 1 := by
-    have hw := alpha_ge_one_int' G
-    try push_cast at hw
-    linarith [hw]
-  have s5 : -(G.chromaticNumber.toNat : ℤ) ≥ -6 := by linarith [hn1]
-  have s6 : (G.chromaticNumber.toNat : ℤ) + 6 * (G.indepNum : ℤ) - (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) ≥ 6 := by
-    have hmul : (0 : ℤ) ≤ ((G.indepNum : ℤ) - 1) * (6 - (G.chromaticNumber.toNat : ℤ)) :=
-      mul_nonneg (by linarith [s4]) (by linarith [s5])
-    ring_nf at hmul ⊢
-    linarith [hmul]
-  have s7 : (G.maxDegree : ℤ) = 3 := by
-    have hw := regular_max_int' G hp2
-    try push_cast at hw
-    linarith [hw]
-  have s8 : 6 * (G.maxDegree : ℤ) + 6 * (G.chromaticNumber.toNat : ℤ) + 6 * (G.indepNum : ℤ) ≥ 43 := by linarith [s1, s2, s3, s6, s7]
-  have s9 : (G.maxDegree : ℤ) + (G.chromaticNumber.toNat : ℤ) + (G.indepNum : ℤ) ≥ 8 := by have hr := s8; omega
+theorem C67 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.maxDegree : ℤ) ≤ 6) (hn2 : (G.cliqueNum : ℤ) ≥ 6) :
+    (G.maxDegree : ℤ) ≤ (G.edgeFinset.card : ℤ) - 3 * (G.minDegree : ℤ) + 5 := by
+  have s1 : (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) - 3 * (G.minDegree : ℤ) ≥ -5 := by
+    by_cases hc1 : (21 : ℤ) ≤ (G.edgeFinset.card : ℤ)
+    · -- 1*m >= 21
+      have s2 : (G.maxDegree : ℤ) - (G.minDegree : ℤ) ≥ 0 := by
+        have hw := min_le_max_int G
+        try push_cast at hw
+        linarith [hw]
+      have s3 : (G.edgeFinset.card : ℤ) ≥ 21 := by have hcc := hc1; omega
+      have s4 : -(G.maxDegree : ℤ) ≥ -6 := by linarith [hn1]
+      have s5 : (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) - 3 * (G.minDegree : ℤ) ≥ -3 := by linarith [s2, s3, s4]
+      linarith [s5]
+    · -- 1*m <= 20
+      have s6 : (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) - 3 * (G.minDegree : ℤ) ≥ -5 := by
+        by_cases hc6 : (8 : ℤ) ≤ (Fintype.card V : ℤ)
+        · -- 1*n >= 8
+          have s7 : (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) ≥ 0 := by
+            have hw := max_le_edges_int G
+            try push_cast at hw
+            linarith [hw]
+          have s8 : 2 * (G.edgeFinset.card : ℤ) - (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ 0 := by
+            have hw := handshake_min_int G
+            try push_cast at hw
+            linarith [hw]
+          have s9 : -(G.maxDegree : ℤ) ≥ -6 := by linarith [hn1]
+          have s10 : (G.minDegree : ℤ) ≥ 0 := by positivity
+          have s11 : (Fintype.card V : ℤ) ≥ 8 := by have hcc := hc6; omega
+          have s12 : -8 * (G.minDegree : ℤ) + (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ 0 := by
+            have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 8) * ((G.minDegree : ℤ) - 0) :=
+              mul_nonneg (by linarith [s11]) (by linarith [s10])
+            ring_nf at hmul ⊢
+            linarith [hmul]
+          have s13 : 2 * (G.edgeFinset.card : ℤ) - 2 * (G.maxDegree : ℤ) - 6 * (G.minDegree : ℤ) ≥ -9 := by linarith [s7, s8, s9, s12]
+          have s14 : (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) - 3 * (G.minDegree : ℤ) ≥ -4 := by have hr := s13; omega
+          linarith [s14]
+        · -- 1*n <= 7
+          have s15 : (Fintype.card V : ℤ) - (G.maxDegree : ℤ) ≥ 1 := by
+            have hw := max_lt_card_int' G
+            try push_cast at hw
+            linarith [hw]
+          have s16 : (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) ≥ 0 := by
+            have hw := max_le_edges_int G
+            try push_cast at hw
+            linarith [hw]
+          have s17 : 2 * (G.edgeFinset.card : ℤ) - (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ 0 := by
+            have hw := handshake_min_int G
+            try push_cast at hw
+            linarith [hw]
+          have s18 : (G.minDegree : ℤ) ≥ 0 := by positivity
+          have s19 : (G.cliqueNum : ℤ) ≥ 6 := by linarith [hn2]
+          have s20 : (Fintype.card V : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by
+            have hw := omega_le_card_int G
+            try push_cast at hw
+            linarith [hw]
+          have s21 : (Fintype.card V : ℤ) ≥ 6 := by linarith [s19, s20]
+          have s22 : -6 * (G.minDegree : ℤ) + (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ 0 := by
+            have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 6) * ((G.minDegree : ℤ) - 0) :=
+              mul_nonneg (by linarith [s21]) (by linarith [s18])
+            ring_nf at hmul ⊢
+            linarith [hmul]
+          have s23 : -(Fintype.card V : ℤ) ≥ -7 := by have hcc := hc6; omega
+          have s24 : (G.maxDegree : ℤ) - (G.minDegree : ℤ) ≥ 0 := by
+            have hw := min_le_max_int G
+            try push_cast at hw
+            linarith [hw]
+          have s25 : -(G.maxDegree : ℤ) ≥ -6 := by linarith [hn1]
+          have s26 : -(G.minDegree : ℤ) ≥ -6 := by linarith [s24, s25]
+          have s27 : -6 * (Fintype.card V : ℤ) - 7 * (G.minDegree : ℤ) + (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ -42 := by
+            have hmul : (0 : ℤ) ≤ (7 - (Fintype.card V : ℤ)) * (6 - (G.minDegree : ℤ)) :=
+              mul_nonneg (by linarith [s23]) (by linarith [s26])
+            ring_nf at hmul ⊢
+            linarith [hmul]
+          have s28 : 19 * (G.edgeFinset.card : ℤ) - 19 * (G.maxDegree : ℤ) - 57 * (G.minDegree : ℤ) ≥ -108 := by linarith [s15, s16, s17, s22, s27]
+          have s29 : (G.edgeFinset.card : ℤ) - (G.maxDegree : ℤ) - 3 * (G.minDegree : ℤ) ≥ -5 := by have hr := s28; omega
+          linarith [s29]
+      linarith [s6]
   have heq_gallai := gallai_int G
-  have heq_rege := regular_edges_int G hp2
-  have heq_regx := regular_max_int' G hp2
-  have heq_regn := regular_min_int' G hp2
-  try push_cast at heq_gallai heq_rege heq_regx heq_regn
-  linarith [s9, heq_gallai, heq_rege, heq_regx, heq_regn]
+  try push_cast at heq_gallai
+  linarith [s1, heq_gallai]

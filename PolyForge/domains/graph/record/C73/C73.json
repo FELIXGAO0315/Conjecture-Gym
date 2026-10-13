@@ -1,63 +1,59 @@
 {
   "id": "C73",
-  "created_at": "2026-10-12T20:01:52.161452+00:00",
+  "created_at": "2026-10-12T23:40:29.306696+00:00",
   "generator": {
-    "version": "1.3.2",
-    "seed": 2024006385
+    "version": "1.4",
+    "seed": 2025006574
   },
   "rendered_with": "1.3",
   "conjecture": {
-    "formula": "if ((is_connected) and (chi <= 5)), then (2*min_deg <= 2*m - chi + 2)",
-    "properties_premises": [
-      {
-        "name": "is_connected"
-      }
-    ],
+    "formula": "if ((chi <= 3)), then (2*min_deg <= m + 3*alpha - 2)",
+    "properties_premises": [],
     "numeric_premises": [
       {
-        "text": "chi <= 5",
+        "text": "chi <= 3",
         "coeffs": {
           "chi": 1
         },
         "rel": "<=",
-        "rhs": 5
+        "rhs": 3
       }
     ],
     "conclusion": {
-      "text": "2*min_deg <= 2*m - chi + 2",
+      "text": "2*min_deg <= m + 3*alpha - 2",
       "coeffs": {
-        "chi": 1,
-        "m": -2,
+        "alpha": -3,
+        "m": -1,
         "min_deg": 2
       },
       "rel": "<=",
-      "rhs": 2
-    },
-    "canonical_form": {
-      "text": "2*m >= 2*min_deg + chi - 2",
-      "coeffs": {
-        "min_deg": -2,
-        "chi": -1,
-        "m": 2
-      },
-      "rel": ">=",
       "rhs": -2
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_connected, chi <= 5. Then 2*min_deg <= 2*m - chi + 2."
+    "canonical_form": {
+      "text": "m >= 2*min_deg - 3*alpha + 2",
+      "coeffs": {
+        "min_deg": -2,
+        "alpha": 3,
+        "m": 1
+      },
+      "rel": ">=",
+      "rhs": 2
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose chi <= 3. Then 2*min_deg <= m + 3*alpha - 2."
   },
   "primary_var": "min_deg",
   "dalmatian": "significant",
-  "properties": [
-    "is_connected"
-  ],
+  "properties": [],
   "conclusion_property": null,
   "instance_of": null,
   "promoted_from": null,
   "proof": {
     "inventory_used": [
+      "alpha_ge_one",
+      "card_le_alpha_chi",
       "chi_le_n",
-      "connected_edges",
       "handshake_min",
+      "max_le_edges",
       "max_lt_card",
       "min_le_max",
       "nonneg_min_deg"
@@ -67,13 +63,13 @@
       {
         "fid": 1,
         "rule": "case_split",
-        "text": "2*m + -2*min_deg + -1*chi + 2 >= 0",
+        "text": "1*m + -2*min_deg + 3*alpha + -2 >= 0",
         "coeffs": {
           "min_deg": "-2",
-          "chi": "-1",
-          "m": "2"
+          "alpha": "3",
+          "m": "1"
         },
-        "const": "2",
+        "const": "-2",
         "rel": ">=",
         "tactic": "by_cases",
         "split_var": "chi",
@@ -89,173 +85,6 @@
               {
                 "fid": 2,
                 "rule": "inventory",
-                "text": "1*n + -1*chi >= 0",
-                "coeffs": {
-                  "chi": "-1",
-                  "n": "1"
-                },
-                "const": "0",
-                "rel": ">=",
-                "inventory": "chi_le_n"
-              },
-              {
-                "fid": 3,
-                "rule": "inventory",
-                "text": "-1*n + 1*m + 1 >= 0",
-                "coeffs": {
-                  "m": "1",
-                  "n": "-1"
-                },
-                "const": "1",
-                "rel": ">=",
-                "inventory": "connected_edges"
-              },
-              {
-                "fid": 4,
-                "rule": "inventory",
-                "text": "2*m + -1*P_n_mindeg >= 0",
-                "coeffs": {
-                  "P_n_mindeg": "-1",
-                  "m": "2"
-                },
-                "const": "0",
-                "rel": ">=",
-                "inventory": "handshake_min"
-              },
-              {
-                "fid": 5,
-                "rule": "premise",
-                "text": "-1*chi + 5 >= 0",
-                "coeffs": {
-                  "chi": "-1"
-                },
-                "const": "5",
-                "rel": ">=",
-                "note": "chi <= 5"
-              },
-              {
-                "fid": 6,
-                "rule": "inventory",
-                "text": "1*min_deg >= 0",
-                "coeffs": {
-                  "min_deg": "1"
-                },
-                "const": "0",
-                "rel": ">=",
-                "inventory": "nonneg_min_deg"
-              },
-              {
-                "fid": 7,
-                "rule": "assumption",
-                "text": "1*chi + -3 >= 0",
-                "coeffs": {
-                  "chi": "1"
-                },
-                "const": "-3",
-                "rel": ">=",
-                "note": "1*chi >= 3"
-              },
-              {
-                "fid": 8,
-                "rule": "combination",
-                "text": "1*n + -3 >= 0",
-                "coeffs": {
-                  "n": "1"
-                },
-                "const": "-3",
-                "rel": ">=",
-                "tactic": "linarith",
-                "deps": [
-                  2,
-                  7
-                ],
-                "mults": [
-                  "1",
-                  "1"
-                ]
-              },
-              {
-                "fid": 9,
-                "rule": "product",
-                "text": "-3*min_deg + 1*P_n_mindeg >= 0",
-                "coeffs": {
-                  "P_n_mindeg": "1",
-                  "min_deg": "-3"
-                },
-                "const": "0",
-                "rel": ">=",
-                "tactic": "mul_nonneg",
-                "deps": [
-                  6,
-                  8
-                ],
-                "prod_var": "P_n_mindeg",
-                "prod_factors": [
-                  [
-                    "n",
-                    "lower",
-                    3,
-                    8
-                  ],
-                  [
-                    "min_deg",
-                    "lower",
-                    0,
-                    6
-                  ]
-                ]
-              },
-              {
-                "fid": 10,
-                "rule": "combination",
-                "text": "2*m + -2*min_deg + -1*chi + 7/3 >= 0",
-                "coeffs": {
-                  "min_deg": "-2",
-                  "chi": "-1",
-                  "m": "2"
-                },
-                "const": "7/3",
-                "rel": ">=",
-                "tactic": "linarith",
-                "deps": [
-                  2,
-                  3,
-                  4,
-                  5,
-                  9
-                ],
-                "mults": [
-                  "2/3",
-                  "2/3",
-                  "2/3",
-                  "1/3",
-                  "2/3"
-                ]
-              },
-              {
-                "fid": 11,
-                "rule": "rounding",
-                "text": "2*m + -2*min_deg + -1*chi + 2 >= 0",
-                "coeffs": {
-                  "min_deg": "-2",
-                  "chi": "-1",
-                  "m": "2"
-                },
-                "const": "2",
-                "rel": ">=",
-                "tactic": "omega",
-                "deps": [
-                  10
-                ]
-              }
-            ]
-          },
-          {
-            "assume": "1*chi <= 2",
-            "steps": [
-              {
-                "fid": 12,
-                "rule": "inventory",
                 "text": "1*max_deg + -1*min_deg >= 0",
                 "coeffs": {
                   "min_deg": "-1",
@@ -266,7 +95,7 @@
                 "inventory": "min_le_max"
               },
               {
-                "fid": 13,
+                "fid": 3,
                 "rule": "inventory",
                 "text": "1*n + -1*max_deg + -1 >= 0",
                 "coeffs": {
@@ -278,19 +107,266 @@
                 "inventory": "max_lt_card"
               },
               {
-                "fid": 14,
+                "fid": 4,
                 "rule": "inventory",
-                "text": "-1*n + 1*m + 1 >= 0",
+                "text": "1*n + -1*chi >= 0",
                 "coeffs": {
-                  "m": "1",
-                  "n": "-1"
+                  "chi": "-1",
+                  "n": "1"
                 },
-                "const": "1",
+                "const": "0",
                 "rel": ">=",
-                "inventory": "connected_edges"
+                "inventory": "chi_le_n"
               },
               {
+                "fid": 5,
+                "rule": "assumption",
+                "text": "1*chi + -3 >= 0",
+                "coeffs": {
+                  "chi": "1"
+                },
+                "const": "-3",
+                "rel": ">=",
+                "note": "1*chi >= 3"
+              },
+              {
+                "fid": 6,
+                "rule": "combination",
+                "text": "1*n + -3 >= 0",
+                "coeffs": {
+                  "n": "1"
+                },
+                "const": "-3",
+                "rel": ">=",
+                "tactic": "linarith",
+                "deps": [
+                  4,
+                  5
+                ],
+                "mults": [
+                  "1",
+                  "1"
+                ]
+              },
+              {
+                "fid": 7,
+                "rule": "inventory",
+                "text": "2*m + -1*P_n_mindeg >= 0",
+                "coeffs": {
+                  "P_n_mindeg": "-1",
+                  "m": "2"
+                },
+                "const": "0",
+                "rel": ">=",
+                "inventory": "handshake_min"
+              },
+              {
+                "fid": 8,
+                "rule": "inventory",
+                "text": "-1*n + 1*P_alpha_chi >= 0",
+                "coeffs": {
+                  "n": "-1",
+                  "P_alpha_chi": "1"
+                },
+                "const": "0",
+                "rel": ">=",
+                "inventory": "card_le_alpha_chi"
+              },
+              {
+                "fid": 9,
+                "rule": "premise",
+                "text": "-1*chi + 3 >= 0",
+                "coeffs": {
+                  "chi": "-1"
+                },
+                "const": "3",
+                "rel": ">=",
+                "note": "chi <= 3"
+              },
+              {
+                "fid": 10,
+                "rule": "inventory",
+                "text": "1*alpha + -1 >= 0",
+                "coeffs": {
+                  "alpha": "1"
+                },
+                "const": "-1",
+                "rel": ">=",
+                "inventory": "alpha_ge_one"
+              },
+              {
+                "fid": 11,
+                "rule": "product",
+                "text": "1*chi + 3*alpha + -1*P_alpha_chi + -3 >= 0",
+                "coeffs": {
+                  "P_alpha_chi": "-1",
+                  "alpha": "3",
+                  "chi": "1"
+                },
+                "const": "-3",
+                "rel": ">=",
+                "tactic": "mul_nonneg",
+                "deps": [
+                  10,
+                  9
+                ],
+                "prod_var": "P_alpha_chi",
+                "prod_factors": [
+                  [
+                    "alpha",
+                    "lower",
+                    1,
+                    10
+                  ],
+                  [
+                    "chi",
+                    "upper",
+                    3,
+                    9
+                  ]
+                ]
+              },
+              {
+                "fid": 12,
+                "rule": "inventory",
+                "text": "1*min_deg >= 0",
+                "coeffs": {
+                  "min_deg": "1"
+                },
+                "const": "0",
+                "rel": ">=",
+                "inventory": "nonneg_min_deg"
+              },
+              {
+                "fid": 13,
+                "rule": "product",
+                "text": "-3*min_deg + 1*P_n_mindeg >= 0",
+                "coeffs": {
+                  "P_n_mindeg": "1",
+                  "min_deg": "-3"
+                },
+                "const": "0",
+                "rel": ">=",
+                "tactic": "mul_nonneg",
+                "deps": [
+                  12,
+                  6
+                ],
+                "prod_var": "P_n_mindeg",
+                "prod_factors": [
+                  [
+                    "n",
+                    "lower",
+                    3,
+                    6
+                  ],
+                  [
+                    "min_deg",
+                    "lower",
+                    0,
+                    12
+                  ]
+                ]
+              },
+              {
+                "fid": 14,
+                "rule": "combination",
+                "text": "1*m + -2*min_deg + 3*alpha + -2 >= 0",
+                "coeffs": {
+                  "min_deg": "-2",
+                  "alpha": "3",
+                  "m": "1"
+                },
+                "const": "-2",
+                "rel": ">=",
+                "tactic": "linarith",
+                "deps": [
+                  2,
+                  3,
+                  6,
+                  7,
+                  8,
+                  9,
+                  11,
+                  13
+                ],
+                "mults": [
+                  "1/2",
+                  "1/2",
+                  "1/2",
+                  "1/2",
+                  "1",
+                  "1",
+                  "1",
+                  "1/2"
+                ]
+              }
+            ]
+          },
+          {
+            "assume": "1*chi <= 2",
+            "steps": [
+              {
                 "fid": 15,
+                "rule": "inventory",
+                "text": "1*max_deg + -1*min_deg >= 0",
+                "coeffs": {
+                  "min_deg": "-1",
+                  "max_deg": "1"
+                },
+                "const": "0",
+                "rel": ">=",
+                "inventory": "min_le_max"
+              },
+              {
+                "fid": 16,
+                "rule": "inventory",
+                "text": "1*n + -1*max_deg + -1 >= 0",
+                "coeffs": {
+                  "max_deg": "-1",
+                  "n": "1"
+                },
+                "const": "-1",
+                "rel": ">=",
+                "inventory": "max_lt_card"
+              },
+              {
+                "fid": 17,
+                "rule": "inventory",
+                "text": "1*m + -1*max_deg >= 0",
+                "coeffs": {
+                  "max_deg": "-1",
+                  "m": "1"
+                },
+                "const": "0",
+                "rel": ">=",
+                "inventory": "max_le_edges"
+              },
+              {
+                "fid": 18,
+                "rule": "inventory",
+                "text": "1*alpha + -1 >= 0",
+                "coeffs": {
+                  "alpha": "1"
+                },
+                "const": "-1",
+                "rel": ">=",
+                "inventory": "alpha_ge_one"
+              },
+              {
+                "fid": 19,
+                "rule": "inventory",
+                "text": "-1*n + 1*P_alpha_chi >= 0",
+                "coeffs": {
+                  "n": "-1",
+                  "P_alpha_chi": "1"
+                },
+                "const": "0",
+                "rel": ">=",
+                "inventory": "card_le_alpha_chi"
+              },
+              {
+                "fid": 20,
                 "rule": "assumption",
                 "text": "-1*chi + 2 >= 0",
                 "coeffs": {
@@ -301,27 +377,65 @@
                 "note": "1*chi <= 2"
               },
               {
-                "fid": 16,
+                "fid": 21,
+                "rule": "product",
+                "text": "1*chi + 2*alpha + -1*P_alpha_chi + -2 >= 0",
+                "coeffs": {
+                  "P_alpha_chi": "-1",
+                  "alpha": "2",
+                  "chi": "1"
+                },
+                "const": "-2",
+                "rel": ">=",
+                "tactic": "mul_nonneg",
+                "deps": [
+                  18,
+                  20
+                ],
+                "prod_var": "P_alpha_chi",
+                "prod_factors": [
+                  [
+                    "alpha",
+                    "lower",
+                    1,
+                    18
+                  ],
+                  [
+                    "chi",
+                    "upper",
+                    2,
+                    20
+                  ]
+                ]
+              },
+              {
+                "fid": 22,
                 "rule": "combination",
-                "text": "2*m + -2*min_deg + -1*chi + 2 >= 0",
+                "text": "1*m + -2*min_deg + 3*alpha + -2 >= 0",
                 "coeffs": {
                   "min_deg": "-2",
-                  "chi": "-1",
-                  "m": "2"
+                  "alpha": "3",
+                  "m": "1"
                 },
-                "const": "2",
+                "const": "-2",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
-                  12,
-                  13,
-                  14,
-                  15
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20,
+                  21
                 ],
                 "mults": [
                   "2",
-                  "2",
-                  "2",
+                  "1",
+                  "1",
+                  "1",
+                  "1",
+                  "1",
                   "1"
                 ]
               }
@@ -332,13 +446,13 @@
     ]
   },
   "iris": {
-    "T": 0.0010111223458038423,
+    "T": 0.002403846153846154,
     "R": 1.0,
-    "L": 0.0,
-    "score": 1.0010111223458038
+    "L": 0.14334554477024897,
+    "score": 1.1457493909240952
   },
   "attained": "yes",
-  "touch": 1,
+  "touch": 2,
   "arith_sharp": "relaxed",
   "depth_type": "product_needed",
   "proof_stats": {
@@ -346,17 +460,17 @@
     "case_splits_conditional": 1,
     "case_splits_bnb": 0,
     "max_nest_depth": 1,
-    "roundings": 1,
-    "inventory_theorems": 5,
-    "product_steps": 1
+    "roundings": 0,
+    "inventory_theorems": 8,
+    "product_steps": 3
   },
-  "proof_cost_initial": 21.0,
-  "proof_cost": 21.0,
-  "proof_cost_expanded": 21.0,
+  "proof_cost_initial": 30.0,
+  "proof_cost": 30.0,
+  "proof_cost_expanded": 30.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 4.2,
+  "hardness": 6.0,
   "lean": {
     "theorem_name": "C73",
     "status": "compiled"

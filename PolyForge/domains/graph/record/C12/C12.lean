@@ -4,9 +4,9 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C12 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.vertexCoverNum.toNat : ℤ) ≤ 5) :
-    2 * (G.indepNum : ℤ) ≥ (Fintype.card V : ℤ) - 3 * (G.chromaticNumber.toNat : ℤ) + 4 := by
-  have s1 : 3 * (G.chromaticNumber.toNat : ℤ) + (G.indepNum : ℤ) - (G.vertexCoverNum.toNat : ℤ) ≥ 4 := by
+theorem C12 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.vertexCoverNum.toNat : ℤ) ≤ 4) :
+    2 * (G.indepNum : ℤ) ≥ (Fintype.card V : ℤ) - 2 * (G.chromaticNumber.toNat : ℤ) + 3 := by
+  have s1 : 2 * (G.chromaticNumber.toNat : ℤ) + (G.indepNum : ℤ) - (G.vertexCoverNum.toNat : ℤ) ≥ 3 := by
     by_cases hc1 : (3 : ℤ) ≤ (G.chromaticNumber.toNat : ℤ)
     · -- 1*chi >= 3
       have s2 : (G.chromaticNumber.toNat : ℤ) ≥ 3 := by have hcc := hc1; omega
@@ -14,8 +14,8 @@ theorem C12 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph
         have hw := alpha_ge_one_int' G
         try push_cast at hw
         linarith [hw]
-      have s4 : -(G.vertexCoverNum.toNat : ℤ) ≥ -5 := by linarith [hn1]
-      have s5 : 3 * (G.chromaticNumber.toNat : ℤ) + (G.indepNum : ℤ) - (G.vertexCoverNum.toNat : ℤ) ≥ 5 := by linarith [s2, s3, s4]
+      have s4 : -(G.vertexCoverNum.toNat : ℤ) ≥ -4 := by linarith [hn1]
+      have s5 : 2 * (G.chromaticNumber.toNat : ℤ) + (G.indepNum : ℤ) - (G.vertexCoverNum.toNat : ℤ) ≥ 3 := by linarith [s2, s3, s4]
       linarith [s5]
     · -- 1*chi <= 2
       have s6 : (G.chromaticNumber.toNat : ℤ) ≥ 1 := by
@@ -40,7 +40,7 @@ theorem C12 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph
         have hw := gallai_int G
         try push_cast at hw
         linarith [hw]
-      have s12 : 3 * (G.chromaticNumber.toNat : ℤ) + (G.indepNum : ℤ) - (G.vertexCoverNum.toNat : ℤ) ≥ 4 := by linarith [s6, s7, s10, s11]
+      have s12 : 2 * (G.chromaticNumber.toNat : ℤ) + (G.indepNum : ℤ) - (G.vertexCoverNum.toNat : ℤ) ≥ 3 := by linarith [s6, s7, s10, s11]
       linarith [s12]
   have heq_gallai := gallai_int G
   try push_cast at heq_gallai

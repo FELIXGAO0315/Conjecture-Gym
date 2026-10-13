@@ -1,45 +1,45 @@
 {
   "id": "C12",
-  "created_at": "2026-10-12T19:42:33.385333+00:00",
+  "created_at": "2026-10-12T21:47:34.567107+00:00",
   "generator": {
-    "version": "1.3.2",
-    "seed": 2024006102
+    "version": "1.4",
+    "seed": 2024006193
   },
   "rendered_with": "1.3",
   "conjecture": {
-    "formula": "if ((tau <= 5)), then (2*alpha >= n - 3*chi + 4)",
+    "formula": "if ((tau <= 4)), then (2*alpha >= n - 2*chi + 3)",
     "properties_premises": [],
     "numeric_premises": [
       {
-        "text": "tau <= 5",
+        "text": "tau <= 4",
         "coeffs": {
           "tau": 1
         },
         "rel": "<=",
-        "rhs": 5
+        "rhs": 4
       }
     ],
     "conclusion": {
-      "text": "2*alpha >= n - 3*chi + 4",
+      "text": "2*alpha >= n - 2*chi + 3",
       "coeffs": {
         "alpha": 2,
-        "chi": 3,
+        "chi": 2,
         "n": -1
       },
       "rel": ">=",
-      "rhs": 4
+      "rhs": 3
     },
     "canonical_form": {
-      "text": "3*chi >= n - 2*alpha + 4",
+      "text": "2*chi >= n - 2*alpha + 3",
       "coeffs": {
         "alpha": 2,
-        "chi": 3,
+        "chi": 2,
         "n": -1
       },
       "rel": ">=",
-      "rhs": 4
+      "rhs": 3
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose tau <= 5. Then 2*alpha >= n - 3*chi + 4."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose tau <= 4. Then 2*alpha >= n - 2*chi + 3."
   },
   "primary_var": "alpha",
   "dalmatian": "significant",
@@ -59,13 +59,13 @@
       {
         "fid": 1,
         "rule": "case_split",
-        "text": "3*chi + 1*alpha + -1*tau + -4 >= 0",
+        "text": "2*chi + 1*alpha + -1*tau + -3 >= 0",
         "coeffs": {
           "alpha": "1",
-          "chi": "3",
+          "chi": "2",
           "tau": "-1"
         },
-        "const": "-4",
+        "const": "-3",
         "rel": ">=",
         "tactic": "by_cases",
         "split_var": "chi",
@@ -103,24 +103,24 @@
               {
                 "fid": 4,
                 "rule": "premise",
-                "text": "-1*tau + 5 >= 0",
+                "text": "-1*tau + 4 >= 0",
                 "coeffs": {
                   "tau": "-1"
                 },
-                "const": "5",
+                "const": "4",
                 "rel": ">=",
-                "note": "tau <= 5"
+                "note": "tau <= 4"
               },
               {
                 "fid": 5,
                 "rule": "combination",
-                "text": "3*chi + 1*alpha + -1*tau + -5 >= 0",
+                "text": "2*chi + 1*alpha + -1*tau + -3 >= 0",
                 "coeffs": {
                   "alpha": "1",
-                  "chi": "3",
+                  "chi": "2",
                   "tau": "-1"
                 },
-                "const": "-5",
+                "const": "-3",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
@@ -129,7 +129,7 @@
                   4
                 ],
                 "mults": [
-                  "3",
+                  "2",
                   "1",
                   "1"
                 ]
@@ -232,13 +232,13 @@
               {
                 "fid": 12,
                 "rule": "combination",
-                "text": "3*chi + 1*alpha + -1*tau + -4 >= 0",
+                "text": "2*chi + 1*alpha + -1*tau + -3 >= 0",
                 "coeffs": {
                   "alpha": "1",
-                  "chi": "3",
+                  "chi": "2",
                   "tau": "-1"
                 },
-                "const": "-4",
+                "const": "-3",
                 "rel": ">=",
                 "tactic": "linarith",
                 "deps": [
@@ -248,7 +248,7 @@
                   11
                 ],
                 "mults": [
-                  "2",
+                  "1",
                   "1",
                   "1",
                   "-1"
@@ -261,14 +261,14 @@
       {
         "fid": 13,
         "rule": "identity_rewrite",
-        "text": "2*alpha >= n - 3*chi + 4",
+        "text": "2*alpha >= n - 2*chi + 3",
         "coeffs": {
           "alpha": 2,
-          "chi": 3,
+          "chi": 2,
           "n": -1
         },
         "rel": ">=",
-        "rhs": 4,
+        "rhs": 3,
         "tactic": "linarith",
         "deps": [
           1
@@ -282,10 +282,10 @@
     ]
   },
   "iris": {
-    "T": 0.0007993605115907274,
+    "T": 0.0008741258741258741,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.0007993605115908
+    "score": 1.0008741258741258
   },
   "attained": "yes",
   "touch": 1,

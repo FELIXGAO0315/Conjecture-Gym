@@ -1,0 +1,412 @@
+{
+  "id": "C90",
+  "created_at": "2026-10-13T00:10:56.402286+00:00",
+  "generator": {
+    "version": "1.4",
+    "seed": 2025006914
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((m >= 2) and (max_deg <= omega)), then (n >= 3)",
+    "properties_premises": [],
+    "numeric_premises": [
+      {
+        "text": "m >= 2",
+        "coeffs": {
+          "m": 1
+        },
+        "rel": ">=",
+        "rhs": 2
+      },
+      {
+        "text": "max_deg <= omega",
+        "coeffs": {
+          "max_deg": 1,
+          "omega": -1
+        },
+        "rel": "<=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "n >= 3",
+      "coeffs": {
+        "n": 1
+      },
+      "rel": ">=",
+      "rhs": 3
+    },
+    "canonical_form": {
+      "text": "n >= 3",
+      "coeffs": {
+        "n": 1
+      },
+      "rel": ">=",
+      "rhs": 3
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose m >= 2, max_deg <= omega. Then n >= 3."
+  },
+  "primary_var": "n",
+  "dalmatian": "significant",
+  "properties": [],
+  "conclusion_property": null,
+  "instance_of": null,
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "chi_le_n",
+      "gallai",
+      "handshake_max",
+      "max_lt_card",
+      "n_ge_one",
+      "omega_le_chi"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "case_split",
+        "text": "2*n + 3*alpha + 3*tau + -15 >= 0",
+        "coeffs": {
+          "n": "2",
+          "alpha": "3",
+          "tau": "3"
+        },
+        "const": "-15",
+        "rel": ">=",
+        "tactic": "by_cases",
+        "split_var": "chi",
+        "split_threshold": 3,
+        "split_coeffs": {
+          "chi": "1"
+        },
+        "split_kind": "conditional",
+        "cases": [
+          {
+            "assume": "1*chi >= 3",
+            "steps": [
+              {
+                "fid": 2,
+                "rule": "inventory",
+                "text": "1*n + -1*chi >= 0",
+                "coeffs": {
+                  "chi": "-1",
+                  "n": "1"
+                },
+                "const": "0",
+                "rel": ">=",
+                "inventory": "chi_le_n"
+              },
+              {
+                "fid": 3,
+                "rule": "assumption",
+                "text": "1*chi + -3 >= 0",
+                "coeffs": {
+                  "chi": "1"
+                },
+                "const": "-3",
+                "rel": ">=",
+                "note": "1*chi >= 3"
+              },
+              {
+                "fid": 4,
+                "rule": "inventory",
+                "text": "-1*n + 1*alpha + 1*tau == 0",
+                "coeffs": {
+                  "alpha": "1",
+                  "tau": "1",
+                  "n": "-1"
+                },
+                "const": "0",
+                "rel": "==",
+                "inventory": "gallai"
+              },
+              {
+                "fid": 5,
+                "rule": "combination",
+                "text": "2*n + 3*alpha + 3*tau + -15 >= 0",
+                "coeffs": {
+                  "n": "2",
+                  "alpha": "3",
+                  "tau": "3"
+                },
+                "const": "-15",
+                "rel": ">=",
+                "tactic": "linarith",
+                "deps": [
+                  2,
+                  3,
+                  4
+                ],
+                "mults": [
+                  "5",
+                  "5",
+                  "3"
+                ]
+              }
+            ]
+          },
+          {
+            "assume": "1*chi <= 2",
+            "steps": [
+              {
+                "fid": 6,
+                "rule": "inventory",
+                "text": "1*n + -1*max_deg + -1 >= 0",
+                "coeffs": {
+                  "max_deg": "-1",
+                  "n": "1"
+                },
+                "const": "-1",
+                "rel": ">=",
+                "inventory": "max_lt_card"
+              },
+              {
+                "fid": 7,
+                "rule": "premise",
+                "text": "1*m + -2 >= 0",
+                "coeffs": {
+                  "m": "1"
+                },
+                "const": "-2",
+                "rel": ">=",
+                "note": "m >= 2"
+              },
+              {
+                "fid": 8,
+                "rule": "inventory",
+                "text": "-2*m + 1*P_n_maxdeg >= 0",
+                "coeffs": {
+                  "m": "-2",
+                  "P_n_maxdeg": "1"
+                },
+                "const": "0",
+                "rel": ">=",
+                "inventory": "handshake_max"
+              },
+              {
+                "fid": 9,
+                "rule": "inventory",
+                "text": "1*n + -1 >= 0",
+                "coeffs": {
+                  "n": "1"
+                },
+                "const": "-1",
+                "rel": ">=",
+                "inventory": "n_ge_one"
+              },
+              {
+                "fid": 10,
+                "rule": "inventory",
+                "text": "1*chi + -1*omega >= 0",
+                "coeffs": {
+                  "omega": "-1",
+                  "chi": "1"
+                },
+                "const": "0",
+                "rel": ">=",
+                "inventory": "omega_le_chi"
+              },
+              {
+                "fid": 11,
+                "rule": "premise",
+                "text": "-1*max_deg + 1*omega >= 0",
+                "coeffs": {
+                  "max_deg": "-1",
+                  "omega": "1"
+                },
+                "const": "0",
+                "rel": ">=",
+                "note": "max_deg <= omega"
+              },
+              {
+                "fid": 12,
+                "rule": "assumption",
+                "text": "-1*chi + 2 >= 0",
+                "coeffs": {
+                  "chi": "-1"
+                },
+                "const": "2",
+                "rel": ">=",
+                "note": "1*chi <= 2"
+              },
+              {
+                "fid": 13,
+                "rule": "combination",
+                "text": "-1*max_deg + 2 >= 0",
+                "coeffs": {
+                  "max_deg": "-1"
+                },
+                "const": "2",
+                "rel": ">=",
+                "tactic": "linarith",
+                "deps": [
+                  10,
+                  11,
+                  12
+                ],
+                "mults": [
+                  "1",
+                  "1",
+                  "1"
+                ]
+              },
+              {
+                "fid": 14,
+                "rule": "product",
+                "text": "2*n + 1*max_deg + -1*P_n_maxdeg + -2 >= 0",
+                "coeffs": {
+                  "P_n_maxdeg": "-1",
+                  "n": "2",
+                  "max_deg": "1"
+                },
+                "const": "-2",
+                "rel": ">=",
+                "tactic": "mul_nonneg",
+                "deps": [
+                  9,
+                  13
+                ],
+                "prod_var": "P_n_maxdeg",
+                "prod_factors": [
+                  [
+                    "n",
+                    "lower",
+                    1,
+                    9
+                  ],
+                  [
+                    "max_deg",
+                    "upper",
+                    2,
+                    13
+                  ]
+                ]
+              },
+              {
+                "fid": 15,
+                "rule": "combination",
+                "text": "1*n + -7/3 >= 0",
+                "coeffs": {
+                  "n": "1"
+                },
+                "const": "-7/3",
+                "rel": ">=",
+                "tactic": "linarith",
+                "deps": [
+                  6,
+                  7,
+                  8,
+                  14
+                ],
+                "mults": [
+                  "1/3",
+                  "2/3",
+                  "1/3",
+                  "1/3"
+                ]
+              },
+              {
+                "fid": 16,
+                "rule": "rounding",
+                "text": "1*n + -3 >= 0",
+                "coeffs": {
+                  "n": "1"
+                },
+                "const": "-3",
+                "rel": ">=",
+                "tactic": "omega",
+                "deps": [
+                  15
+                ]
+              },
+              {
+                "fid": 17,
+                "rule": "inventory",
+                "text": "-1*n + 1*alpha + 1*tau == 0",
+                "coeffs": {
+                  "alpha": "1",
+                  "tau": "1",
+                  "n": "-1"
+                },
+                "const": "0",
+                "rel": "==",
+                "inventory": "gallai"
+              },
+              {
+                "fid": 18,
+                "rule": "combination",
+                "text": "2*n + 3*alpha + 3*tau + -15 >= 0",
+                "coeffs": {
+                  "n": "2",
+                  "alpha": "3",
+                  "tau": "3"
+                },
+                "const": "-15",
+                "rel": ">=",
+                "tactic": "linarith",
+                "deps": [
+                  16,
+                  17
+                ],
+                "mults": [
+                  "5",
+                  "3"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "fid": 19,
+        "rule": "identity_rewrite",
+        "text": "n >= 3",
+        "coeffs": {
+          "n": 1
+        },
+        "rel": ">=",
+        "rhs": 3,
+        "tactic": "linarith",
+        "deps": [
+          1
+        ],
+        "identities": [
+          "gallai"
+        ],
+        "identities_human": "the Gallai identity `alpha + tau = n`",
+        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`."
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.007380073800738007,
+    "R": 1.0,
+    "L": 0.09407208683835973,
+    "score": 1.1014521606390977
+  },
+  "attained": "yes",
+  "touch": 2,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 1,
+    "case_splits_conditional": 1,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 1,
+    "roundings": 1,
+    "inventory_theorems": 6,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 23.5,
+  "proof_cost": 23.5,
+  "proof_cost_expanded": 23.5,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 3.9166666666666665,
+  "lean": {
+    "theorem_name": "C90",
+    "status": "compiled"
+  }
+}
