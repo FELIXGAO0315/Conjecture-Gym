@@ -1,0 +1,240 @@
+{
+  "id": "C252",
+  "created_at": "2026-10-14T04:57:05.129526+00:00",
+  "generator": {
+    "version": "1.4.1",
+    "seed": 2027007258
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((m >= 6) and (omega >= 5)), then (2*min_deg <= m - 2)",
+    "properties_premises": [],
+    "numeric_premises": [
+      {
+        "text": "m >= 6",
+        "coeffs": {
+          "m": 1
+        },
+        "rel": ">=",
+        "rhs": 6
+      },
+      {
+        "text": "omega >= 5",
+        "coeffs": {
+          "omega": 1
+        },
+        "rel": ">=",
+        "rhs": 5
+      }
+    ],
+    "conclusion": {
+      "text": "2*min_deg <= m - 2",
+      "coeffs": {
+        "m": -1,
+        "min_deg": 2
+      },
+      "rel": "<=",
+      "rhs": -2
+    },
+    "canonical_form": {
+      "text": "m >= 2*min_deg + 2",
+      "coeffs": {
+        "min_deg": -2,
+        "m": 1
+      },
+      "rel": ">=",
+      "rhs": 2
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose m >= 6, omega >= 5. Then 2*min_deg <= m - 2."
+  },
+  "primary_var": "min_deg",
+  "dalmatian": "significant",
+  "properties": [],
+  "conclusion_property": null,
+  "instance_of": null,
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "handshake_min",
+      "nonneg_min_deg",
+      "omega_le_n"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "premise",
+        "text": "1*m + -6 >= 0",
+        "coeffs": {
+          "m": "1"
+        },
+        "const": "-6",
+        "rel": ">=",
+        "note": "m >= 6"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "2*m + -1*P_n_mindeg >= 0",
+        "coeffs": {
+          "P_n_mindeg": "-1",
+          "m": "2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "handshake_min"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "1*min_deg >= 0",
+        "coeffs": {
+          "min_deg": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_min_deg"
+      },
+      {
+        "fid": 4,
+        "rule": "premise",
+        "text": "1*omega + -5 >= 0",
+        "coeffs": {
+          "omega": "1"
+        },
+        "const": "-5",
+        "rel": ">=",
+        "note": "omega >= 5"
+      },
+      {
+        "fid": 5,
+        "rule": "inventory",
+        "text": "1*n + -1*omega >= 0",
+        "coeffs": {
+          "omega": "-1",
+          "n": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "omega_le_n"
+      },
+      {
+        "fid": 6,
+        "rule": "combination",
+        "text": "1*n + -5 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-5",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          4,
+          5
+        ],
+        "mults": [
+          "1",
+          "1"
+        ]
+      },
+      {
+        "fid": 7,
+        "rule": "product",
+        "text": "-5*min_deg + 1*P_n_mindeg >= 0",
+        "coeffs": {
+          "P_n_mindeg": "1",
+          "min_deg": "-5"
+        },
+        "const": "0",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          3,
+          6
+        ],
+        "prod_var": "P_n_mindeg",
+        "prod_factors": [
+          [
+            "n",
+            "lower",
+            5,
+            6
+          ],
+          [
+            "min_deg",
+            "lower",
+            0,
+            3
+          ]
+        ]
+      },
+      {
+        "fid": 8,
+        "rule": "combination",
+        "text": "1*m + -2*min_deg + -6/5 >= 0",
+        "coeffs": {
+          "min_deg": "-2",
+          "m": "1"
+        },
+        "const": "-6/5",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          7
+        ],
+        "mults": [
+          "1/5",
+          "2/5",
+          "2/5"
+        ]
+      },
+      {
+        "fid": 9,
+        "rule": "rounding",
+        "text": "1*m + -2*min_deg + -2 >= 0",
+        "coeffs": {
+          "min_deg": "-2",
+          "m": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          8
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.015384615384615385,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0153846153846153
+  },
+  "attained": "yes",
+  "touch": 1,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 1,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 9.0,
+  "proof_cost": 9.0,
+  "proof_cost_expanded": 9.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.5,
+  "lean": {
+    "theorem_name": "C252",
+    "status": "compiled"
+  }
+}

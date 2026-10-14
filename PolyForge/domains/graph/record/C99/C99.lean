@@ -4,73 +4,98 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C99 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hp1 : G.Connected) (hp2 : 2 ≤ Fintype.card V) (hn1 : (G.edgeFinset.card : ℤ) ≥ 6) :
-    (G.diam : ℤ) ≥ -3 * (G.edgeFinset.card : ℤ) + 3 * (G.minDegree : ℤ) + 10 := by
-  have s1 : 3 * (G.edgeFinset.card : ℤ) - 3 * (G.minDegree : ℤ) + (G.diam : ℤ) ≥ 10 := by
-    by_cases hc1 : (6 : ℤ) ≤ (Fintype.card V : ℤ)
-    · -- 1*n >= 6
-      have s2 : (G.diam : ℤ) - (G.radius.toNat : ℤ) ≥ 0 := by
-        have hw := radius_le_diam_int G hp1
-        try push_cast at hw
-        linarith [hw]
-      have s3 : (G.radius.toNat : ℤ) ≥ 1 := by
-        have hw := radius_ge_one_int G hp1 hp2
-        try push_cast at hw
-        linarith [hw]
-      have s4 : (Fintype.card V : ℤ) ≥ 6 := by have hcc := hc1; omega
-      have s5 : (G.edgeFinset.card : ℤ) ≥ 6 := by linarith [hn1]
-      have s6 : 2 * (G.edgeFinset.card : ℤ) - (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ 0 := by
-        have hw := handshake_min_int G
-        try push_cast at hw
-        linarith [hw]
-      have s7 : (G.minDegree : ℤ) ≥ 1 := by
-        have hw := connected_min_deg_int G hp1 hp2
-        try push_cast at hw
-        linarith [hw]
-      have s8 : -(Fintype.card V : ℤ) - 6 * (G.minDegree : ℤ) + (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ -6 := by
-        have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 6) * ((G.minDegree : ℤ) - 1) :=
-          mul_nonneg (by linarith [s4]) (by linarith [s7])
-        ring_nf at hmul ⊢
-        linarith [hmul]
-      have s9 : 3 * (G.edgeFinset.card : ℤ) - 3 * (G.minDegree : ℤ) + (G.diam : ℤ) ≥ 13 := by linarith [s2, s3, s4, s5, s6, s8]
-      linarith [s9]
-    · -- 1*n <= 5
-      have s10 : (G.diam : ℤ) ≥ 1 := by
-        have hw := diam_ge_one_int G hp1 hp2
-        try push_cast at hw
-        linarith [hw]
-      have s11 : (G.edgeFinset.card : ℤ) ≥ 6 := by linarith [hn1]
-      have s12 : -(Fintype.card V : ℤ) - 2 * (G.edgeFinset.card : ℤ) + (Fintype.card V : ℤ) * (Fintype.card V : ℤ) ≥ 0 := by
-        have hw := two_mul_edges_le_card_sq_sub_card_int G
-        try push_cast at hw
-        linarith [hw]
-      have s13 : (Fintype.card V : ℤ) ≥ 1 := by
-        have hw := card_ge_one_int (V := V)
-        try push_cast at hw
-        linarith [hw]
-      have s14 : -(Fintype.card V : ℤ) ≥ -5 := by have hcc := hc1; omega
-      have s15 : 6 * (Fintype.card V : ℤ) - (Fintype.card V : ℤ) * (Fintype.card V : ℤ) ≥ 5 := by
-        have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 1) * (5 - (Fintype.card V : ℤ)) :=
-          mul_nonneg (by linarith [s13]) (by linarith [s14])
-        ring_nf at hmul ⊢
-        linarith [hmul]
-      have s16 : 5 * (Fintype.card V : ℤ) ≥ 17 := by linarith [s11, s12, s15]
-      have s17 : (Fintype.card V : ℤ) ≥ 4 := by have hr := s16; omega
-      have s18 : 2 * (G.edgeFinset.card : ℤ) - (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ 0 := by
-        have hw := handshake_min_int G
-        try push_cast at hw
-        linarith [hw]
-      have s19 : (G.minDegree : ℤ) ≥ 1 := by
-        have hw := connected_min_deg_int G hp1 hp2
-        try push_cast at hw
-        linarith [hw]
-      have s20 : -(Fintype.card V : ℤ) - 4 * (G.minDegree : ℤ) + (Fintype.card V : ℤ) * (G.minDegree : ℤ) ≥ -4 := by
-        have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 4) * ((G.minDegree : ℤ) - 1) :=
-          mul_nonneg (by linarith [s17]) (by linarith [s19])
-        ring_nf at hmul ⊢
-        linarith [hmul]
-      have s21 : 3 * (G.edgeFinset.card : ℤ) - 3 * (G.minDegree : ℤ) + (G.diam : ℤ) ≥ 10 := by linarith [s10, s17, s11, s18, s20]
-      linarith [s21]
+theorem C99 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (Fintype.card V : ℤ) ≥ 5) :
+    (G.cliqueNum : ℤ) ≤ 3 * (G.chromaticNumber.toNat : ℤ) + 3 * (G.indepNum : ℤ) - 12 := by
+  have s1 : 3 * (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) + 3 * (G.indepNum : ℤ) ≥ 12 := by
+    by_cases hc1 : (3 : ℤ) ≤ (G.indepNum : ℤ)
+    · -- 1*alpha >= 3
+      have s2 : 3 * (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) + 3 * (G.indepNum : ℤ) ≥ 13 := by
+        by_cases hc2 : (3 : ℤ) ≤ (G.chromaticNumber.toNat : ℤ)
+        · -- 1*chi >= 3
+          have s3 : (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by
+            have hw := omega_le_chi_int G
+            try push_cast at hw
+            linarith [hw]
+          have s4 : (G.chromaticNumber.toNat : ℤ) ≥ 3 := by have hcc := hc2; omega
+          have s5 : (G.indepNum : ℤ) ≥ 3 := by have hcc := hc1; omega
+          have s6 : 3 * (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) + 3 * (G.indepNum : ℤ) ≥ 15 := by linarith [s3, s4, s5]
+          linarith [s6]
+        · -- 1*chi <= 2
+          have s7 : (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by
+            have hw := omega_le_chi_int G
+            try push_cast at hw
+            linarith [hw]
+          have s8 : (G.indepNum : ℤ) ≥ 3 := by have hcc := hc1; omega
+          have s9 : (Fintype.card V : ℤ) ≥ 5 := by linarith [hn1]
+          have s10 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
+            have hw := card_le_alpha_chi_int G
+            try push_cast at hw
+            linarith [hw]
+          have s11 : -(G.chromaticNumber.toNat : ℤ) ≥ -2 := by have hcc := hc2; omega
+          have s12 : 3 * (G.chromaticNumber.toNat : ℤ) + 2 * (G.indepNum : ℤ) - (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) ≥ 6 := by
+            have hmul : (0 : ℤ) ≤ ((G.indepNum : ℤ) - 3) * (2 - (G.chromaticNumber.toNat : ℤ)) :=
+              mul_nonneg (by linarith [s8]) (by linarith [s11])
+            ring_nf at hmul ⊢
+            linarith [hmul]
+          have s13 : 9 * (G.chromaticNumber.toNat : ℤ) - 3 * (G.cliqueNum : ℤ) + 9 * (G.indepNum : ℤ) ≥ 37 := by linarith [s7, s8, s9, s10, s12]
+          have s14 : 3 * (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) + 3 * (G.indepNum : ℤ) ≥ 13 := by have hr := s13; omega
+          linarith [s14]
+      linarith [s2]
+    · -- 1*alpha <= 2
+      have s15 : 3 * (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) + 3 * (G.indepNum : ℤ) ≥ 12 := by
+        by_cases hc15 : (2 : ℤ) ≤ (G.indepNum : ℤ)
+        · -- 1*alpha >= 2
+          have s16 : (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by
+            have hw := omega_le_chi_int G
+            try push_cast at hw
+            linarith [hw]
+          have s17 : (Fintype.card V : ℤ) ≥ 5 := by linarith [hn1]
+          have s18 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
+            have hw := card_le_alpha_chi_int G
+            try push_cast at hw
+            linarith [hw]
+          have s19 : -(G.indepNum : ℤ) ≥ -2 := by have hcc := hc15; omega
+          have s20 : (G.chromaticNumber.toNat : ℤ) ≥ 1 := by
+            have hw := chi_ge_one_int' G
+            try push_cast at hw
+            linarith [hw]
+          have s21 : 2 * (G.chromaticNumber.toNat : ℤ) + (G.indepNum : ℤ) - (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) ≥ 2 := by
+            have hmul : (0 : ℤ) ≤ (2 - (G.indepNum : ℤ)) * ((G.chromaticNumber.toNat : ℤ) - 1) :=
+              mul_nonneg (by linarith [s19]) (by linarith [s20])
+            ring_nf at hmul ⊢
+            linarith [hmul]
+          have s22 : 2 * (G.chromaticNumber.toNat : ℤ) ≥ 5 := by linarith [s17, s18, s19, s21]
+          have s23 : (G.chromaticNumber.toNat : ℤ) ≥ 3 := by have hr := s22; omega
+          have s24 : (G.indepNum : ℤ) ≥ 2 := by have hcc := hc15; omega
+          have s25 : 3 * (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) + 3 * (G.indepNum : ℤ) ≥ 12 := by linarith [s16, s23, s24]
+          linarith [s25]
+        · -- 1*alpha <= 1
+          have s26 : (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by
+            have hw := omega_le_chi_int G
+            try push_cast at hw
+            linarith [hw]
+          have s27 : (G.indepNum : ℤ) ≥ 1 := by
+            have hw := alpha_ge_one_int' G
+            try push_cast at hw
+            linarith [hw]
+          have s28 : (Fintype.card V : ℤ) ≥ 5 := by linarith [hn1]
+          have s29 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
+            have hw := card_le_alpha_chi_int G
+            try push_cast at hw
+            linarith [hw]
+          have s30 : (G.chromaticNumber.toNat : ℤ) ≥ 1 := by
+            have hw := chi_ge_one_int' G
+            try push_cast at hw
+            linarith [hw]
+          have s31 : -(G.indepNum : ℤ) ≥ -1 := by have hcc := hc15; omega
+          have s32 : (G.chromaticNumber.toNat : ℤ) + (G.indepNum : ℤ) - (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) ≥ 1 := by
+            have hmul : (0 : ℤ) ≤ (1 - (G.indepNum : ℤ)) * ((G.chromaticNumber.toNat : ℤ) - 1) :=
+              mul_nonneg (by linarith [s31]) (by linarith [s30])
+            ring_nf at hmul ⊢
+            linarith [hmul]
+          have s33 : 3 * (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) + 3 * (G.indepNum : ℤ) ≥ 13 := by linarith [s26, s27, s28, s29, s32]
+          linarith [s33]
+      linarith [s15]
   have heq_gallai := gallai_int G
   try push_cast at heq_gallai
   linarith [s1, heq_gallai]
