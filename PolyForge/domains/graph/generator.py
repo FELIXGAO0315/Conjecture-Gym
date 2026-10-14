@@ -13,6 +13,7 @@ worker entry) is reused from ``PolyForge.generator.generator``.
 from __future__ import annotations
 
 import json
+import os
 import random
 import shutil
 from collections import defaultdict
@@ -42,7 +43,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data" / "graph_pool.json"
-RECORD = ROOT / "record"
+# v1.4.2 §E: ``POLYFORGE_GRAPH_RECORD`` redirects the record directory (used by the
+# crash / reproducibility tests so they never touch the committed record).
+RECORD = Path(os.environ.get("POLYFORGE_GRAPH_RECORD", str(ROOT / "record")))
 LEAN_DIR = F.LEAN_DIR
 
 GENERATOR_VERSION = "1.4.1"
@@ -535,6 +538,18 @@ def classify_depth(premises, direction):
     if s_p != "opt":
         return "split_needed"
     return _classify(slin, vlin, s_np, v_np, s_p, v_p)
+
+
+def _structure_depth_type(proof_stats):
+    """v1.4.2 §A1(b): the recorded ``depth_type`` = the highest level actually present
+    in the proof — any case split ⇒ ``split_needed``; else any product step ⇒
+    ``product_needed``; else ``rounding_only``.  (``classify_depth`` above gives the
+    LP-necessity class used for phase acceptance, which is a different axis.)"""
+    if proof_stats.get("case_splits", 0) > 0:
+        return "split_needed"
+    if proof_stats.get("product_steps", 0) > 0:
+        return "product_needed"
+    return "rounding_only"
 
 
 # ── direction / candidate enumeration (§III.4) ────────────────────────────────
@@ -1847,20 +1862,40 @@ def _record_premise_view(data):
             "numeric": numeric, "disp": disp, "canon": canon}
 
 
+_SKIP_RULE = True   # v1.4.2 §C1 — toggled off only by the C3 equivalence test
+
+
 def _reverse_prune_targets(new_data, records):
+    """Targets made redundant by the just-committed ``new_data`` (R).
+
+    v1.4.2 §C1 (skip rule): a pre-existing target S can be made *newly* redundant by R
+    only if R is usable under S, i.e. ``premises(S) ⇒ premises(R)`` — then R's conclusion
+    is an available fact in S's restricted derivation.  **Soundness:** restricted
+    derivability is monotone in the fact set; if ``premises(S) ⇏ premises(R)`` then R's
+    conclusion is never an available fact under S's premises, so adding R cannot change
+    whether S is derivable, and S may be skipped.  Removals never trigger re-derivation:
+    deleting records only *shrinks* the usable fact set, which (by the same monotonicity)
+    can never make a surviving record newly redundant.
+
+    v1.4.2 §C2 (sequential prune): candidate targets are pruned in ascending id order,
+    each re-checked against the record with the earlier prunes already removed — so two
+    mutually-derivable records are never both deleted (the lower id goes, the higher
+    survives)."""
     R = _record_premise_view(new_data)
     views = [_record_premise_view(d) for d in records]
+
+    def _idnum(v):
+        return int(v["id"][1:]) if v["id"][1:].isdigit() else 0
+
+    cand = [S for S in views if S["id"] != R["id"]
+            and (not _SKIP_RULE or _premises_imply(S, R))]
+    remaining = list(views)                      # working record (R included)
     victims = []
-    for S in views:
-        if S["id"] == R["id"]:
-            continue
-        # §I guard: only examine S when R is usable under S — S's premises imply R's
-        # (restricted premise implication; cached).  Skips most S before any derivation.
-        if not _premises_imply(S, R):
-            continue
-        red, used = _redundant_restricted(S, views)
+    for S in sorted(cand, key=_idnum):
+        red, used = _redundant_restricted(S, remaining)
         if red:
             victims.append((S["id"], used))
+            remaining = [v for v in remaining if v["id"] != S["id"]]
     return victims
 
 
@@ -1908,14 +1943,165 @@ def basis_duplicates(records):
     return dups
 
 
-def apply_reverse_prune(record_dir, new_data):
+# ── v1.4.2 §D: pruned-archive + closure audit ─────────────────────────────────
+def _derive_cert(S, avail_views):
+    """Restricted derivation of ``S``'s canonical conclusion from the ``avail_views``
+    records (+ linear Inventory); returns ``(derivable, used_ids, steps)`` where ``steps``
+    is a compact certificate (record facts, linear-combination multipliers, rounding).
+    The restricted inventory for S must already be installed."""
+    d0 = {v: int(c) for v, c in S["canon"]["coeffs"].items() if int(c) != 0}
+    if not d0:
+        return (False, [], [])
+    extra = [dict(pr) for pr in S["numeric"]]
+    tagmap = {}
+    for E in avail_views:
+        tag = f"__REC__{E['id']}"
+        extra.append({"coeffs": {k: int(v) for k, v in E["disp"]["coeffs"].items()},
+                      "rel": E["disp"]["rel"], "rhs": int(E["disp"]["rhs"]), "text": tag})
+        tagmap[tag] = E["id"]
+    ctx = Context(premises=extra, depth=0, use_conditional_split=False, use_bnb=False,
+                  use_lemmas=False, extra_directions=[d0, _neg(d0)])
+    ctx.saturate()
+    fact = _find_fact(ctx, S["canon"])
+    if fact is None:
+        return (False, [], [])
+    used, cert = [], []
+    for s in traceback(ctx, fact):
+        r = s.get("rule")
+        if r == "premise":
+            note = s.get("note", "")
+            if note in tagmap:
+                used.append(tagmap[note]); cert.append({"rule": "record", "id": tagmap[note], "text": s["text"]})
+            else:
+                cert.append({"rule": "premise", "text": s["text"]})
+        elif r == "combination":
+            cert.append({"rule": "linarith", "mults": s.get("mults"), "text": s["text"]})
+        elif r == "rounding":
+            cert.append({"rule": "rounding", "text": s["text"]})
+        elif r in ("inventory", "conditional"):
+            cert.append({"rule": r, "name": s.get("inventory"), "text": s["text"]})
+    return (True, sorted(set(used)), cert)
+
+
+def _avail_for(S, views):
+    """Records (views) whose premises are implied by ``S``'s premises (restricted);
+    the restricted inventory for S must be installed."""
+    out = []
+    for E in views:
+        if E["id"] == S["id"]:
+            continue
+        if not {p["name"] for p in E["props"]}.issubset(S["pset"]):
+            continue
+        if not all(_restricted_entails(S["numeric"], pr) for pr in E["numeric"]):
+            continue
+        out.append(E)
+    return out
+
+
+def redundancy_certificate(data, records):
+    """Certificate for a forward/reverse redundancy decision on ``data`` against the
+    existing ``records`` (restricted criterion).  Returns ``(is_redundant, used_ids,
+    steps)`` — mirrors ``_redundant_restricted`` (step 1: Inventory alone ⇒ NOT redundant)
+    but also returns the derivation steps for the archive (§D1)."""
+    saved = (DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME)
+    try:
+        props, numeric, canon = _record_props_canon(data)
+        S = {"id": data.get("id"), "props": props,
+             "pset": property_closure({p["name"] for p in props}),
+             "params": {p["name"]: p.get("param") for p in props if "param" in p},
+             "numeric": numeric, "canon": canon, "disp": canon}
+        views = [_record_premise_view(d) for d in records if d.get("id") != data.get("id")]
+        DED.set_active_inventory(S["pset"], S["params"])
+        with _restricted_inventory():
+            if _restricted_derive(S["numeric"], S["canon"], []) is not None:
+                return (False, [], [])                 # Inventory alone ⇒ not redundant
+            avail = _avail_for(S, views)
+            if not avail:
+                return (False, [], [])
+            der, used, cert = _derive_cert(S, avail)
+        return (der, used, cert)
+    finally:
+        DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME = saved
+
+
+def make_prune_entry(data, reason, used_ids, cert, segment=None, commit_index=None):
+    """Build a §D1 archive record for a pruned/rejected proposition ``data``."""
+    import hashlib
+    props, numeric, canon = _record_props_canon(data)
+    content = json.dumps({"props": sorted(p["name"] for p in props), "numeric": numeric,
+                          "canon": {"coeffs": {k: int(v) for k, v in canon["coeffs"].items()},
+                                    "rel": canon["rel"], "rhs": int(canon["rhs"])}}, sort_keys=True)
+    return {"standard_form": data["conjecture"]["formula"], "original_id": data.get("id"),
+            "reason": reason, "segment": segment, "commit_index": commit_index,
+            "props": [{"name": p["name"], **({"param": p["param"]} if "param" in p else {})} for p in props],
+            "numeric": numeric,
+            "canonical": {"coeffs": {k: int(v) for k, v in canon["coeffs"].items()},
+                          "rel": canon["rel"], "rhs": int(canon["rhs"])},
+            "certificate": {"records_used": used_ids, "steps": cert},
+            "content_hash": hashlib.sha256(content.encode()).hexdigest()[:16]}
+
+
+def pruned_archive_append(record_dir, entry):
+    """§D1: append one JSON line to ``record_dir/pruned.jsonl`` (append-only; never
+    deleted — a data file of the pipeline, not a report)."""
+    record_dir = Path(record_dir)
+    record_dir.mkdir(parents=True, exist_ok=True)
+    with open(record_dir / "pruned.jsonl", "a") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def load_pruned_archive(record_dir):
+    p = Path(record_dir) / "pruned.jsonl"
+    if not p.exists():
+        return []
+    return [json.loads(ln) for ln in p.read_text().splitlines() if ln.strip()]
+
+
+def closure_audit(final_records, archive_entries):
+    """§D2: every archived proposition must remain derivable from the FINAL record under
+    the restricted criterion (linear combination + rounding, over the Inventory and the
+    final-record conclusions whose premises it implies).  Because restricted derivation is
+    NOT closed under composition (bounded rounding; the fact set shrinks as records are
+    pruned), a proposition pruned via a now-removed record may fail.  Returns
+    ``(n_ok, failures)`` with ``failures = [(original_id, standard_form, certificate), …]``."""
+    saved = (DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME)
+    try:
+        final_views = [_record_premise_view(d) for d in final_records]
+        ok, fail = 0, []
+        for e in archive_entries:
+            props = e["props"]; numeric = e["numeric"]; canon = e["canonical"]
+            S = {"id": e.get("original_id"), "props": props,
+                 "pset": property_closure({p["name"] for p in props}),
+                 "params": {p["name"]: p.get("param") for p in props if "param" in p},
+                 "numeric": numeric,
+                 "canon": {"coeffs": {k: int(v) for k, v in canon["coeffs"].items()},
+                           "rel": canon["rel"], "rhs": int(canon["rhs"])}, "disp": canon}
+            DED.set_active_inventory(S["pset"], S["params"])
+            with _restricted_inventory():
+                avail = [(f"__REC__{E['id']}", E["disp"]) for E in _avail_for(S, final_views)]
+                der = _restricted_derive(S["numeric"], S["canon"], avail)
+            if der is not None:
+                ok += 1
+            else:
+                fail.append((e.get("original_id"), e.get("standard_form"), e.get("certificate")))
+        return ok, fail
+    finally:
+        DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME = saved
+
+
+def apply_reverse_prune(record_dir, new_data, segment=None, commit_index=None):
     """§I: run reverse pruning against the on-disk record (authoritative current set),
-    delete each redundant record's directory, and return ``[(victim_id, used_ids), …]``.
-    Reading the record from disk keeps the view correct after replacements/earlier
-    prunes."""
+    delete each redundant record's directory, archive each prune (§D1), and return
+    ``[(victim_id, used_ids), …]``."""
     records = load_records(record_dir)
     victims = reverse_prune_targets(new_data, records)
-    for vid, _used in victims:
+    by_id = {d["id"]: d for d in records}
+    for vid, used in victims:
+        vdata = by_id.get(vid)
+        if vdata is not None:
+            _, cused, cert = redundancy_certificate(vdata, [d for d in records if d["id"] != vid])
+            pruned_archive_append(record_dir, make_prune_entry(
+                vdata, "pruned_by_newer", used or cused, cert, segment, commit_index))
         vdir = record_dir / vid
         if vdir.exists():
             shutil.rmtree(vdir)
@@ -2206,9 +2392,12 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
                     f"numeric={c_numeric}\n conclusion={conclusion}\n model={model}")
             # §VI.1: a relaxed-only model (some P ≠ x·y) is a statistic, not fatal.
             stats["relaxed_counter_model"] += 1
-        # depth label (product_needed / split_needed / rounding_only)
-        depth_type = classify_depth(c_numeric, ccoeffs)
-        if not _accepts(accept, depth_type):
+        # v1.4.2 §A1: the LP-NECESSITY class (what extra power is *required* beyond
+        # linear) still drives phase acceptance — the hard tier is "needs a product or a
+        # split", the easy tier is "rounding suffices".  The RECORDED depth_type is set
+        # below from the actual proof STRUCTURE instead (any case split → split_needed).
+        accept_class = classify_depth(c_numeric, ccoeffs)
+        if not _accepts(accept, accept_class):
             stats["depth_mismatch"] += 1
             continue
         # shortest proof
@@ -2260,6 +2449,11 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         inv_used = sorted(all_inv)
         renumber_steps(tb)
         proof_stats = _pstats(tb)
+        # v1.4.2 §A1(b): depth_type reflects the HIGHEST level actually present in the
+        # proof — any case split ⇒ split_needed; else any product step ⇒ product_needed;
+        # else rounding_only.  (v1.4.1 recorded the LP-necessity class, which labelled
+        # case-split proofs product_needed whenever a product was also essential.)
+        depth_type = _structure_depth_type(proof_stats)
         # §VI.2: product conjectures are arithmetically sharp only in the relaxed
         # (envelope) sense — the counter-model gate cannot certify true optimality.
         arith_sharp = "relaxed" if proof_stats.get("product_steps", 0) > 0 else "exact"

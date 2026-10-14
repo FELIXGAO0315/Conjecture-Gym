@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## PolyForge (v1.4.1)
+## PolyForge (v1.4.2)
 
 PolyForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about a mathematical subject, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -105,16 +105,28 @@ python -m run polyforge graph 80 --minutes 150 --seed 2025   # segment 2 (accumu
 ```
 
 Seeds run `2024, 2025, 2026, …`. The first segment starts from an empty record; each later
-segment accumulates on the previous one's record. Because commits (and reverse pruning)
-happen in the main process in premise-index order, a segment's content depends only on its
-seed and the earlier segments' results — **not** on machine speed — *unless* the segment
-hits its time cap, in which case its content does depend on speed. A driver (kept outside
-the repo) backs up the record before each segment, records per-segment statistics in
-`progress.json`, and resumes from the first unfinished segment after an interruption
-(restoring the segment's pre-run backup and re-running it). **Stop rule (v1.4.1):** after a
-segment, stop iff its net gain (new writes − reverse-pruned) falls below 20% of the first
-segment's net, **or** two *consecutive* segments hit the time cap. A single time-limited
-segment does not stop the run (a time cap is not by itself evidence of saturation).
+segment accumulates on the previous one's record.
+
+**Deterministic work budget (v1.4.2).** A segment's main phase stops after at most
+`--max-groups G` premise groups (a *work* budget, not wall-clock), so a segment's content
+is a deterministic function of (seed, target, `G`) — independent of machine speed and
+worker count. The main phase returns an explicit end reason — `TARGET_REACHED`,
+`BUDGET_EXHAUSTED` or `CANDIDATES_EXHAUSTED` — printed in `SEGMENT STATS`. `--minutes` is
+now only a **safety cap**: exceeding it aborts the run loudly (exit 3) and is never a
+stop-rule signal. **Stop rule (v1.4.2):** after a segment, stop iff (a) two *consecutive*
+segments end `BUDGET_EXHAUSTED`, or (b) a segment ends `CANDIDATES_EXHAUSTED`, or (c) its
+net gain (new writes − reverse-pruned) falls below 20% of the first segment's net.
+
+**Run safety (v1.4.2).** The run takes an exclusive `flock` on the record directory for its
+whole lifetime and stamps a per-run token on `record/.run_token`; a second run (or an
+orphan that inherited a descriptor) cannot acquire the lock and is told the holder PID.
+Every record write verifies the on-disk token still matches its own, so a stale/orphan
+writer whose token was rotated away by a restore is refused. Only the main process writes
+the record (workers merely return results), and each worker is killed automatically when
+its parent dies (`PR_SET_PDEATHSIG` on Linux). Record writes are atomic (temp dir +
+`os.replace`), so a crash leaves only complete records and a restart needs zero manual
+steps. The driver (kept outside the repo) backs up the record before each segment, records
+per-segment statistics in `progress.json`, and resumes from the first unfinished segment.
 
 ### Axiom base
 
@@ -301,6 +313,8 @@ the final identity-rewrite step (re-rendered records are tagged
 Each major version has eight minor versions, x.0 through x.7, after which the major version increments: 0.0 → … → 0.7 → 1.0 → … → 1.7 → 2.0 → … → 2.7. A third component (e.g. 0.6.1) marks a patch within a minor version.
 
 ### Changelog
+
+- **v1.4.2** — `depth_type` now reflects the proof's actual structure (any case split ⇒ `split_needed`; else any product step ⇒ `product_needed`; else `rounding_only`) rather than the LP-necessity class used for phase acceptance; the main-phase counter is the hard tier (`split_needed` + `product_needed`), named accordingly. Deterministic work-budget stop rule (`--max-groups`; main phase returns `TARGET_REACHED` / `BUDGET_EXHAUSTED` / `CANDIDATES_EXHAUSTED`; `--minutes` is a safety cap only). Reverse pruning skips targets `N` cannot affect (premise-implication guard, cached) and prunes targets sequentially in id order so two mutually-derivable records are never both removed. Every forward rejection and reverse prune is archived to `record/pruned.jsonl` with a derivation certificate; a `closure_audit` checks every archived proposition is still derivable from the final record. Run safety: exclusive record-dir `flock` + per-run write token, workers killed with the parent (`PDEATHSIG`), atomic writes.
 
 - **v1.4.1** — Redundancy (forward check, reverse pruning, basis audit) now means derivable from existing records by linear combination and rounding only, with premise implication under the same restriction, consistent with how product reasoning is valued at generation time; cached premise implication; production run re-done with a saturation-based stop rule.
 - **v1.4** — Reverse pruning keeps the record a non-redundant basis regardless of discovery order; weakened forms promoted to their cleanest core in one step; reproducible multi-segment production run of the graph domain.

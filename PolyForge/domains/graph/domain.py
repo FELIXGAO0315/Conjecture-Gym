@@ -81,16 +81,29 @@ class GraphDomain(Domain):
         return G.main_commit_check(prop, committed, self.snapshot_records, self.pool)
 
     # ── v1.4 §I: reverse pruning (main process, commit order) ──────────────────
-    def reverse_prune(self, new_data):
+    def reverse_prune(self, new_data, segment=None, commit_index=None):
         """Drop every existing record made redundant by the just-committed
         ``new_data``.  Returns ``[(victim_id, used_ids), …]``.  Keeps the main-process
-        snapshot (read by ``main_commit_check``) consistent with the on-disk record."""
-        victims = G.apply_reverse_prune(self.record_dir, new_data)
+        snapshot (read by ``main_commit_check``) consistent with the on-disk record.
+        Each prune is archived to record/pruned.jsonl (§D1)."""
+        victims = G.apply_reverse_prune(self.record_dir, new_data, segment, commit_index)
         if victims:
             drop = {vid for vid, _ in victims}
             self.snapshot_records = [d for d in self.snapshot_records
                                      if d.get("id") not in drop]
         return victims
+
+    def archive_forward_reject(self, prop, committed, segment=None, commit_index=None):
+        """§D1: archive a main-process forward redundancy rejection
+        (``redundant_vs_record_main``) to record/pruned.jsonl.  Never raises."""
+        try:
+            data = self.assemble_data(prop, "C0", [])
+            existing = list(self.snapshot_records) + [c["data"] for c in committed]
+            _, used, cert = G.redundancy_certificate(data, existing)
+            G.pruned_archive_append(self.record_dir, G.make_prune_entry(
+                data, "redundant_vs_record", used, cert, segment, commit_index))
+        except Exception:
+            pass
 
     # ── v1.4 §I.4: renumber records to contiguous ids (segment end) ────────────
     def renumber_records(self):
