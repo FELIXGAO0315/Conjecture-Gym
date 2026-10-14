@@ -574,10 +574,19 @@ def main(argv):
                   "time (§I.5).")
 
     _, final_total, _ = _init_depth_counts(domain.record_dir)
-    hit_time_limit = bool(minutes is not None and elapsed >= minutes * 60.0 * 0.999)
+    # A segment "hit the time limit" iff the MAIN phase was cut off by its time budget
+    # before producing the target N split_needed records (so time, not the target, was
+    # the binding constraint).  Using the main-phase count — not total elapsed — is what
+    # the multi-segment stop rule needs: with the 85/15 main/supplement split and a
+    # possibly-small supplement cap, a time-limited segment can finish (supplement
+    # exhausted) before the full wall-clock budget elapses.
+    main_added = phase1[0] if phase1 else 0
+    hit_time_limit = bool(target is not None and main_added < target) if target is not None \
+        else bool(minutes is not None and elapsed >= minutes * 60.0 * 0.999)
     print(f"\nSEGMENT STATS  written={added}  replaced={replaced}  pruned={pruned}  "
           f"net={added - pruned}  record_total={final_total}  premise_groups={sampled}  "
-          f"elapsed_s={elapsed:.1f}  hit_time_limit={hit_time_limit}")
+          f"elapsed_s={elapsed:.1f}  main_split_needed={main_added}  "
+          f"hit_time_limit={hit_time_limit}")
 
     _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time_total,
                    writes_by_depth, new_skel_segments, batch_count,
