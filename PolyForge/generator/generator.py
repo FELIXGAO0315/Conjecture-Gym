@@ -243,11 +243,36 @@ def build_md(data: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+# ── run token (v1.4.2 §E2): only the current run may write the record ─────────
+_RUN_TOKEN = None
+
+
+def set_run_token(tok):
+    """Set the token the current run stamps on ``record_dir/.run_token``; every
+    ``write_record`` verifies the on-disk token still matches, so a stale/orphan writer
+    (whose token was rotated away by a restore) is rejected.  ``None`` disables the check
+    (e.g. the hex domain / ad-hoc use)."""
+    global _RUN_TOKEN
+    _RUN_TOKEN = tok
+
+
+class StaleWriterError(RuntimeError):
+    pass
+
+
 # ── atomic record writing ────────────────────────────────────────────────────
 def write_record(data: dict, lean_src: str, record_dir, lean_working_dir=None):
     """Write to a temp dir first, then rename to C{n}/ atomically."""
     name = data["id"]
     record_dir.mkdir(parents=True, exist_ok=True)
+    # §E2: refuse to write if the on-disk token no longer matches this run's token.
+    if _RUN_TOKEN is not None:
+        tok_path = record_dir / ".run_token"
+        on_disk = tok_path.read_text().strip() if tok_path.exists() else None
+        if on_disk != _RUN_TOKEN:
+            raise StaleWriterError(
+                f"record token mismatch (mine={_RUN_TOKEN!r} on-disk={on_disk!r}); "
+                f"refusing to write {name} — this process is a stale/orphan writer.")
     tmp = record_dir / f".{name}.tmp"
     if tmp.exists():
         shutil.rmtree(tmp)

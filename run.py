@@ -54,7 +54,48 @@ import threading
 import time
 from collections import defaultdict
 
+import fcntl
+import uuid
+
 from PolyForge.generator import generator as CG
+
+
+# ── v1.4.2 §E3: workers exit automatically when the parent (run.py) dies ───────
+def _worker_init():
+    """Pool-worker initializer: on Linux, ask the kernel to SIGKILL this worker when
+    its parent process dies (PR_SET_PDEATHSIG), so an orphaned worker can never keep
+    writing after the driver/run is gone."""
+    try:
+        import ctypes
+        ctypes.CDLL("libc.so.6", use_errno=True).prctl(1, int(signal.SIGKILL), 0, 0, 0)
+    except Exception:
+        pass
+
+
+# ── v1.4.2 §E1/§E2: exclusive record-dir lock + per-run token ──────────────────
+def acquire_record_lock(record_dir):
+    """Take an exclusive, non-blocking flock on ``record_dir/.lock`` for the whole run
+    and stamp a fresh token on ``record_dir/.run_token``.  If another driver / orphan
+    already holds the lock, abort and name the holder PID.  Returns ``(fd, token)``; the
+    lock is released when ``fd`` is closed (or the process exits)."""
+    record_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = record_dir / ".lock"
+    fd = open(lock_path, "a+")
+    try:
+        fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        fd.seek(0)
+        holder = fd.read().strip() or "unknown"
+        fd.close()
+        print(f"!!! record directory {record_dir} is locked by another run ({holder}); "
+              f"aborting to avoid concurrent/orphan writers (§E1).")
+        raise SystemExit(4)
+    token = f"{os.getpid()}-{uuid.uuid4().hex[:12]}"
+    fd.seek(0); fd.truncate()
+    fd.write(f"pid={os.getpid()} token={token}\n"); fd.flush()
+    (record_dir / ".run_token").write_text(token)
+    CG.set_run_token(token)
+    return fd, token
 from PolyForge.domains import load_domain, DOMAIN_NAMES
 
 # ── tunables (v0.6.4) ─────────────────────────────────────────────────────────
@@ -182,7 +223,7 @@ def parse_args(argv):
     if domain not in DOMAIN_NAMES:
         print(f"unknown domain: {domain!r} (expected one of {DOMAIN_NAMES})")
         return None
-    target = minutes = seed = workers = None
+    target = minutes = seed = workers = max_groups = None
     rest = argv[3:]
     i = 0
     while i < len(rest):
@@ -193,12 +234,15 @@ def parse_args(argv):
             seed = int(rest[i + 1]); i += 2
         elif a == "--workers":
             workers = int(rest[i + 1]); i += 2
+        elif a == "--max-groups":
+            # v1.4.2 §B1: deterministic main-phase WORK budget (premise groups).
+            max_groups = int(rest[i + 1]); i += 2
         elif a.isdigit():
             target = int(a); i += 1
         else:
             print(f"unrecognised argument: {a}"); return None
     return {"domain": domain, "target": target, "minutes": minutes,
-            "seed": seed, "workers": workers}
+            "seed": seed, "workers": workers, "max_groups": max_groups}
 
 
 def main(argv):
@@ -219,8 +263,14 @@ def main(argv):
 
     target = opts["target"]
     minutes = opts["minutes"]
+    max_groups = opts.get("max_groups")
     base_seed = opts["seed"] if opts["seed"] is not None else random.randrange(1 << 30)
     n_workers, worker_basis = choose_workers(opts["workers"])
+
+    # §E1/§E2: take the exclusive record lock + run token for the whole run (held via
+    # ``_lock_fd`` until the process exits).  Aborts if another run/orphan holds it.
+    _lock_fd, _run_token = acquire_record_lock(domain.record_dir)
+    print(f"  record lock acquired; run token {_run_token}")
 
     print(f"PolyForge v{domain.generator_version}  domain={domain.name}  "
           f"(base seed {base_seed})")
@@ -273,6 +323,7 @@ def main(argv):
     committed = []                           # {"skeleton","data"} for records written this run
     _main_commit_check = getattr(domain, "main_commit_check", None)
     _reverse_prune = getattr(domain, "reverse_prune", None)   # v1.4 §I
+    _archive_reject = getattr(domain, "archive_forward_reject", None)   # v1.4.2 §D1
     pruned_log = []                          # (victim, by_record, [used_ids]) in prune order
     rp_timing = {"rp": 0.0, "commit": 0.0}   # §I.5 reverse-prune vs commit wall-clock
     compile_failed_idx = []                  # premise indices whose Lean compile failed
@@ -288,7 +339,7 @@ def main(argv):
     signal.signal(signal.SIGINT, handler)
 
     ctx = mp.get_context("fork")
-    wp = ctx.Pool(n_workers)
+    wp = ctx.Pool(n_workers, initializer=_worker_init)   # §E3 PDEATHSIG on each worker
     mem = MemMonitor(wp)
     mem.start()
 
@@ -299,16 +350,27 @@ def main(argv):
     WINDOW = n_workers * 4
     COMMIT_BUFFER_CAP = 500        # pause dispatch if this many results await commit
 
-    def run_phase(accept, target, deadline):
+    def run_phase(accept, target, max_groups, safety_deadline):
         """Dispatch / compile / commit loop for ONE phase.  Produces up to ``target``
-        new records of depth_type ``accept`` (``target=None`` → until Ctrl+C or the
-        deadline).  See the module docstring and the per-step comments for the
-        determinism argument (the record is exactly the first ``target`` premise sets,
-        in index order, that pass EVERY check including Lean compile)."""
+        new records of depth_type ``accept``, consuming at most ``max_groups`` premise
+        groups (v1.4.2 §B1 deterministic WORK budget; ``None`` → unbounded).
+
+        Determinism: the phase processes premise groups in strict index order, commits
+        the passers up to ``target``, and otherwise stops after exactly ``max_groups``
+        groups — so the record is a deterministic function of (seed, target, max_groups),
+        independent of worker count and wall-clock.  ``safety_deadline`` (§B3) is a pure
+        safety cap: hitting it aborts the run loudly and is NEVER a normal stop signal.
+
+        Returns ``(added, replaced, boundary_idx, elapsed, end_reason, groups_used)`` with
+        ``end_reason`` ∈ {TARGET_REACHED, BUDGET_EXHAUSTED, CANDIDATES_EXHAUSTED,
+        SAFETY_ABORT}."""
         nonlocal next_id, total_written, sampled, sample_time_total
         nonlocal batch_count, batch_time_total, bisection_total
         phase_t0 = time.time()
         added = replaced = 0
+        phase_start_idx = disp["next"]    # first premise index of this phase
+        groups = {"n": 0}                 # premise groups CONSUMED (collected) this phase
+        end = {"reason": None}
         boundary = {"idx": disp["collect"] - 1}
         done = {"flag": False}            # target slot filled during commit
         pending = []                      # [(idx, prop)] sequenced, awaiting compile+commit
@@ -329,6 +391,8 @@ def main(argv):
                 okk, reason = _main_commit_check(prop, committed)
                 if not okk:
                     stats[reason] += 1
+                    if reason == "redundant_vs_record_main" and _archive_reject is not None:
+                        _archive_reject(prop, committed, base_seed, idx)   # §D1
                     return False
             skel, metrics, dt = prop["skeleton"], prop["metrics"], prop["depth_type"]
             mode, target_name, supersedes, old_entry = "new", None, [], None
@@ -364,7 +428,7 @@ def main(argv):
             # commit order, so the result is independent of the worker count.
             if _reverse_prune is not None:
                 _t_rp = time.time()
-                victims = _reverse_prune(data)
+                victims = _reverse_prune(data, base_seed, idx)
                 rp_timing["rp"] += time.time() - _t_rp
                 for vid, used in victims:
                     for hh in [hh for hh, nn in existing_hashes.items() if nn == vid]:
@@ -428,12 +492,18 @@ def main(argv):
         def dispatch_full():
             return target is not None and added + len(pending) >= target
 
+        def budget_exhausted():
+            return max_groups is not None and groups["n"] >= max_groups
+
         def stop_dispatch():
             if stop["flag"] or soundness["err"] or done["flag"]:
                 return True
             if dispatch_full():
                 return True
-            if deadline is not None and time.time() >= deadline:
+            if budget_exhausted():                       # §B1 deterministic work budget
+                return True
+            if safety_deadline is not None and time.time() >= safety_deadline:
+                end["reason"] = "SAFETY_ABORT"           # §B3 loud abort, never a stop signal
                 return True
             return False
 
@@ -454,7 +524,9 @@ def main(argv):
             # (1) dispatch to fill the COMPUTE window, unless the commit buffer is
             # full (results already collected/sequenced but not yet committed).
             while (not halt) and len(inflight) < WINDOW \
-                    and (len(ready) + len(pending)) < COMMIT_BUFFER_CAP:
+                    and (len(ready) + len(pending)) < COMMIT_BUFFER_CAP \
+                    and (max_groups is None
+                         or disp["next"] < phase_start_idx + max_groups):
                 inflight[disp["next"]] = wp.apply_async(CG.worker, (disp["next"], accept))
                 disp["next"] += 1
             progressed = False
@@ -468,6 +540,7 @@ def main(argv):
                 tag, idx, payload, lstats, elapsed = ready.pop(disp["collect"])
                 disp["collect"] += 1
                 sampled += 1
+                groups["n"] += 1          # §B1: a premise group consumed this phase
                 sample_time_total += elapsed
                 for k, v in lstats.items():
                     stats[k] += v
@@ -499,29 +572,37 @@ def main(argv):
         disp["next"] = boundary["idx"] + 1
         inflight.clear()
         ready.clear()
-        return added, replaced, boundary["idx"], time.time() - phase_t0
+        # §B2 explicit end reason
+        if end["reason"] != "SAFETY_ABORT":
+            if done["flag"]:
+                end["reason"] = "TARGET_REACHED"
+            elif budget_exhausted():
+                end["reason"] = "BUDGET_EXHAUSTED"
+            else:
+                end["reason"] = "CANDIDATES_EXHAUSTED"
+        return (added, replaced, boundary["idx"], time.time() - phase_t0,
+                end["reason"], groups["n"])
 
     t0 = time.time()
-    if minutes is not None:
-        # §IV (v0.6.4): 85% of the time budget for the main phase, 15% for supplement.
-        main_deadline = t0 + minutes * 60.0 * 0.85
-        full_deadline = t0 + minutes * 60.0
-    else:
-        main_deadline = full_deadline = None
+    # v1.4.2 §B1/§B3: the main-phase budget is a deterministic WORK budget
+    # (``max_groups`` premise groups).  ``--minutes`` is now only a SAFETY cap — hitting
+    # it aborts the run loudly (§B3) and is never a normal stop signal.
+    safety_deadline = (t0 + minutes * 60.0) if minutes is not None else None
+    supp_groups = max_groups                 # supplement gets the same deterministic budget
 
     phase1 = phase2 = None
     try:
-        # ── main phase: split_needed only ─────────────────────────────────────
-        phase1 = run_phase("split_needed", target, main_deadline)
+        # ── main phase: hard tier (split_needed OR product_needed) ─────────────
+        phase1 = run_phase("split_needed", target, max_groups, safety_deadline)
         S = phase1[0]
-        if not soundness["err"]:
+        if phase1[4] != "SAFETY_ABORT" and not soundness["err"]:
             # ── supplement phase: rounding_only, CAP floor(S * RO_MAX_RATIO) ────
             ro_cap = int(S * domain.ro_max_ratio)
             if ro_cap > 0:
                 stop["flag"] = False      # re-arm after a Ctrl+C-ended main phase
                 print(f"\nsupplement phase: up to {ro_cap} rounding_only "
                       f"(cap = floor({S} * {domain.ro_max_ratio}))")
-                phase2 = run_phase("rounding_only", ro_cap, full_deadline)
+                phase2 = run_phase("rounding_only", ro_cap, supp_groups, safety_deadline)
             else:
                 print(f"\nsupplement phase skipped: S={S} → cap floor("
                       f"{S} * {domain.ro_max_ratio}) = 0 rounding_only")
@@ -531,6 +612,13 @@ def main(argv):
         wp.join()
 
     elapsed = time.time() - t0
+
+    # §B3: a safety-cap abort is a loud failure, never a graceful stop.
+    if phase1 is not None and phase1[4] == "SAFETY_ABORT":
+        print(f"\n!!! SAFETY-CAP ABORT — main phase exceeded the {minutes:g}-minute safety "
+              f"cap after {phase1[5]} groups.  This is NOT a stop-rule signal; investigate "
+              f"(too slow / stuck).  Record left as-is for inspection.")
+        return 3
 
     if soundness["err"]:
         idx, msg = soundness["err"]
@@ -574,19 +662,17 @@ def main(argv):
                   "time (§I.5).")
 
     _, final_total, _ = _init_depth_counts(domain.record_dir)
-    # A segment "hit the time limit" iff the MAIN phase was cut off by its time budget
-    # before producing the target N split_needed records (so time, not the target, was
-    # the binding constraint).  Using the main-phase count — not total elapsed — is what
-    # the multi-segment stop rule needs: with the 85/15 main/supplement split and a
-    # possibly-small supplement cap, a time-limited segment can finish (supplement
-    # exhausted) before the full wall-clock budget elapses.
+    # v1.4.2 §B2: the segment's status is the MAIN phase's explicit end reason.  Only
+    # BUDGET_EXHAUSTED counts as a "limited segment"; TARGET_REACHED and
+    # CANDIDATES_EXHAUSTED do not.  The main-phase count is the hard tier
+    # (split_needed OR product_needed) — see §A1; wall-clock is informational only.
     main_added = phase1[0] if phase1 else 0
-    hit_time_limit = bool(target is not None and main_added < target) if target is not None \
-        else bool(minutes is not None and elapsed >= minutes * 60.0 * 0.999)
+    main_end_reason = phase1[4] if phase1 else "NONE"
+    main_groups = phase1[5] if phase1 else 0
     print(f"\nSEGMENT STATS  written={added}  replaced={replaced}  pruned={pruned}  "
           f"net={added - pruned}  record_total={final_total}  premise_groups={sampled}  "
-          f"elapsed_s={elapsed:.1f}  main_split_needed={main_added}  "
-          f"hit_time_limit={hit_time_limit}")
+          f"main_hard_written={main_added}  main_groups={main_groups}  "
+          f"main_end_reason={main_end_reason}  elapsed_s_informational={elapsed:.1f}")
 
     _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time_total,
                    writes_by_depth, new_skel_segments, batch_count,
