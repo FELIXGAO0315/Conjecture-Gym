@@ -48,7 +48,7 @@ DATA = ROOT / "data" / "graph_pool.json"
 RECORD = Path(os.environ.get("POLYFORGE_GRAPH_RECORD", str(ROOT / "record")))
 LEAN_DIR = F.LEAN_DIR
 
-GENERATOR_VERSION = "1.4.1"
+GENERATOR_VERSION = "1.4.2"
 MAIN_COEFFS = (1, 2)          # main-variable coefficient
 # v1.2 §III.5: other-term coefficients widened to |·| ≤ 3 so conclusions like
 # 2m ≥ 3n (handshake under min_deg ≥ 3) can be expressed.

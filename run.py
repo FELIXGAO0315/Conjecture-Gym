@@ -326,6 +326,7 @@ def main(argv):
     _archive_reject = getattr(domain, "archive_forward_reject", None)   # v1.4.2 §D1
     pruned_log = []                          # (victim, by_record, [used_ids]) in prune order
     rp_timing = {"rp": 0.0, "commit": 0.0}   # §I.5 reverse-prune vs commit wall-clock
+    fwd_timing = {"t": 0.0}                   # §P7 main-process forward redundancy check
     compile_failed_idx = []                  # premise indices whose Lean compile failed
     protected = set()                        # §6 (v0.7): C-names cited in some lemmas_used
 
@@ -388,7 +389,9 @@ def main(argv):
             # domain main-process commit checks (graph §V re-check / §VI Dalmatian);
             # done here in strict index order so the record stays reproducible.
             if _main_commit_check is not None:
+                _t_fwd = time.time()
                 okk, reason = _main_commit_check(prop, committed)
+                fwd_timing["t"] += time.time() - _t_fwd
                 if not okk:
                     stats[reason] += 1
                     if reason == "redundant_vs_record_main" and _archive_reject is not None:
@@ -588,7 +591,14 @@ def main(argv):
     # (``max_groups`` premise groups).  ``--minutes`` is now only a SAFETY cap — hitting
     # it aborts the run loudly (§B3) and is never a normal stop signal.
     safety_deadline = (t0 + minutes * 60.0) if minutes is not None else None
-    supp_groups = max_groups                 # supplement gets the same deterministic budget
+    # v1.4.2 §P1: the SUPPLEMENT phase is also a deterministic WORK budget (no wall-clock).
+    # Its default preserves the v1.4.1 main/supplement split, which was 85% / 15% of the
+    # time budget: supp_groups = round(main_groups · 15/85).  (The supplement additionally
+    # stops at its record cap floor(S · ro_max_ratio); whichever binds first.)
+    supp_groups = max(1, round(max_groups * 15.0 / 85.0)) if max_groups is not None else None
+    if max_groups is not None:
+        print(f"  work budget: main max_groups={max_groups}, supplement max_groups={supp_groups} "
+              f"(15/85 of main)")
 
     phase1 = phase2 = None
     try:
@@ -669,10 +679,19 @@ def main(argv):
     main_added = phase1[0] if phase1 else 0
     main_end_reason = phase1[4] if phase1 else "NONE"
     main_groups = phase1[5] if phase1 else 0
+    # §P7 timing breakdown (wall-clock, main process): generation time is the parallel
+    # worker CPU sum (overlapped with the main loop); forward / reverse / compile are the
+    # serial main-process timers; "other" is the remaining wall (dispatch/collect/write +
+    # time spent waiting for workers, i.e. where generation overlaps).
+    t_gen = sample_time_total; t_fwd = fwd_timing["t"]; t_rev = rp_timing["rp"]
+    t_comp = batch_time_total
+    t_other = max(0.0, elapsed - t_fwd - t_rev - t_comp)
     print(f"\nSEGMENT STATS  written={added}  replaced={replaced}  pruned={pruned}  "
           f"net={added - pruned}  record_total={final_total}  premise_groups={sampled}  "
           f"main_hard_written={main_added}  main_groups={main_groups}  "
-          f"main_end_reason={main_end_reason}  elapsed_s_informational={elapsed:.1f}")
+          f"main_end_reason={main_end_reason}  elapsed_s_informational={elapsed:.1f}  "
+          f"t_gen_cpu={t_gen:.1f}  t_forward={t_fwd:.1f}  t_reverse={t_rev:.1f}  "
+          f"t_compile={t_comp:.1f}  t_other={t_other:.1f}")
 
     _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time_total,
                    writes_by_depth, new_skel_segments, batch_count,

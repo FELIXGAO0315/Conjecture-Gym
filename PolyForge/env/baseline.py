@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""PolyForge v1.4.2 §F1: one-line-tactic baseline over the exported graph tasks.
+"""PolyForge v1.4.2 §F1/§P8: one-line / bounded-tactic baselines over the exported tasks.
 
-Two levels, each trying tactics {omega, linarith, nlinarith, nlinarith <;> omega}:
-  L0 — bare tactic on the task's own hypotheses (premises only);
-  L1 — first instantiate every applicable linear Inventory lemma as a `have`
-       hypothesis, then the same tactics.
-Scoring reuses the oracle's verifier (static scan + compile + env-diff + type match +
-standard-axioms), so a "solve" means a genuine reward-1 proof.
+Levels (each a "solve" = genuine reward 1 via the oracle verifier path):
+  L0  bare tactic on the task's own hypotheses (premises only);
+  L1  + all applicable LINEAR Inventory facts as `have`s, then the L0 tactics;
+  L2  + the nonlinear/product Inventory facts (handshake, edge-count, card≤α·χ, …) as
+      `have`s, then nlinarith variants (nlinarith's degree-2 search multiplies pairs of
+      the ≤40 provided facts);
+  L3  bounded case split: up to 2 variables whose premise/inventory range has width ≤ 12
+      get `interval_cases` (nested), then {omega, nlinarith} with the L2 facts.
+Per-task timeout 60 s; tasks verified in parallel; structural depth_type from proof_stats.
 
-Usage: python -m PolyForge.env.baseline <export_dir> [--record <record_dir>] [--nprocs N]
-Reports solve counts per difficulty tier and per (structure) depth_type, and the list of
-tasks solved at L0.
+Usage: python -m PolyForge.env.baseline <export_dir> [--record DIR] [--nprocs N] [--json OUT]
 """
-import json, sys
+import json, sys, time
 from collections import defaultdict
 from pathlib import Path
 
@@ -23,21 +24,31 @@ from PolyForge.domains.graph import generator as G
 from PolyForge.domains.graph import formalizer as F
 from PolyForge.env import verifier as V
 
-TACTICS = ["omega", "linarith", "nlinarith", "nlinarith <;> omega"]
+TACTICS0 = ["omega", "linarith", "nlinarith", "nlinarith <;> omega"]
+TACTICS2 = ["nlinarith {FACTS}", "nlinarith {FACTS} <;> omega", "nlinarith"]
+TACTICS3 = ["omega", "nlinarith {FACTS}"]
+MAX_HINTS = 40
 dom = GraphDomain(); D.configure(dom)
+# product-fact Lean wrappers that take only G (no property argument)
+_PRODG = {"handshake_min": "handshake_min_int", "handshake_max": "handshake_max_int",
+          "edge_card_bound": "two_mul_edges_le_card_sq_sub_card_int",
+          "card_le_alpha_chi": "card_le_alpha_chi_int"}
+_NAT = {v: z[1:z.rindex(" :")] for v, z in F._Z.items()}   # ℤ term "(X : ℤ)" -> ℕ term "X"
 
 
-def l1_preamble(data):
-    """`have` lines instantiating the applicable linear Inventory lemmas for this task,
-    plus the hyp names, reusing the formalizer's wrapper rendering (§F1 L1)."""
+def _active(data):
     cj = data["conjecture"]
     props = cj["properties_premises"]; numeric = cj["numeric_premises"]
     pset = G.property_closure({p["name"] for p in props})
     params = {p["name"]: p.get("param") for p in props if "param" in p}
-    D.configure(dom); G.DED.set_active_inventory(pset, params)
-    prop_hyps = {p["name"]: f"hp{i}" for i, p in enumerate(props, 1)}
+    G.DED.set_active_inventory(pset, params)
+    return props, numeric, pset, params, {p["name"]: f"hp{i}" for i, p in enumerate(props, 1)}
+
+
+def l1_preamble(data):
+    props, numeric, pset, params, prop_hyps = _active(data)
     lines, names, fid = [], [], 1
-    for e in G.DED.INVENTORY:                       # linear Inventory facts only
+    for e in G.DED.INVENTORY:
         if G._has_product(e["conclusion"]["coeffs"]):
             continue
         coeffs, const, rel = D._conc_to_form(e["conclusion"])
@@ -49,7 +60,6 @@ def l1_preamble(data):
         except Exception:
             continue
         lines += buf; names.append(f"s{fid}"); fid += 1
-    # identity equalities (Gallai always; tree / regular when premised)
     ids = [("heqg", "gallai_int G")]
     pn = {p["name"] for p in props}
     if "is_tree" in pn:
@@ -59,84 +69,166 @@ def l1_preamble(data):
         ids += [("heqre", f"regular_edges_int G {hr}"), ("heqrx", f"regular_max_int' G {hr}"),
                 ("heqrn", f"regular_min_int' G {hr}")]
     for nm, call in ids:
-        lines.append(f"  have {nm} := {call}")
-        lines.append(f"  try push_cast at {nm}")
+        lines.append(f"  have {nm} := {call}"); lines.append(f"  try push_cast at {nm}")
         names.append(nm)
     return lines, names
+
+
+def l2_preamble(data):
+    lines, names = l1_preamble(data)
+    props, numeric, pset, params, prop_hyps = _active(data)
+    k = 1
+    for e in G.DED.PRODUCT_FACTS:
+        nm = e["name"]
+        if nm in _PRODG:
+            call = f"{_PRODG[nm]} G"
+        elif nm == "bipartite_edges":
+            try:
+                call = f"bipartite_four_mul_edges_int G {F._prop_term('is_bipartite', prop_hyps)}"
+            except Exception:
+                continue
+        else:
+            continue
+        hid = f"p{k}"; lines.append(f"  have {hid} := {call}")
+        lines.append(f"  try push_cast at {hid}"); names.append(hid); k += 1
+    return lines, names
+
+
+def _var_bounds(numeric):
+    tree = G._build_split_tree(G._premise_forms(numeric), [], D.DEFAULT_SPLIT_DEPTH, products=True)
+    out = {}
+    for v in G.VARS:
+        slo, lo = G._vint(tree, G._cvec({v: 1}), D.DEFAULT_SPLIT_DEPTH)
+        shi, neg = G._vint(tree, G._cvec({v: -1}), D.DEFAULT_SPLIT_DEPTH)
+        a = lo if slo == "opt" else None
+        b = (-neg) if shi == "opt" else None
+        if a is not None and b is not None and 0 <= b - a <= 12:
+            out[v] = (int(a), int(b))
+    return out
+
+
+def l3_prefix(data):
+    """L2 facts + interval_cases on up to 2 small-range variables; returns (lines, names)
+    or None if no suitable variable."""
+    props, numeric, pset, params, prop_hyps = _active(data)
+    usable = G.finite_vars(pset)
+    bounds = _var_bounds(numeric)
+    pick = [v for v in G.VARS if v in bounds and v in usable and v in _NAT][:2]
+    if not pick:
+        return None
+    lines, names = l2_preamble(data)
+    for v in pick:
+        b = bounds[v][1]
+        lines.append(f"  have hb_{v} : {_NAT[v]} ≤ {b} := by omega")
+        lines.append(f"  interval_cases {_NAT[v]}")
+    return lines, names
+
+
+def _mk(level, tac, pre_lines, names):
+    facts = "[" + ", ".join(names[:MAX_HINTS]) + "]" if names else "[]"
+    body = tac.replace("{FACTS}", facts)
+    if level == "L0":
+        return body
+    return "\n".join(pre_lines) + "\n  " + (body if level != "L3" else f"all_goals ({body})")
 
 
 def main(argv):
     export_dir = Path(argv[0])
     rec_dir = Path("/home/felix_gao/Conjecture-Gym/PolyForge/domains/graph/record")
-    nprocs = 4
+    nprocs, jout = 4, None
     if "--record" in argv:
         rec_dir = Path(argv[argv.index("--record") + 1])
     if "--nprocs" in argv:
         nprocs = int(argv[argv.index("--nprocs") + 1])
+    if "--json" in argv:
+        jout = Path(argv[argv.index("--json") + 1])
     tasks = [json.loads(l) for l in (export_dir / "tasks.jsonl").read_text().splitlines() if l.strip()]
     recs = {}
     for d in rec_dir.iterdir():
         j = d / f"{d.name}.json"
         if j.exists():
-            data = json.load(open(j))
-            recs[data["conjecture"]["formula"]] = data
+            dd = json.load(open(j)); recs[dd["conjecture"]["formula"]] = dd
     print(f"{len(tasks)} tasks; {len(recs)} records", flush=True)
 
-    # build L0 and L1 candidate proofs (task, level, tactic_index, proof)
     cand = []
-    l1_by_task = {}
     for t in tasks:
-        for ti, tac in enumerate(TACTICS):
-            cand.append((t["task_id"], "L0", ti, tac))
-        data = recs.get(t["formula"])
-        if data is not None:
-            try:
-                lines, names = l1_preamble(data)
-                pre = "\n".join(lines)
-                refs = "[" + ", ".join(names) + "]" if names else ""
-                l1_by_task[t["task_id"]] = True
-                for ti, tac in enumerate(TACTICS):
-                    body = pre + "\n  " + (tac + " " + refs if refs and tac != "omega" else tac)
-                    cand.append((t["task_id"], "L1", ti, body))
-            except Exception as ex:
-                print("L1 build failed", t["task_id"], ex, flush=True)
-    print(f"{len(cand)} candidate (task,level,tactic) proofs to verify", flush=True)
+        tid = t["task_id"]; data = recs.get(t["formula"])
+        for tac in TACTICS0:
+            cand.append((tid, "L0", _mk("L0", tac, None, None)))
+        if data is None:
+            continue
+        try:
+            l1l, l1n = l1_preamble(data)
+            for tac in TACTICS0:
+                cand.append((tid, "L1", _mk("L1", tac, l1l, l1n)))
+        except Exception:
+            pass
+        try:
+            l2l, l2n = l2_preamble(data)
+            for tac in TACTICS2:
+                cand.append((tid, "L2", _mk("L2", tac, l2l, l2n)))
+        except Exception:
+            pass
+        try:
+            r = l3_prefix(data)
+            if r is not None:
+                l3l, l3n = r
+                for tac in TACTICS3:
+                    cand.append((tid, "L3", _mk("L3", tac, l3l, l3n)))
+        except Exception:
+            pass
+    print(f"{len(cand)} candidate proofs to verify (timeout 60s each)", flush=True)
 
-    ver = V.Verifier("graph", nprocs=nprocs)
-    import time
+    ver = V.Verifier("graph", nprocs=nprocs, timeout=60.0)
     t0 = time.time()
-    results = ver.verify_batch([(tid, proof) for tid, _lv, _ti, proof in cand])
+    results = ver.verify_batch([(tid, proof) for tid, _lv, proof in cand])
     ver.close()
     print(f"verified in {time.time()-t0:.0f}s", flush=True)
 
-    solved = defaultdict(dict)       # task_id -> {"L0": tac_or_None, "L1": tac_or_None}
-    for (tid, lv, ti, _proof), r in zip(cand, results):
+    solved = defaultdict(dict)
+    for (tid, lv, _p), r in zip(cand, results):
         if r.reward == 1.0 and solved[tid].get(lv) is None:
-            solved[tid][lv] = TACTICS[ti]
+            solved[tid][lv] = True
 
     tier = {t["task_id"]: t["difficulty"] for t in tasks}
     sdt = {t["task_id"]: G._structure_depth_type(t["proof_stats"]) for t in tasks}
-    tab = defaultdict(lambda: {"n": 0, "L0": 0, "L1": 0})
-    tot = {"n": 0, "L0": 0, "L1": 0}
+    LV = ["L0", "L1", "L2", "L3"]
+    tab = defaultdict(lambda: {k: 0 for k in ["n"] + LV})
+    tot = {k: 0 for k in ["n"] + LV}
     for t in tasks:
         tid = t["task_id"]; key = (tier[tid], sdt[tid])
         tab[key]["n"] += 1; tot["n"] += 1
-        if solved[tid].get("L0"): tab[key]["L0"] += 1; tot["L0"] += 1
-        if solved[tid].get("L1"): tab[key]["L1"] += 1; tot["L1"] += 1
+        for lv in LV:
+            if solved[tid].get(lv):
+                tab[key][lv] += 1; tot[lv] += 1
 
-    print("\n=== F1 baseline: solved per (tier × structure depth_type) ===")
-    print(f"{'tier':8s} {'depth_type':16s} {'n':>4s} {'L0':>5s} {'L1':>5s}")
+    print("\n=== baseline: solved per (tier × structure depth_type) ===")
+    print(f"{'tier':8s} {'depth_type':16s} {'n':>4s} " + " ".join(f"{lv:>4s}" for lv in LV))
     for key in sorted(tab):
         c = tab[key]
-        print(f"{key[0]:8s} {key[1]:16s} {c['n']:>4d} {c['L0']:>5d} {c['L1']:>5d}")
-    print(f"{'TOTAL':8s} {'':16s} {tot['n']:>4d} {tot['L0']:>5d} {tot['L1']:>5d}")
-    rate = 100.0 * tot["L0"] / tot["n"]
-    print(f"\nL0 solve rate: {tot['L0']}/{tot['n']} = {rate:.1f}%   "
-          f"L1 solve rate: {tot['L1']}/{tot['n']} = {100.0*tot['L1']/tot['n']:.1f}%")
-    l0list = sorted(tid for tid in solved if solved[tid].get("L0"))
-    print(f"\ntasks solved at L0 ({len(l0list)}): " + ", ".join(l0list))
-    print(f"\n[DECISION F1] L0 rate {'EXCEEDS' if rate > 30 else 'is below'} 30% "
-          f"→ tier recalibration {'PROPOSED (not applied this round)' if rate > 30 else 'not needed'}")
+        print(f"{key[0]:8s} {key[1]:16s} {c['n']:>4d} " + " ".join(f"{c[lv]:>4d}" for lv in LV))
+    print(f"{'TOTAL':8s} {'':16s} {tot['n']:>4d} " + " ".join(f"{tot[lv]:>4d}" for lv in LV))
+    for lv in LV:
+        print(f"{lv} solve rate: {tot[lv]}/{tot['n']} = {100.0*tot[lv]/tot['n']:.1f}%")
+    for lv in ("L2", "L3"):
+        sl = sorted(tid for tid in solved if solved[tid].get(lv))
+        print(f"tasks solved at {lv} ({len(sl)}): " + ", ".join(sl))
+    # §V4 [DECISION]: L2/L3 solving >30% of product_needed/split_needed hard tasks
+    for hard_dt in ("product_needed", "split_needed"):
+        n = sum(1 for t in tasks if sdt[t["task_id"]] == hard_dt)
+        for lv in ("L2", "L3"):
+            s = sum(1 for t in tasks if sdt[t["task_id"]] == hard_dt and solved[t["task_id"]].get(lv))
+            if n and 100.0 * s / n > 30:
+                print(f"[DECISION] {lv} solves {s}/{n}={100.0*s/n:.0f}% of {hard_dt} (>30%) "
+                      f"→ PROPOSE difficulty = lowest solving baseline level (not applied)")
+    if jout is not None:
+        jout.write_text(json.dumps({
+            "levels": LV, "total": tot,
+            "by_tier_depth": {f"{k[0]}|{k[1]}": v for k, v in tab.items()},
+            "solved_L2": sorted(tid for tid in solved if solved[tid].get("L2")),
+            "solved_L3": sorted(tid for tid in solved if solved[tid].get("L3")),
+        }, indent=2))
+        print(f"wrote {jout}")
 
 
 if __name__ == "__main__":

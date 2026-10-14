@@ -125,8 +125,22 @@ writer whose token was rotated away by a restore is refused. Only the main proce
 the record (workers merely return results), and each worker is killed automatically when
 its parent dies (`PR_SET_PDEATHSIG` on Linux). Record writes are atomic (temp dir +
 `os.replace`), so a crash leaves only complete records and a restart needs zero manual
-steps. The driver (kept outside the repo) backs up the record before each segment, records
-per-segment statistics in `progress.json`, and resumes from the first unfinished segment.
+steps.
+
+**Production driver (v1.4.2, `scripts/run_production.py`).** The cross-segment driver lives
+in the repo. Before each segment it backs up the whole record (C-dirs + `pruned.jsonl` +
+`.production_state.jsonl`); after each completed segment it appends one line to
+`record/.production_state.jsonl` with the stats, the `gen/forward/reverse/compile/other`
+timing breakdown, and the sha256 of the record and of `pruned.jsonl`. On start it verifies
+those hashes against disk — matching ⇒ resume from the next seed, mismatch ⇒ restore the
+in-progress segment's pre-run backup and redo it (zero manual steps; a SIGKILL mid-commit
+resumes to a byte-identical record). When the run ends (or stops early) the driver itself
+runs the post-run audits — basis + `closure_audit`, reproducibility of segment 1, export +
+stratified split + oracle + anti-cheat + standalone recompile, and the L0–L3 tactic
+baselines — into `record/production_summary.json`, so the audits complete even if the
+launching session dies. `PolyForge/env/baseline.py` adds the L2 (all Inventory facts incl.
+products, then `nlinarith`) and L3 (`interval_cases` on ≤2 small-range variables) tactic
+baselines; `PolyForge/env/oracle_check.py` runs the oracle + anti-cheat + recompile audit.
 
 ### Axiom base
 
