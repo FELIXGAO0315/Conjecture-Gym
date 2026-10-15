@@ -1,16 +1,16 @@
 {
   "id": "C202",
-  "created_at": "2026-10-14T02:11:02.709187+00:00",
+  "created_at": "2026-10-15T05:54:10.434779+00:00",
   "generator": {
-    "version": "1.4.1",
-    "seed": 2026007242
+    "version": "1.4.2",
+    "seed": 2026007927
   },
   "rendered_with": "1.3",
   "conjecture": {
-    "formula": "if ((nontrivial) and (is_connected) and (diam >= 2)), then (diam <= 2*m - 2*min_deg)",
+    "formula": "if ((has_cycle) and (is_connected) and (alpha >= tau)), then (diam >= -alpha + girth)",
     "properties_premises": [
       {
-        "name": "nontrivial"
+        "name": "has_cycle"
       },
       {
         "name": "is_connected"
@@ -18,40 +18,41 @@
     ],
     "numeric_premises": [
       {
-        "text": "diam >= 2",
+        "text": "alpha >= tau",
         "coeffs": {
-          "diam": 1
+          "alpha": 1,
+          "tau": -1
         },
         "rel": ">=",
-        "rhs": 2
+        "rhs": 0
       }
     ],
     "conclusion": {
-      "text": "diam <= 2*m - 2*min_deg",
+      "text": "diam >= -alpha + girth",
       "coeffs": {
+        "alpha": 1,
         "diam": 1,
-        "m": -2,
-        "min_deg": 2
-      },
-      "rel": "<=",
-      "rhs": 0
-    },
-    "canonical_form": {
-      "text": "2*m >= 2*min_deg + diam",
-      "coeffs": {
-        "diam": -1,
-        "m": 2,
-        "min_deg": -2
+        "girth": -1
       },
       "rel": ">=",
       "rhs": 0
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose nontrivial, is_connected, diam >= 2. Then diam <= 2*m - 2*min_deg."
+    "canonical_form": {
+      "text": "alpha >= -diam + girth",
+      "coeffs": {
+        "diam": 1,
+        "alpha": 1,
+        "girth": -1
+      },
+      "rel": ">=",
+      "rhs": 0
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose has_cycle, is_connected, alpha >= tau. Then diam >= -alpha + girth."
   },
   "primary_var": "diam",
   "dalmatian": "significant",
   "properties": [
-    "nontrivial",
+    "has_cycle",
     "is_connected"
   ],
   "conclusion_property": null,
@@ -59,197 +60,114 @@
   "promoted_from": null,
   "proof": {
     "inventory_used": [
-      "connected_edges",
-      "connected_min_deg",
-      "diam_le_card_sub_one",
-      "handshake_min"
+      "gallai",
+      "girth_le_card",
+      "girth_le_diam"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
         "rule": "inventory",
-        "text": "1*n + -1*diam + -1 >= 0",
+        "text": "2*diam + -1*girth + 1 >= 0",
         "coeffs": {
-          "diam": "-1",
-          "n": "1"
+          "girth": "-1",
+          "diam": "2"
         },
-        "const": "-1",
+        "const": "1",
         "rel": ">=",
-        "inventory": "diam_le_card_sub_one"
+        "inventory": "girth_le_diam"
       },
       {
         "fid": 2,
         "rule": "inventory",
-        "text": "2*m + -1*P_n_mindeg >= 0",
+        "text": "1*n + -1*girth >= 0",
         "coeffs": {
-          "P_n_mindeg": "-1",
-          "m": "2"
+          "girth": "-1",
+          "n": "1"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "handshake_min"
+        "inventory": "girth_le_card"
       },
       {
         "fid": 3,
         "rule": "premise",
-        "text": "1*diam + -2 >= 0",
+        "text": "1*alpha + -1*tau >= 0",
         "coeffs": {
-          "diam": "1"
+          "alpha": "1",
+          "tau": "-1"
         },
-        "const": "-2",
+        "const": "0",
         "rel": ">=",
-        "note": "diam >= 2"
+        "note": "alpha >= tau"
       },
       {
         "fid": 4,
         "rule": "inventory",
-        "text": "-1*n + 1*m + 1 >= 0",
+        "text": "-1*n + 1*alpha + 1*tau == 0",
         "coeffs": {
-          "m": "1",
+          "alpha": "1",
+          "tau": "1",
           "n": "-1"
         },
-        "const": "1",
-        "rel": ">=",
-        "inventory": "connected_edges"
+        "const": "0",
+        "rel": "==",
+        "inventory": "gallai"
       },
       {
         "fid": 5,
         "rule": "combination",
-        "text": "2*m + -1*diam + -2 >= 0",
+        "text": "1*alpha + 1*diam + -1*girth + 1/2 >= 0",
         "coeffs": {
-          "diam": "-1",
-          "m": "2"
+          "diam": "1",
+          "alpha": "1",
+          "girth": "-1"
         },
-        "const": "-2",
-        "rel": ">=",
-        "tactic": "linarith",
-        "deps": [
-          3,
-          4,
-          1
-        ],
-        "mults": [
-          "1",
-          "2",
-          "2"
-        ]
-      },
-      {
-        "fid": 6,
-        "rule": "inventory",
-        "text": "1*min_deg + -1 >= 0",
-        "coeffs": {
-          "min_deg": "1"
-        },
-        "const": "-1",
-        "rel": ">=",
-        "inventory": "connected_min_deg"
-      },
-      {
-        "fid": 7,
-        "rule": "combination",
-        "text": "1*n + -3 >= 0",
-        "coeffs": {
-          "n": "1"
-        },
-        "const": "-3",
-        "rel": ">=",
-        "tactic": "linarith",
-        "deps": [
-          3,
-          1
-        ],
-        "mults": [
-          "1",
-          "1"
-        ]
-      },
-      {
-        "fid": 8,
-        "rule": "product",
-        "text": "-1*n + -3*min_deg + 1*P_n_mindeg + 3 >= 0",
-        "coeffs": {
-          "P_n_mindeg": "1",
-          "n": "-1",
-          "min_deg": "-3"
-        },
-        "const": "3",
-        "rel": ">=",
-        "tactic": "mul_nonneg",
-        "deps": [
-          6,
-          7
-        ],
-        "prod_var": "P_n_mindeg",
-        "prod_factors": [
-          [
-            "n",
-            "lower",
-            3,
-            7
-          ],
-          [
-            "min_deg",
-            "lower",
-            1,
-            6
-          ]
-        ]
-      },
-      {
-        "fid": 9,
-        "rule": "combination",
-        "text": "2*m + -2*min_deg + -1*diam + 2/3 >= 0",
-        "coeffs": {
-          "diam": "-1",
-          "m": "2",
-          "min_deg": "-2"
-        },
-        "const": "2/3",
+        "const": "1/2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
           2,
-          5,
-          8
+          3,
+          4
         ],
         "mults": [
-          "2/3",
-          "2/3",
-          "1/3",
-          "2/3"
+          "1/2",
+          "1/2",
+          "1/2",
+          "1/2"
         ]
       },
       {
-        "fid": 10,
+        "fid": 6,
         "rule": "rounding",
-        "text": "2*m + -2*min_deg + -1*diam >= 0",
+        "text": "1*alpha + 1*diam + -1*girth >= 0",
         "coeffs": {
-          "diam": "-1",
-          "m": "2",
-          "min_deg": "-2"
+          "diam": "1",
+          "alpha": "1",
+          "girth": "-1"
         },
         "const": "0",
         "rel": ">=",
         "tactic": "omega",
         "deps": [
-          9
+          5
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.0010111223458038423,
-    "R": 1.0,
-    "L": 0.0,
-    "score": 1.0010111223458038
+    "T": 0.006802721088435374,
+    "R": 0.5,
+    "L": 0.6236095644623236,
+    "score": 1.130412285550759
   },
   "attained": "yes",
-  "touch": 1,
-  "arith_sharp": "relaxed",
-  "depth_type": "product_needed",
+  "touch": 2,
+  "arith_sharp": "exact",
+  "depth_type": "rounding_only",
   "proof_stats": {
     "case_splits": 0,
     "case_splits_conditional": 0,
@@ -257,15 +175,15 @@
     "max_nest_depth": 0,
     "roundings": 1,
     "inventory_theorems": 3,
-    "product_steps": 1
+    "product_steps": 0
   },
-  "proof_cost_initial": 12.5,
-  "proof_cost": 12.5,
-  "proof_cost_expanded": 12.5,
+  "proof_cost_initial": 9.0,
+  "proof_cost": 9.0,
+  "proof_cost_expanded": 9.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.5,
+  "hardness": 1.5,
   "lean": {
     "theorem_name": "C202",
     "status": "compiled"

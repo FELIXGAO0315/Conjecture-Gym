@@ -1,13 +1,13 @@
 {
   "id": "C60",
-  "created_at": "2026-10-13T21:59:48.152640+00:00",
+  "created_at": "2026-10-15T00:58:47.500746+00:00",
   "generator": {
-    "version": "1.4.1",
-    "seed": 2024007011
+    "version": "1.4.2",
+    "seed": 2024007037
   },
   "rendered_with": "1.3",
   "conjecture": {
-    "formula": "if ((is_tree) and (diam >= 3)), then (radius >= 2)",
+    "formula": "if ((is_tree) and (alpha >= 2)), then (diam <= n + radius - 2)",
     "properties_premises": [
       {
         "name": "is_tree"
@@ -15,48 +15,67 @@
     ],
     "numeric_premises": [
       {
-        "text": "diam >= 3",
+        "text": "alpha >= 2",
         "coeffs": {
-          "diam": 1
+          "alpha": 1
         },
         "rel": ">=",
-        "rhs": 3
+        "rhs": 2
       }
     ],
     "conclusion": {
-      "text": "radius >= 2",
+      "text": "diam <= n + radius - 2",
       "coeffs": {
-        "radius": 1
+        "diam": 1,
+        "n": -1,
+        "radius": -1
       },
-      "rel": ">=",
-      "rhs": 2
+      "rel": "<=",
+      "rhs": -2
     },
     "canonical_form": {
-      "text": "radius >= 2",
+      "text": "n >= diam - radius + 2",
       "coeffs": {
-        "radius": 1
+        "diam": -1,
+        "radius": 1,
+        "n": 1
       },
       "rel": ">=",
       "rhs": 2
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, diam >= 3. Then radius >= 2."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, alpha >= 2. Then diam <= n + radius - 2."
   },
-  "primary_var": "radius",
-  "dalmatian": "unknown",
+  "primary_var": "diam",
+  "dalmatian": "significant",
   "properties": [
     "is_tree"
   ],
   "conclusion_property": null,
-  "instance_of": "diam_le_two_radius",
+  "instance_of": null,
   "promoted_from": null,
   "proof": {
     "inventory_used": [
-      "diam_le_two_radius"
+      "diam_le_card_sub_one",
+      "diam_le_two_radius",
+      "gallai",
+      "nonneg_tau",
+      "tree_edges"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
+        "rule": "premise",
+        "text": "1*alpha + -2 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "note": "alpha >= 2"
+      },
+      {
+        "fid": 2,
         "rule": "inventory",
         "text": "-1*diam + 2*radius >= 0",
         "coeffs": {
@@ -68,59 +87,130 @@
         "inventory": "diam_le_two_radius"
       },
       {
-        "fid": 2,
-        "rule": "premise",
-        "text": "1*diam + -3 >= 0",
+        "fid": 3,
+        "rule": "inventory",
+        "text": "1*n + -1*diam + -1 >= 0",
         "coeffs": {
-          "diam": "1"
+          "diam": "-1",
+          "n": "1"
         },
-        "const": "-3",
+        "const": "-1",
         "rel": ">=",
-        "note": "diam >= 3"
+        "inventory": "diam_le_card_sub_one"
       },
       {
-        "fid": 3,
-        "rule": "combination",
-        "text": "1*radius + -3/2 >= 0",
+        "fid": 4,
+        "rule": "inventory",
+        "text": "1*tau >= 0",
         "coeffs": {
+          "tau": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_tau"
+      },
+      {
+        "fid": 5,
+        "rule": "inventory",
+        "text": "-1*n + 1*alpha + 1*tau == 0",
+        "coeffs": {
+          "alpha": "1",
+          "tau": "1",
+          "n": "-1"
+        },
+        "const": "0",
+        "rel": "==",
+        "inventory": "gallai"
+      },
+      {
+        "fid": 6,
+        "rule": "inventory",
+        "text": "-1*n + 1*m + 1 == 0",
+        "coeffs": {
+          "m": "1",
+          "n": "-1"
+        },
+        "const": "1",
+        "rel": "==",
+        "inventory": "tree_edges"
+      },
+      {
+        "fid": 7,
+        "rule": "combination",
+        "text": "1*m + -1*diam + 1*radius + -1/2 >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "m": "1",
           "radius": "1"
         },
-        "const": "-3/2",
+        "const": "-1/2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
-          2
+          2,
+          3,
+          4,
+          5,
+          6
         ],
         "mults": [
           "1/2",
-          "1/2"
+          "1/2",
+          "1/2",
+          "1/2",
+          "-1/2",
+          "1"
         ]
       },
       {
-        "fid": 4,
+        "fid": 8,
         "rule": "rounding",
-        "text": "1*radius + -2 >= 0",
+        "text": "1*m + -1*diam + 1*radius + -1 >= 0",
         "coeffs": {
+          "diam": "-1",
+          "m": "1",
           "radius": "1"
         },
-        "const": "-2",
+        "const": "-1",
         "rel": ">=",
         "tactic": "omega",
         "deps": [
-          3
+          7
         ]
+      },
+      {
+        "fid": 9,
+        "rule": "identity_rewrite",
+        "text": "diam <= n + radius - 2",
+        "coeffs": {
+          "diam": 1,
+          "n": -1,
+          "radius": -1
+        },
+        "rel": "<=",
+        "rhs": -2,
+        "tactic": "linarith",
+        "deps": [
+          8
+        ],
+        "identities": [
+          "gallai",
+          "tree"
+        ],
+        "identities_human": "the Gallai identity `alpha + tau = n`; the tree identity `m = n - 1`",
+        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`; the tree identity `m = n - 1`."
       }
     ]
   },
   "iris": {
-    "T": 0.7777777777777778,
-    "R": 0.14285714285714285,
-    "L": 0.31622776601683794,
-    "score": 1.2368626866517587
+    "T": 0.043478260869565216,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0434782608695652
   },
   "attained": "yes",
-  "touch": 14,
+  "touch": 1,
   "arith_sharp": "exact",
   "depth_type": "rounding_only",
   "proof_stats": {
@@ -129,16 +219,16 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 1,
-    "inventory_theorems": 1,
+    "inventory_theorems": 4,
     "product_steps": 0
   },
-  "proof_cost_initial": 5.0,
-  "proof_cost": 5.0,
-  "proof_cost_expanded": 5.0,
+  "proof_cost_initial": 11.5,
+  "proof_cost": 11.5,
+  "proof_cost_expanded": 11.5,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 1.6666666666666667,
+  "hardness": 2.3,
   "lean": {
     "theorem_name": "C60",
     "status": "compiled"

@@ -4,15 +4,23 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C59 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.cliqueNum : ℤ) ≤ 2 * (G.maxDegree : ℤ)) :
-    (G.maxDegree : ℤ) ≥ 1 := by
-  have s1 : (G.cliqueNum : ℤ) ≥ 1 := by
-    have hw := omega_ge_one_int' G
+theorem C59 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hp1 : G.Connected) (hn1 : (Fintype.card V : ℤ) ≥ 6) :
+    (G.radius.toNat : ℤ) ≥ -3 * (G.edgeFinset.card : ℤ) + 3 * (G.diam : ℤ) + 3 := by
+  have s1 : -(G.diam : ℤ) + 2 * (G.radius.toNat : ℤ) ≥ 0 := by
+    have hw := diam_le_two_radius_int G hp1
     try push_cast at hw
     linarith [hw]
-  have s2 : 2 * (G.maxDegree : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by linarith [hn1]
-  have s3 : 2 * (G.maxDegree : ℤ) ≥ 1 := by linarith [s1, s2]
-  have s4 : (G.maxDegree : ℤ) ≥ 1 := by have hr := s3; omega
+  have s2 : -(Fintype.card V : ℤ) + (G.edgeFinset.card : ℤ) ≥ -1 := by
+    have hw := connected_edges_int G hp1
+    try push_cast at hw
+    linarith [hw]
+  have s3 : (Fintype.card V : ℤ) ≥ 6 := by linarith [hn1]
+  have s4 : (Fintype.card V : ℤ) - (G.diam : ℤ) ≥ 1 := by
+    have hw := diam_le_card_sub_one_int G hp1
+    try push_cast at hw
+    linarith [hw]
+  have s5 : 6 * (G.edgeFinset.card : ℤ) - 6 * (G.diam : ℤ) + 2 * (G.radius.toNat : ℤ) ≥ 5 := by linarith [s1, s2, s3, s4]
+  have s6 : 3 * (G.edgeFinset.card : ℤ) - 3 * (G.diam : ℤ) + (G.radius.toNat : ℤ) ≥ 3 := by have hr := s5; omega
   have heq_gallai := gallai_int G
   try push_cast at heq_gallai
-  linarith [s4, heq_gallai]
+  linarith [s6, heq_gallai]

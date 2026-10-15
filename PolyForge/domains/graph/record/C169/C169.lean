@@ -4,28 +4,27 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C169 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.maxDegree : ℤ) ≤ 5) (hn2 : (G.vertexCoverNum.toNat : ℤ) ≤ 5) :
-    2 * (G.indepNum : ℤ) ≥ -3 * (Fintype.card V : ℤ) + 2 * (G.edgeFinset.card : ℤ) - 10 := by
-  have s1 : -2 * (G.edgeFinset.card : ℤ) + (Fintype.card V : ℤ) * (G.maxDegree : ℤ) ≥ 0 := by
-    have hw := handshake_max_int G
+theorem C169 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.chromaticNumber.toNat : ℤ) ≤ 3) :
+    (Fintype.card V : ℤ) ≤ (G.chromaticNumber.toNat : ℤ) + 3 * (G.indepNum : ℤ) - 3 := by
+  have s1 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
+    have hw := card_le_alpha_chi_int G
     try push_cast at hw
     linarith [hw]
-  have s2 : -(G.maxDegree : ℤ) ≥ -5 := by linarith [hn1]
-  have s3 : -(G.vertexCoverNum.toNat : ℤ) ≥ -5 := by linarith [hn2]
-  have s4 : (Fintype.card V : ℤ) ≥ 1 := by
-    have hw := card_ge_one_int (V := V)
+  have s2 : (G.indepNum : ℤ) ≥ 1 := by
+    have hw := alpha_ge_one_int' G
     try push_cast at hw
     linarith [hw]
-  have s5 : 5 * (Fintype.card V : ℤ) + (G.maxDegree : ℤ) - (Fintype.card V : ℤ) * (G.maxDegree : ℤ) ≥ 5 := by
-    have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 1) * (5 - (G.maxDegree : ℤ)) :=
-      mul_nonneg (by linarith [s4]) (by linarith [s2])
+  have s3 : -(G.chromaticNumber.toNat : ℤ) ≥ -3 := by linarith [hn1]
+  have s4 : (G.chromaticNumber.toNat : ℤ) + 3 * (G.indepNum : ℤ) - (G.indepNum : ℤ) * (G.chromaticNumber.toNat : ℤ) ≥ 3 := by
+    have hmul : (0 : ℤ) ≤ ((G.indepNum : ℤ) - 1) * (3 - (G.chromaticNumber.toNat : ℤ)) :=
+      mul_nonneg (by linarith [s2]) (by linarith [s3])
     ring_nf at hmul ⊢
     linarith [hmul]
-  have s6 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) + (G.vertexCoverNum.toNat : ℤ) = 0 := by
+  have s5 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) + (G.vertexCoverNum.toNat : ℤ) = 0 := by
     have hw := gallai_int G
     try push_cast at hw
     linarith [hw]
-  have s7 : 3 * (Fintype.card V : ℤ) - 2 * (G.edgeFinset.card : ℤ) + 2 * (G.indepNum : ℤ) ≥ -10 := by linarith [s1, s2, s3, s5, s6]
+  have s6 : 2 * (Fintype.card V : ℤ) + (G.chromaticNumber.toNat : ℤ) - 3 * (G.vertexCoverNum.toNat : ℤ) ≥ 3 := by linarith [s1, s4, s5]
   have heq_gallai := gallai_int G
   try push_cast at heq_gallai
-  linarith [s7, heq_gallai]
+  linarith [s6, heq_gallai]

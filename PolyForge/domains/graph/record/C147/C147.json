@@ -1,44 +1,52 @@
 {
   "id": "C147",
-  "created_at": "2026-10-14T00:05:54.883768+00:00",
+  "created_at": "2026-10-15T03:23:42.065950+00:00",
   "generator": {
-    "version": "1.4.1",
-    "seed": 2025007550
+    "version": "1.4.2",
+    "seed": 2026006324
   },
   "rendered_with": "1.3",
   "conjecture": {
-    "formula": "if ((omega <= 2*max_deg)), then (n >= 2)",
+    "formula": "if ((alpha >= 2*tau) and (max_deg >= 1)), then (alpha >= 2)",
     "properties_premises": [],
     "numeric_premises": [
       {
-        "text": "omega <= 2*max_deg",
+        "text": "alpha >= 2*tau",
         "coeffs": {
-          "omega": 1,
-          "max_deg": -2
+          "alpha": 1,
+          "tau": -2
         },
-        "rel": "<=",
+        "rel": ">=",
         "rhs": 0
+      },
+      {
+        "text": "max_deg >= 1",
+        "coeffs": {
+          "max_deg": 1
+        },
+        "rel": ">=",
+        "rhs": 1
       }
     ],
     "conclusion": {
-      "text": "n >= 2",
+      "text": "alpha >= 2",
       "coeffs": {
-        "n": 1
+        "alpha": 1
       },
       "rel": ">=",
       "rhs": 2
     },
     "canonical_form": {
-      "text": "n >= 2",
+      "text": "alpha >= 2",
       "coeffs": {
-        "n": 1
+        "alpha": 1
       },
       "rel": ">=",
       "rhs": 2
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose omega <= 2*max_deg. Then n >= 2."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose alpha >= 2*tau, max_deg >= 1. Then alpha >= 2."
   },
-  "primary_var": "n",
+  "primary_var": "alpha",
   "dalmatian": "significant",
   "properties": [],
   "conclusion_property": null,
@@ -47,8 +55,7 @@
   "proof": {
     "inventory_used": [
       "gallai",
-      "max_lt_card",
-      "omega_ge_one"
+      "max_lt_card"
     ],
     "lemmas_used": [],
     "steps": [
@@ -66,26 +73,26 @@
       },
       {
         "fid": 2,
-        "rule": "inventory",
-        "text": "1*omega + -1 >= 0",
+        "rule": "premise",
+        "text": "1*max_deg + -1 >= 0",
         "coeffs": {
-          "omega": "1"
+          "max_deg": "1"
         },
         "const": "-1",
         "rel": ">=",
-        "inventory": "omega_ge_one"
+        "note": "max_deg >= 1"
       },
       {
         "fid": 3,
         "rule": "premise",
-        "text": "2*max_deg + -1*omega >= 0",
+        "text": "1*alpha + -2*tau >= 0",
         "coeffs": {
-          "omega": "-1",
-          "max_deg": "2"
+          "alpha": "1",
+          "tau": "-2"
         },
         "const": "0",
         "rel": ">=",
-        "note": "omega <= 2*max_deg"
+        "note": "alpha >= 2*tau"
       },
       {
         "fid": 4,
@@ -103,12 +110,11 @@
       {
         "fid": 5,
         "rule": "combination",
-        "text": "1*alpha + 1*tau + -3/2 >= 0",
+        "text": "1*alpha + -4/3 >= 0",
         "coeffs": {
-          "alpha": "1",
-          "tau": "1"
+          "alpha": "1"
         },
-        "const": "-3/2",
+        "const": "-4/3",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
@@ -118,19 +124,18 @@
           4
         ],
         "mults": [
-          "1",
-          "1/2",
-          "1/2",
-          "1"
+          "2/3",
+          "2/3",
+          "1/3",
+          "2/3"
         ]
       },
       {
         "fid": 6,
         "rule": "rounding",
-        "text": "1*alpha + 1*tau + -2 >= 0",
+        "text": "1*alpha + -2 >= 0",
         "coeffs": {
-          "alpha": "1",
-          "tau": "1"
+          "alpha": "1"
         },
         "const": "-2",
         "rel": ">=",
@@ -141,16 +146,37 @@
       },
       {
         "fid": 7,
-        "rule": "identity_rewrite",
-        "text": "n >= 2",
+        "rule": "combination",
+        "text": "3*n + 2*alpha + -3*tau + -10 >= 0",
         "coeffs": {
-          "n": 1
+          "alpha": "2",
+          "n": "3",
+          "tau": "-3"
+        },
+        "const": "-10",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          6,
+          4
+        ],
+        "mults": [
+          "5",
+          "-3"
+        ]
+      },
+      {
+        "fid": 8,
+        "rule": "identity_rewrite",
+        "text": "alpha >= 2",
+        "coeffs": {
+          "alpha": 1
         },
         "rel": ">=",
         "rhs": 2,
         "tactic": "linarith",
         "deps": [
-          6
+          7
         ],
         "identities": [
           "gallai"
@@ -161,13 +187,13 @@
     ]
   },
   "iris": {
-    "T": 0.0008032128514056225,
+    "T": 0.019801980198019802,
     "R": 1.0,
-    "L": 0.0,
-    "score": 1.0008032128514057
+    "L": 0.13245323570650439,
+    "score": 1.1522552159045243
   },
   "attained": "yes",
-  "touch": 1,
+  "touch": 2,
   "arith_sharp": "exact",
   "depth_type": "rounding_only",
   "proof_stats": {
@@ -176,16 +202,16 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 1,
-    "inventory_theorems": 3,
+    "inventory_theorems": 2,
     "product_steps": 0
   },
-  "proof_cost_initial": 9.0,
-  "proof_cost": 9.0,
-  "proof_cost_expanded": 9.0,
+  "proof_cost_initial": 8.0,
+  "proof_cost": 8.0,
+  "proof_cost_expanded": 8.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.25,
+  "hardness": 1.3333333333333333,
   "lean": {
     "theorem_name": "C147",
     "status": "compiled"

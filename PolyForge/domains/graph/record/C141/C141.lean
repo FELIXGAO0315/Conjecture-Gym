@@ -4,28 +4,27 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C141 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.minDegree : ℤ) ≤ 2) (hn2 : (G.vertexCoverNum.toNat : ℤ) ≥ (G.indepNum : ℤ)) :
-    (G.chromaticNumber.toNat : ℤ) ≤ -(G.minDegree : ℤ) + 3 * (G.vertexCoverNum.toNat : ℤ) := by
-  have s1 : (Fintype.card V : ℤ) - (G.chromaticNumber.toNat : ℤ) ≥ 0 := by
-    have hw := chi_le_n_int G
-    try push_cast at hw
-    linarith [hw]
-  have s2 : (G.maxDegree : ℤ) - (G.minDegree : ℤ) ≥ 0 := by
-    have hw := min_le_max_int G
-    try push_cast at hw
-    linarith [hw]
-  have s3 : (Fintype.card V : ℤ) - (G.maxDegree : ℤ) ≥ 1 := by
+theorem C141 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (G.maxDegree : ℤ) ≤ 5) :
+    (G.edgeFinset.card : ℤ) ≤ 3 * (Fintype.card V : ℤ) - 3 := by
+  have s1 : (Fintype.card V : ℤ) - (G.maxDegree : ℤ) ≥ 1 := by
     have hw := max_lt_card_int' G
     try push_cast at hw
     linarith [hw]
-  have s4 : -(G.minDegree : ℤ) ≥ -2 := by linarith [hn1]
-  have s5 : -(G.indepNum : ℤ) + (G.vertexCoverNum.toNat : ℤ) ≥ 0 := by linarith [hn2]
-  have s6 : -(Fintype.card V : ℤ) + (G.indepNum : ℤ) + (G.vertexCoverNum.toNat : ℤ) = 0 := by
-    have hw := gallai_int G
+  have s2 : -2 * (G.edgeFinset.card : ℤ) + (Fintype.card V : ℤ) * (G.maxDegree : ℤ) ≥ 0 := by
+    have hw := handshake_max_int G
     try push_cast at hw
     linarith [hw]
-  have s7 : -2 * (G.minDegree : ℤ) - 2 * (G.chromaticNumber.toNat : ℤ) + 6 * (G.vertexCoverNum.toNat : ℤ) ≥ -1 := by linarith [s1, s2, s3, s4, s5, s6]
-  have s8 : -(G.minDegree : ℤ) - (G.chromaticNumber.toNat : ℤ) + 3 * (G.vertexCoverNum.toNat : ℤ) ≥ 0 := by have hr := s7; omega
+  have s3 : (Fintype.card V : ℤ) ≥ 1 := by
+    have hw := card_ge_one_int (V := V)
+    try push_cast at hw
+    linarith [hw]
+  have s4 : -(G.maxDegree : ℤ) ≥ -5 := by linarith [hn1]
+  have s5 : 5 * (Fintype.card V : ℤ) + (G.maxDegree : ℤ) - (Fintype.card V : ℤ) * (G.maxDegree : ℤ) ≥ 5 := by
+    have hmul : (0 : ℤ) ≤ ((Fintype.card V : ℤ) - 1) * (5 - (G.maxDegree : ℤ)) :=
+      mul_nonneg (by linarith [s3]) (by linarith [s4])
+    ring_nf at hmul ⊢
+    linarith [hmul]
+  have s6 : 3 * (Fintype.card V : ℤ) - (G.edgeFinset.card : ℤ) ≥ 3 := by linarith [s1, s2, s5]
   have heq_gallai := gallai_int G
   try push_cast at heq_gallai
-  linarith [s8, heq_gallai]
+  linarith [s6, heq_gallai]

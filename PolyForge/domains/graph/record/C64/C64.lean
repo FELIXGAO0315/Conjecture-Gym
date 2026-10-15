@@ -4,19 +4,20 @@ import GraphLemmas
 open SimpleGraph
 open PolyForge.Graph
 
-theorem C64 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hp1 : ¬ G.IsAcyclic) (hn1 : (Fintype.card V : ℤ) ≤ 2 * (G.chromaticNumber.toNat : ℤ)) :
-    (G.cliqueNum : ℤ) ≤ 2 * (G.chromaticNumber.toNat : ℤ) - 2 := by
-  have s1 : (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) ≥ 0 := by
-    have hw := omega_le_chi_int G
+theorem C64 {V : Type} [Fintype V] [DecidableEq V] [Nonempty V] (G : SimpleGraph V) [DecidableRel G.Adj] (hn1 : (Fintype.card V : ℤ) ≤ 6) :
+    3 * (G.maxDegree : ℤ) ≥ (G.edgeFinset.card : ℤ) := by
+  have s1 : -2 * (G.edgeFinset.card : ℤ) + (Fintype.card V : ℤ) * (G.maxDegree : ℤ) ≥ 0 := by
+    have hw := handshake_max_int G
     try push_cast at hw
     linarith [hw]
-  have s2 : (Fintype.card V : ℤ) ≥ 3 := by
-    have hw := three_le_card_of_cycle_int G hp1
-    try push_cast at hw
-    linarith [hw]
-  have s3 : -(Fintype.card V : ℤ) + 2 * (G.chromaticNumber.toNat : ℤ) ≥ 0 := by linarith [hn1]
-  have s4 : 4 * (G.chromaticNumber.toNat : ℤ) - 2 * (G.cliqueNum : ℤ) ≥ 3 := by linarith [s1, s2, s3]
-  have s5 : 2 * (G.chromaticNumber.toNat : ℤ) - (G.cliqueNum : ℤ) ≥ 2 := by have hr := s4; omega
+  have s2 : (G.maxDegree : ℤ) ≥ 0 := by positivity
+  have s3 : -(Fintype.card V : ℤ) ≥ -6 := by linarith [hn1]
+  have s4 : 6 * (G.maxDegree : ℤ) - (Fintype.card V : ℤ) * (G.maxDegree : ℤ) ≥ 0 := by
+    have hmul : (0 : ℤ) ≤ (6 - (Fintype.card V : ℤ)) * ((G.maxDegree : ℤ) - 0) :=
+      mul_nonneg (by linarith [s3]) (by linarith [s2])
+    ring_nf at hmul ⊢
+    linarith [hmul]
+  have s5 : -(G.edgeFinset.card : ℤ) + 3 * (G.maxDegree : ℤ) ≥ 0 := by linarith [s1, s4]
   have heq_gallai := gallai_int G
   try push_cast at heq_gallai
   linarith [s5, heq_gallai]

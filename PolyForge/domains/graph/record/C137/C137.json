@@ -1,168 +1,204 @@
 {
   "id": "C137",
-  "created_at": "2026-10-13T23:59:15.723823+00:00",
+  "created_at": "2026-10-15T03:02:16.247550+00:00",
   "generator": {
-    "version": "1.4.1",
-    "seed": 2025007368
+    "version": "1.4.2",
+    "seed": 2026006137
   },
   "rendered_with": "1.3",
   "conjecture": {
-    "formula": "if ((not_bipartite) and (omega <= 2*alpha)), then (alpha >= -chi + omega + 2)",
+    "formula": "if ((is_k_edge_connected(3)) and (has_cycle)), then (m >= 3*min_deg - 3)",
     "properties_premises": [
       {
-        "name": "not_bipartite"
-      }
-    ],
-    "numeric_premises": [
+        "name": "is_k_edge_connected",
+        "param": 3
+      },
       {
-        "text": "omega <= 2*alpha",
-        "coeffs": {
-          "omega": 1,
-          "alpha": -2
-        },
-        "rel": "<=",
-        "rhs": 0
+        "name": "has_cycle"
       }
     ],
+    "numeric_premises": [],
     "conclusion": {
-      "text": "alpha >= -chi + omega + 2",
+      "text": "m >= 3*min_deg - 3",
       "coeffs": {
-        "alpha": 1,
-        "chi": 1,
-        "omega": -1
+        "m": 1,
+        "min_deg": -3
       },
       "rel": ">=",
-      "rhs": 2
+      "rhs": -3
     },
     "canonical_form": {
-      "text": "chi >= omega - alpha + 2",
+      "text": "m >= 3*min_deg - 3",
       "coeffs": {
-        "alpha": 1,
-        "chi": 1,
-        "omega": -1
+        "m": 1,
+        "min_deg": -3
       },
       "rel": ">=",
-      "rhs": 2
+      "rhs": -3
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose not_bipartite, omega <= 2*alpha. Then alpha >= -chi + omega + 2."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_k_edge_connected(3), has_cycle. Then m >= 3*min_deg - 3."
   },
-  "primary_var": "alpha",
+  "primary_var": "m",
   "dalmatian": "significant",
   "properties": [
-    "not_bipartite"
+    "is_k_edge_connected",
+    "has_cycle"
   ],
   "conclusion_property": null,
   "instance_of": null,
   "promoted_from": null,
   "proof": {
     "inventory_used": [
-      "not_bipartite_chi",
-      "omega_le_chi"
+      "cycle_three_le_card",
+      "edge_conn_min_deg",
+      "handshake_min",
+      "max_lt_card",
+      "min_le_max"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
         "rule": "inventory",
-        "text": "1*chi + -1*omega >= 0",
+        "text": "1*max_deg + -1*min_deg >= 0",
         "coeffs": {
-          "omega": "-1",
-          "chi": "1"
+          "min_deg": "-1",
+          "max_deg": "1"
         },
         "const": "0",
         "rel": ">=",
-        "inventory": "omega_le_chi"
+        "inventory": "min_le_max"
       },
       {
         "fid": 2,
         "rule": "inventory",
-        "text": "1*chi + -3 >= 0",
+        "text": "1*n + -1*max_deg + -1 >= 0",
         "coeffs": {
-          "chi": "1"
+          "max_deg": "-1",
+          "n": "1"
         },
-        "const": "-3",
+        "const": "-1",
         "rel": ">=",
-        "inventory": "not_bipartite_chi"
+        "inventory": "max_lt_card"
       },
       {
         "fid": 3,
-        "rule": "premise",
-        "text": "-1*omega + 2*alpha >= 0",
+        "rule": "inventory",
+        "text": "2*m + -1*P_n_mindeg >= 0",
         "coeffs": {
-          "omega": "-1",
-          "alpha": "2"
+          "P_n_mindeg": "-1",
+          "m": "2"
         },
         "const": "0",
         "rel": ">=",
-        "note": "omega <= 2*alpha"
+        "inventory": "handshake_min"
       },
       {
         "fid": 4,
-        "rule": "combination",
-        "text": "1*chi + -1*omega + 1*alpha + -3/2 >= 0",
+        "rule": "inventory",
+        "text": "1*min_deg + -3 >= 0",
         "coeffs": {
-          "alpha": "1",
-          "chi": "1",
-          "omega": "-1"
+          "min_deg": "1"
         },
-        "const": "-3/2",
+        "const": "-3",
+        "rel": ">=",
+        "inventory": "edge_conn_min_deg"
+      },
+      {
+        "fid": 5,
+        "rule": "inventory",
+        "text": "1*n + -3 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "inventory": "cycle_three_le_card"
+      },
+      {
+        "fid": 6,
+        "rule": "product",
+        "text": "-3*n + -3*min_deg + 1*P_n_mindeg + 9 >= 0",
+        "coeffs": {
+          "P_n_mindeg": "1",
+          "n": "-3",
+          "min_deg": "-3"
+        },
+        "const": "9",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          4,
+          5
+        ],
+        "prod_var": "P_n_mindeg",
+        "prod_factors": [
+          [
+            "n",
+            "lower",
+            3,
+            5
+          ],
+          [
+            "min_deg",
+            "lower",
+            3,
+            4
+          ]
+        ]
+      },
+      {
+        "fid": 7,
+        "rule": "combination",
+        "text": "1*m + -3*min_deg + 3 >= 0",
+        "coeffs": {
+          "m": "1",
+          "min_deg": "-3"
+        },
+        "const": "3",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
           2,
-          3
+          3,
+          6
         ],
         "mults": [
-          "1/2",
+          "3/2",
+          "3/2",
           "1/2",
           "1/2"
-        ]
-      },
-      {
-        "fid": 5,
-        "rule": "rounding",
-        "text": "1*chi + -1*omega + 1*alpha + -2 >= 0",
-        "coeffs": {
-          "alpha": "1",
-          "chi": "1",
-          "omega": "-1"
-        },
-        "const": "-2",
-        "rel": ">=",
-        "tactic": "omega",
-        "deps": [
-          4
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.10113421550094517,
-    "R": 0.018691588785046728,
-    "L": 0.37796447300922725,
-    "score": 0.4977902772952192
+    "T": 0.005780346820809248,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0057803468208093
   },
   "attained": "yes",
-  "touch": 107,
-  "arith_sharp": "exact",
-  "depth_type": "rounding_only",
+  "touch": 1,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
   "proof_stats": {
     "case_splits": 0,
     "case_splits_conditional": 0,
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
-    "roundings": 1,
-    "inventory_theorems": 1,
-    "product_steps": 0
+    "roundings": 0,
+    "inventory_theorems": 4,
+    "product_steps": 1
   },
-  "proof_cost_initial": 5.5,
-  "proof_cost": 5.5,
-  "proof_cost_expanded": 5.5,
+  "proof_cost_initial": 11.0,
+  "proof_cost": 11.0,
+  "proof_cost_expanded": 11.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 0.9166666666666666,
+  "hardness": 5.5,
   "lean": {
     "theorem_name": "C137",
     "status": "compiled"

@@ -1,61 +1,85 @@
 {
   "id": "C182",
-  "created_at": "2026-10-14T01:15:00.672714+00:00",
+  "created_at": "2026-10-15T04:52:02.052021+00:00",
   "generator": {
-    "version": "1.4.1",
-    "seed": 2026006655
+    "version": "1.4.2",
+    "seed": 2026007242
   },
   "rendered_with": "1.3",
   "conjecture": {
-    "formula": "if ((tau >= 3)), then (m >= 2*min_deg)",
-    "properties_premises": [],
+    "formula": "if ((nontrivial) and (is_connected) and (diam >= 2)), then (diam <= 2*m - 2*min_deg)",
+    "properties_premises": [
+      {
+        "name": "nontrivial"
+      },
+      {
+        "name": "is_connected"
+      }
+    ],
     "numeric_premises": [
       {
-        "text": "tau >= 3",
+        "text": "diam >= 2",
         "coeffs": {
-          "tau": 1
+          "diam": 1
         },
         "rel": ">=",
-        "rhs": 3
+        "rhs": 2
       }
     ],
     "conclusion": {
-      "text": "m >= 2*min_deg",
+      "text": "diam <= 2*m - 2*min_deg",
       "coeffs": {
-        "m": 1,
-        "min_deg": -2
+        "diam": 1,
+        "m": -2,
+        "min_deg": 2
       },
-      "rel": ">=",
+      "rel": "<=",
       "rhs": 0
     },
     "canonical_form": {
-      "text": "m >= 2*min_deg",
+      "text": "2*m >= 2*min_deg + diam",
       "coeffs": {
-        "m": 1,
+        "diam": -1,
+        "m": 2,
         "min_deg": -2
       },
       "rel": ">=",
       "rhs": 0
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose tau >= 3. Then m >= 2*min_deg."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose nontrivial, is_connected, diam >= 2. Then diam <= 2*m - 2*min_deg."
   },
-  "primary_var": "m",
+  "primary_var": "diam",
   "dalmatian": "significant",
-  "properties": [],
+  "properties": [
+    "nontrivial",
+    "is_connected"
+  ],
   "conclusion_property": null,
   "instance_of": null,
   "promoted_from": null,
   "proof": {
     "inventory_used": [
-      "alpha_ge_one",
-      "gallai",
-      "handshake_min",
-      "nonneg_min_deg"
+      "connected_edges",
+      "connected_min_deg",
+      "diam_le_card_sub_one",
+      "handshake_min"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
+        "rule": "inventory",
+        "text": "1*n + -1*diam + -1 >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "diam_le_card_sub_one"
+      },
+      {
+        "fid": 2,
         "rule": "inventory",
         "text": "2*m + -1*P_n_mindeg >= 0",
         "coeffs": {
@@ -67,130 +91,160 @@
         "inventory": "handshake_min"
       },
       {
-        "fid": 2,
-        "rule": "inventory",
-        "text": "1*min_deg >= 0",
-        "coeffs": {
-          "min_deg": "1"
-        },
-        "const": "0",
-        "rel": ">=",
-        "inventory": "nonneg_min_deg"
-      },
-      {
         "fid": 3,
-        "rule": "inventory",
-        "text": "1*alpha + -1 >= 0",
+        "rule": "premise",
+        "text": "1*diam + -2 >= 0",
         "coeffs": {
-          "alpha": "1"
+          "diam": "1"
         },
-        "const": "-1",
+        "const": "-2",
         "rel": ">=",
-        "inventory": "alpha_ge_one"
+        "note": "diam >= 2"
       },
       {
         "fid": 4,
-        "rule": "premise",
-        "text": "1*tau + -3 >= 0",
+        "rule": "inventory",
+        "text": "-1*n + 1*m + 1 >= 0",
         "coeffs": {
-          "tau": "1"
+          "m": "1",
+          "n": "-1"
         },
-        "const": "-3",
+        "const": "1",
         "rel": ">=",
-        "note": "tau >= 3"
+        "inventory": "connected_edges"
       },
       {
         "fid": 5,
-        "rule": "inventory",
-        "text": "-1*n + 1*alpha + 1*tau == 0",
-        "coeffs": {
-          "alpha": "1",
-          "tau": "1",
-          "n": "-1"
-        },
-        "const": "0",
-        "rel": "==",
-        "inventory": "gallai"
-      },
-      {
-        "fid": 6,
         "rule": "combination",
-        "text": "1*n + -4 >= 0",
+        "text": "2*m + -1*diam + -2 >= 0",
         "coeffs": {
-          "n": "1"
+          "diam": "-1",
+          "m": "2"
         },
-        "const": "-4",
+        "const": "-2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           3,
           4,
-          5
+          1
         ],
         "mults": [
           "1",
-          "1",
-          "-1"
+          "2",
+          "2"
         ]
       },
       {
+        "fid": 6,
+        "rule": "inventory",
+        "text": "1*min_deg + -1 >= 0",
+        "coeffs": {
+          "min_deg": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "connected_min_deg"
+      },
+      {
         "fid": 7,
+        "rule": "combination",
+        "text": "1*n + -3 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          3,
+          1
+        ],
+        "mults": [
+          "1",
+          "1"
+        ]
+      },
+      {
+        "fid": 8,
         "rule": "product",
-        "text": "-4*min_deg + 1*P_n_mindeg >= 0",
+        "text": "-1*n + -3*min_deg + 1*P_n_mindeg + 3 >= 0",
         "coeffs": {
           "P_n_mindeg": "1",
-          "min_deg": "-4"
+          "n": "-1",
+          "min_deg": "-3"
         },
-        "const": "0",
+        "const": "3",
         "rel": ">=",
         "tactic": "mul_nonneg",
         "deps": [
-          2,
-          6
+          6,
+          7
         ],
         "prod_var": "P_n_mindeg",
         "prod_factors": [
           [
             "n",
             "lower",
-            4,
-            6
+            3,
+            7
           ],
           [
             "min_deg",
             "lower",
-            0,
-            2
+            1,
+            6
           ]
         ]
       },
       {
-        "fid": 8,
+        "fid": 9,
         "rule": "combination",
-        "text": "1*m + -2*min_deg >= 0",
+        "text": "2*m + -2*min_deg + -1*diam + 2/3 >= 0",
         "coeffs": {
-          "m": "1",
+          "diam": "-1",
+          "m": "2",
           "min_deg": "-2"
         },
-        "const": "0",
+        "const": "2/3",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
-          7
+          2,
+          5,
+          8
         ],
         "mults": [
-          "1/2",
-          "1/2"
+          "2/3",
+          "2/3",
+          "1/3",
+          "2/3"
+        ]
+      },
+      {
+        "fid": 10,
+        "rule": "rounding",
+        "text": "2*m + -2*min_deg + -1*diam >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "m": "2",
+          "min_deg": "-2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          9
         ]
       }
     ]
   },
   "iris": {
-    "T": 0.0008920606601248885,
+    "T": 0.0010111223458038423,
     "R": 1.0,
     "L": 0.0,
-    "score": 1.0008920606601248
+    "score": 1.0010111223458038
   },
   "attained": "yes",
   "touch": 1,
@@ -201,17 +255,17 @@
     "case_splits_conditional": 0,
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
-    "roundings": 0,
-    "inventory_theorems": 2,
+    "roundings": 1,
+    "inventory_theorems": 3,
     "product_steps": 1
   },
-  "proof_cost_initial": 8.5,
-  "proof_cost": 8.5,
-  "proof_cost_expanded": 8.5,
+  "proof_cost_initial": 12.5,
+  "proof_cost": 12.5,
+  "proof_cost_expanded": 12.5,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 2.125,
+  "hardness": 2.5,
   "lean": {
     "theorem_name": "C182",
     "status": "compiled"

@@ -1,88 +1,118 @@
 {
   "id": "C259",
-  "created_at": "2026-10-14T05:12:44.185632+00:00",
+  "created_at": "2026-10-15T10:00:25.405111+00:00",
   "generator": {
-    "version": "1.4.1",
-    "seed": 2027007444
+    "version": "1.4.2",
+    "seed": 2027008576
   },
   "rendered_with": "1.3",
   "conjecture": {
-    "formula": "if ((n >= 5) and (tau <= 2*alpha)), then (alpha >= 2)",
-    "properties_premises": [],
+    "formula": "if ((is_tree) and (tau >= alpha)), then (n >= diam - radius + 2)",
+    "properties_premises": [
+      {
+        "name": "is_tree"
+      }
+    ],
     "numeric_premises": [
       {
-        "text": "n >= 5",
-        "coeffs": {
-          "n": 1
-        },
-        "rel": ">=",
-        "rhs": 5
-      },
-      {
-        "text": "tau <= 2*alpha",
+        "text": "tau >= alpha",
         "coeffs": {
           "tau": 1,
-          "alpha": -2
+          "alpha": -1
         },
-        "rel": "<=",
+        "rel": ">=",
         "rhs": 0
       }
     ],
     "conclusion": {
-      "text": "alpha >= 2",
+      "text": "n >= diam - radius + 2",
       "coeffs": {
-        "alpha": 1
+        "diam": -1,
+        "n": 1,
+        "radius": 1
       },
       "rel": ">=",
       "rhs": 2
     },
     "canonical_form": {
-      "text": "alpha >= 2",
+      "text": "n >= diam - radius + 2",
       "coeffs": {
-        "alpha": 1
+        "diam": -1,
+        "radius": 1,
+        "n": 1
       },
       "rel": ">=",
       "rhs": 2
     },
-    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose n >= 5, tau <= 2*alpha. Then alpha >= 2."
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, tau >= alpha. Then n >= diam - radius + 2."
   },
-  "primary_var": "alpha",
-  "dalmatian": "significant",
-  "properties": [],
+  "primary_var": "n",
+  "dalmatian": "unknown",
+  "properties": [
+    "is_tree"
+  ],
   "conclusion_property": null,
-  "instance_of": "gallai",
+  "instance_of": null,
   "promoted_from": null,
   "proof": {
     "inventory_used": [
-      "gallai"
+      "alpha_ge_one",
+      "diam_le_card_sub_one",
+      "diam_le_two_radius",
+      "gallai",
+      "tree_edges"
     ],
     "lemmas_used": [],
     "steps": [
       {
         "fid": 1,
-        "rule": "premise",
-        "text": "1*n + -5 >= 0",
+        "rule": "inventory",
+        "text": "1*alpha + -1 >= 0",
         "coeffs": {
-          "n": "1"
+          "alpha": "1"
         },
-        "const": "-5",
+        "const": "-1",
         "rel": ">=",
-        "note": "n >= 5"
+        "inventory": "alpha_ge_one"
       },
       {
         "fid": 2,
-        "rule": "premise",
-        "text": "2*alpha + -1*tau >= 0",
+        "rule": "inventory",
+        "text": "-1*diam + 2*radius >= 0",
         "coeffs": {
-          "tau": "-1",
-          "alpha": "2"
+          "diam": "-1",
+          "radius": "2"
         },
         "const": "0",
         "rel": ">=",
-        "note": "tau <= 2*alpha"
+        "inventory": "diam_le_two_radius"
       },
       {
         "fid": 3,
+        "rule": "inventory",
+        "text": "1*n + -1*diam + -1 >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "diam_le_card_sub_one"
+      },
+      {
+        "fid": 4,
+        "rule": "premise",
+        "text": "-1*alpha + 1*tau >= 0",
+        "coeffs": {
+          "tau": "1",
+          "alpha": "-1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "tau >= alpha"
+      },
+      {
+        "fid": 5,
         "rule": "inventory",
         "text": "-1*n + 1*alpha + 1*tau == 0",
         "coeffs": {
@@ -95,71 +125,94 @@
         "inventory": "gallai"
       },
       {
-        "fid": 4,
-        "rule": "combination",
-        "text": "2*n + -2*tau + -10/3 >= 0",
+        "fid": 6,
+        "rule": "inventory",
+        "text": "-1*n + 1*m + 1 == 0",
         "coeffs": {
-          "n": "2",
-          "tau": "-2"
+          "m": "1",
+          "n": "-1"
         },
-        "const": "-10/3",
+        "const": "1",
+        "rel": "==",
+        "inventory": "tree_edges"
+      },
+      {
+        "fid": 7,
+        "rule": "combination",
+        "text": "1*m + -1*diam + 1*radius + -1/2 >= 0",
+        "coeffs": {
+          "m": "1",
+          "diam": "-1",
+          "radius": "1"
+        },
+        "const": "-1/2",
         "rel": ">=",
         "tactic": "linarith",
         "deps": [
           1,
           2,
-          3
+          3,
+          4,
+          5,
+          6
         ],
         "mults": [
-          "2/3",
-          "2/3",
-          "-4/3"
+          "1",
+          "1/2",
+          "1/2",
+          "1/2",
+          "-1/2",
+          "1"
         ]
       },
       {
-        "fid": 5,
+        "fid": 8,
         "rule": "rounding",
-        "text": "1*n + -1*tau + -2 >= 0",
+        "text": "1*m + -1*diam + 1*radius + -1 >= 0",
         "coeffs": {
-          "n": "1",
-          "tau": "-1"
+          "m": "1",
+          "diam": "-1",
+          "radius": "1"
         },
-        "const": "-2",
+        "const": "-1",
         "rel": ">=",
         "tactic": "omega",
         "deps": [
-          4
+          7
         ]
       },
       {
-        "fid": 6,
+        "fid": 9,
         "rule": "identity_rewrite",
-        "text": "alpha >= 2",
+        "text": "n >= diam - radius + 2",
         "coeffs": {
-          "alpha": 1
+          "diam": -1,
+          "n": 1,
+          "radius": 1
         },
         "rel": ">=",
         "rhs": 2,
         "tactic": "linarith",
         "deps": [
-          5
+          8
         ],
         "identities": [
-          "gallai"
+          "gallai",
+          "tree"
         ],
-        "identities_human": "the Gallai identity `alpha + tau = n`",
-        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`."
+        "identities_human": "the Gallai identity `alpha + tau = n`; the tree identity `m = n - 1`",
+        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`; the tree identity `m = n - 1`."
       }
     ]
   },
   "iris": {
-    "T": 0.044444444444444446,
-    "R": 0.04,
-    "L": 0.2182178902359924,
-    "score": 0.30266233468043685
+    "T": 0.25,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.25
   },
   "attained": "yes",
-  "touch": 50,
+  "touch": 1,
   "arith_sharp": "exact",
   "depth_type": "rounding_only",
   "proof_stats": {
@@ -168,16 +221,16 @@
     "case_splits_bnb": 0,
     "max_nest_depth": 0,
     "roundings": 1,
-    "inventory_theorems": 1,
+    "inventory_theorems": 5,
     "product_steps": 0
   },
-  "proof_cost_initial": 5.5,
-  "proof_cost": 5.5,
-  "proof_cost_expanded": 5.5,
+  "proof_cost_initial": 13.0,
+  "proof_cost": 13.0,
+  "proof_cost_expanded": 13.0,
   "shorten_rounds": 0,
   "generation": 0,
   "supersedes": [],
-  "hardness": 0.9166666666666666,
+  "hardness": 2.1666666666666665,
   "lean": {
     "theorem_name": "C259",
     "status": "compiled"
