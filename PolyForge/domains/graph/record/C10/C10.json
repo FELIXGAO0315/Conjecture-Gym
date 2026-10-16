@@ -1,5 +1,11 @@
 {
   "id": "C10",
+  "key": "920cf8fbc6c55e1e79ec2d5bb016ad8ec8184552e7beae79243c9b782ddfa12b",
+  "provenance_keys": {
+    "self": "920cf8fbc6c55e1e79ec2d5bb016ad8ec8184552e7beae79243c9b782ddfa12b",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:10:59.235856+00:00",
   "generator": {
     "version": "1.4.2",

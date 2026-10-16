@@ -1,5 +1,11 @@
 {
   "id": "C158",
+  "key": "7b77cc5213d248161aa26ead0895c66ccf32101c69ecb44e1973da67c9e552dd",
+  "provenance_keys": {
+    "self": "7b77cc5213d248161aa26ead0895c66ccf32101c69ecb44e1973da67c9e552dd",
+    "instance_of": "handshake_min",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T03:42:29.496981+00:00",
   "generator": {
     "version": "1.4.2",

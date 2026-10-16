@@ -1,5 +1,11 @@
 {
   "id": "C105",
+  "key": "2ac5202ae5a1cbc54f6a041bc70a36ebe7bc893cb7b8023340fd0de4a1720852",
+  "provenance_keys": {
+    "self": "2ac5202ae5a1cbc54f6a041bc70a36ebe7bc893cb7b8023340fd0de4a1720852",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T02:07:06.447300+00:00",
   "generator": {
     "version": "1.4.2",

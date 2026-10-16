@@ -1,5 +1,11 @@
 {
   "id": "C217",
+  "key": "eff4eeed5271d6daa25d2f6eb8ccd190a969776f5f40e2f8746e33aa13c54ac2",
+  "provenance_keys": {
+    "self": "eff4eeed5271d6daa25d2f6eb8ccd190a969776f5f40e2f8746e33aa13c54ac2",
+    "instance_of": "omega_le_chi",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T06:28:28.133258+00:00",
   "generator": {
     "version": "1.4.2",

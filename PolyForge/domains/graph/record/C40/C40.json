@@ -1,5 +1,11 @@
 {
   "id": "C40",
+  "key": "fa770ddde133b8beee4e1d6ab4ed5d911180ef991fc24bcf69e0e5f077a24dd2",
+  "provenance_keys": {
+    "self": "fa770ddde133b8beee4e1d6ab4ed5d911180ef991fc24bcf69e0e5f077a24dd2",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:39:55.382348+00:00",
   "generator": {
     "version": "1.4.2",

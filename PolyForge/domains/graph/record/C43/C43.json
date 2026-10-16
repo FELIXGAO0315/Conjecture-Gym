@@ -1,5 +1,11 @@
 {
   "id": "C43",
+  "key": "1790cad102acd606e5fa6937564900d732c3f1b1e2385dd2b7c8fc8684ef4875",
+  "provenance_keys": {
+    "self": "1790cad102acd606e5fa6937564900d732c3f1b1e2385dd2b7c8fc8684ef4875",
+    "instance_of": "handshake_min",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:44:50.219709+00:00",
   "generator": {
     "version": "1.4.2",

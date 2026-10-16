@@ -1,5 +1,11 @@
 {
   "id": "C126",
+  "key": "4c72442c7f5e2e614dfe3164cdf69eebd6524072d87ffc0e44b4c744abbbc8d2",
+  "provenance_keys": {
+    "self": "4c72442c7f5e2e614dfe3164cdf69eebd6524072d87ffc0e44b4c744abbbc8d2",
+    "instance_of": "max_le_edges",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T02:49:45.197447+00:00",
   "generator": {
     "version": "1.4.2",

@@ -1,5 +1,11 @@
 {
   "id": "C61",
+  "key": "b82929d30eb8d4deb8d2b15eba77a06d27b81ff1187911ce6c8465f3b1b794dc",
+  "provenance_keys": {
+    "self": "b82929d30eb8d4deb8d2b15eba77a06d27b81ff1187911ce6c8465f3b1b794dc",
+    "instance_of": "diam_le_two_radius",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T01:00:15.089354+00:00",
   "generator": {
     "version": "1.4.2",

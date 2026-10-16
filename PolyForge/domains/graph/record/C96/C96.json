@@ -1,5 +1,11 @@
 {
   "id": "C96",
+  "key": "3c45271c970b82e431cc33e29af4e2feb349bfe52f14621852d25c5a0aa57426",
+  "provenance_keys": {
+    "self": "3c45271c970b82e431cc33e29af4e2feb349bfe52f14621852d25c5a0aa57426",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T01:46:21.494329+00:00",
   "generator": {
     "version": "1.4.2",

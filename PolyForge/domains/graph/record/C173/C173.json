@@ -1,5 +1,11 @@
 {
   "id": "C173",
+  "key": "bcc4e0c59d1110fa9282688f4c9115ce3d256f520e421f1feaab00af2beb94f9",
+  "provenance_keys": {
+    "self": "bcc4e0c59d1110fa9282688f4c9115ce3d256f520e421f1feaab00af2beb94f9",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T04:29:38.291608+00:00",
   "generator": {
     "version": "1.4.2",

@@ -1,5 +1,11 @@
 {
   "id": "C271",
+  "key": "5d9707b09826fb69e6bc00acb366453955a7a93fe03f180a8d3c3d61ac023fdf",
+  "provenance_keys": {
+    "self": "5d9707b09826fb69e6bc00acb366453955a7a93fe03f180a8d3c3d61ac023fdf",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T10:58:36.187873+00:00",
   "generator": {
     "version": "1.4.2",

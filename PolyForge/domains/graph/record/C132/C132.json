@@ -1,5 +1,11 @@
 {
   "id": "C132",
+  "key": "98c6fdac355404cd4b9c40b31d75a1e7fc084b051311fed83ed0b99234eec706",
+  "provenance_keys": {
+    "self": "98c6fdac355404cd4b9c40b31d75a1e7fc084b051311fed83ed0b99234eec706",
+    "instance_of": "omega_le_maxdeg",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T02:52:35.247325+00:00",
   "generator": {
     "version": "1.4.2",

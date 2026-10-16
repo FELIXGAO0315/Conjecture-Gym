@@ -1,5 +1,11 @@
 {
   "id": "C107",
+  "key": "19af6ee01ec61bc5b16cc21470cfab9d08f88f630cc0c45669a30714c1db6c13",
+  "provenance_keys": {
+    "self": "19af6ee01ec61bc5b16cc21470cfab9d08f88f630cc0c45669a30714c1db6c13",
+    "instance_of": null,
+    "promoted_from": "2f0530c787f6fe5470ec30891c883953f2780744a83cecf10b003d489d5eeb5c"
+  },
   "created_at": "2026-10-15T02:09:48.251598+00:00",
   "generator": {
     "version": "1.4.2",

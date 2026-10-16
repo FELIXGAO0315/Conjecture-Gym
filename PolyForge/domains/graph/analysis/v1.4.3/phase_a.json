@@ -1,0 +1,1585 @@
+{
+  "counts": {
+    "L0": 0,
+    "U": 0,
+    "L1": 61,
+    "L2": 145,
+    "L3": 6,
+    "none": 107
+  },
+  "by_depth_type": {
+    "split_needed": {
+      "L0": 0,
+      "U": 0,
+      "L1": 1,
+      "L2": 59,
+      "L3": 4,
+      "none": 96
+    },
+    "product_needed": {
+      "L0": 0,
+      "U": 0,
+      "L1": 0,
+      "L2": 85,
+      "L3": 2,
+      "none": 11
+    },
+    "rounding_only": {
+      "L0": 0,
+      "U": 0,
+      "L1": 60,
+      "L2": 1,
+      "L3": 0,
+      "none": 0
+    }
+  },
+  "by_legacy_tier": {
+    "medium": {
+      "L0": 0,
+      "U": 0,
+      "L1": 11,
+      "L2": 58,
+      "L3": 6,
+      "none": 25
+    },
+    "easy": {
+      "L0": 0,
+      "U": 0,
+      "L1": 50,
+      "L2": 60,
+      "L3": 0,
+      "none": 3
+    },
+    "hard": {
+      "L0": 0,
+      "U": 0,
+      "L1": 0,
+      "L2": 27,
+      "L3": 0,
+      "none": 79
+    }
+  },
+  "hardness_quantiles": {
+    "L0": null,
+    "U": null,
+    "L1": {
+      "n": 61,
+      "min": 0.688,
+      "p25": 1.167,
+      "median": 1.4,
+      "p75": 1.8,
+      "max": 3.1
+    },
+    "L2": {
+      "n": 145,
+      "min": 0.571,
+      "p25": 1.571,
+      "median": 2.312,
+      "p75": 3.5,
+      "max": 15.9
+    },
+    "L3": {
+      "n": 6,
+      "min": 2.5,
+      "p25": 3.083,
+      "median": 3.292,
+      "p75": 3.5,
+      "max": 3.7
+    },
+    "none": {
+      "n": 107,
+      "min": 1.625,
+      "p25": 4.25,
+      "median": 7.1,
+      "p75": 10.2,
+      "max": 43.75
+    }
+  },
+  "spearman_hardness_autorank": {
+    "rho": 0.7116,
+    "p": 1.5903093203000716e-50
+  },
+  "A4_L3_none": [
+    {
+      "task_id": "graph-7a6c5f5f383d",
+      "formula": "if ((is_tree) and (alpha >= 3)), then (2*radius >= -3*alpha + 2*diam + 5)",
+      "depth_type": "split_needed",
+      "hardness": 3.7,
+      "auto": "L3",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "bnb:radius"
+      ]
+    },
+    {
+      "task_id": "graph-52b128245bbe",
+      "formula": "if ((is_tree) and (alpha >= tau) and (diam >= 2)), then (omega <= 3*chi + 2*alpha - 8)",
+      "depth_type": "split_needed",
+      "hardness": 3.5,
+      "auto": "L3",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-a14c890dd478",
+      "formula": "if ((m >= 2) and (alpha <= 4)), then (2*n <= 3*m + 3*chi)",
+      "depth_type": "split_needed",
+      "hardness": 3.5,
+      "auto": "L3",
+      "steps": 3,
+      "case_splits": 2,
+      "product_steps": 1,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-f14038ba90ba",
+      "formula": "if ((is_acyclic) and (max_deg <= 2*min_deg)), then (2*min_deg >= 2*max_deg - 3*alpha + 3)",
+      "depth_type": "split_needed",
+      "hardness": 3.083,
+      "auto": "L3",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "bnb:min_deg"
+      ]
+    },
+    {
+      "task_id": "graph-4a21aba9a57a",
+      "formula": "if ((is_acyclic) and (omega <= max_deg)), then (2*omega <= -n + 4*alpha)",
+      "depth_type": "product_needed",
+      "hardness": 3.083,
+      "auto": "L3",
+      "steps": 1,
+      "case_splits": 0,
+      "product_steps": 1,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-4f97af511627",
+      "formula": "if ((is_bipartite) and (chi <= max_deg)), then (4*alpha >= 2*n - 3*max_deg + 6)",
+      "depth_type": "product_needed",
+      "hardness": 2.5,
+      "auto": "L3",
+      "steps": 2,
+      "case_splits": 0,
+      "product_steps": 2,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-113274967402",
+      "formula": "if ((is_regular(3))), then (3*alpha >= -2*chi + 11)",
+      "depth_type": "split_needed",
+      "hardness": 43.75,
+      "auto": "none",
+      "steps": 12,
+      "case_splits": 6,
+      "product_steps": 6,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-7bd42c3353eb",
+      "formula": "if ((max_deg <= 4)), then (2*min_deg <= 2*chi + 3*alpha - 4)",
+      "depth_type": "split_needed",
+      "hardness": 26.3,
+      "auto": "none",
+      "steps": 23,
+      "case_splits": 6,
+      "product_steps": 17,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-cbe2137838b1",
+      "formula": "if ((alpha <= 2*tau) and (m >= 5)), then (2*m >= -3*chi - 3*alpha + 25)",
+      "depth_type": "split_needed",
+      "hardness": 23.562,
+      "auto": "none",
+      "steps": 25,
+      "case_splits": 6,
+      "product_steps": 19,
+      "split_vars": [
+        "bnb:m"
+      ]
+    },
+    {
+      "task_id": "graph-6f0daf074a3a",
+      "formula": "if ((nontrivial) and (is_connected) and (radius <= 6)), then (radius <= 2*m - 3*min_deg + 2)",
+      "depth_type": "split_needed",
+      "hardness": 17.9,
+      "auto": "none",
+      "steps": 12,
+      "case_splits": 3,
+      "product_steps": 9,
+      "split_vars": [
+        "bnb:m"
+      ]
+    },
+    {
+      "task_id": "graph-3c545d1d6541",
+      "formula": "if ((is_connected) and (n >= 3)), then (chi <= 3*m - 3*min_deg)",
+      "depth_type": "split_needed",
+      "hardness": 17.9,
+      "auto": "none",
+      "steps": 13,
+      "case_splits": 7,
+      "product_steps": 6,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-e897119d1218",
+      "formula": "if ((not_bipartite) and (tau <= 5)), then (2*alpha >= -m + 3*min_deg - 1)",
+      "depth_type": "split_needed",
+      "hardness": 15.8,
+      "auto": "none",
+      "steps": 14,
+      "case_splits": 4,
+      "product_steps": 10,
+      "split_vars": [
+        "omega"
+      ]
+    },
+    {
+      "task_id": "graph-fc940e5ebc2e",
+      "formula": "if ((is_connected) and (m <= 5)), then (2*max_deg >= -3*chi + 3*tau + 1)",
+      "depth_type": "split_needed",
+      "hardness": 14.7,
+      "auto": "none",
+      "steps": 11,
+      "case_splits": 2,
+      "product_steps": 9,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-dd43b58c7d2f",
+      "formula": "if ((has_cycle) and (girth >= 5)), then (2*chi >= -3*alpha + 12)",
+      "depth_type": "split_needed",
+      "hardness": 14.625,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 4,
+      "product_steps": 4,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-f8c285a6ae13",
+      "formula": "if ((has_cycle) and (omega >= max_deg)), then (2*omega >= -3*n - 3*max_deg + 21)",
+      "depth_type": "split_needed",
+      "hardness": 14.0,
+      "auto": "none",
+      "steps": 11,
+      "case_splits": 5,
+      "product_steps": 6,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-2e1ddf7a9f2e",
+      "formula": "if ((has_cycle) and (tau <= 4)), then (girth <= 3*chi + 3*alpha - 8)",
+      "depth_type": "split_needed",
+      "hardness": 13.8,
+      "auto": "none",
+      "steps": 10,
+      "case_splits": 3,
+      "product_steps": 7,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-ec13110b37e2",
+      "formula": "if ((is_acyclic) and (m <= 5)), then (m <= -2*n + 5*alpha + 2)",
+      "depth_type": "split_needed",
+      "hardness": 13.6,
+      "auto": "none",
+      "steps": 9,
+      "case_splits": 3,
+      "product_steps": 6,
+      "split_vars": [
+        "bnb:chi"
+      ]
+    },
+    {
+      "task_id": "graph-f1e737aa197e",
+      "formula": "if ((is_acyclic) and (is_connected) and (m <= 5)), then (4*n <= -3*min_deg + 3*alpha + 18)",
+      "depth_type": "split_needed",
+      "hardness": 13.5,
+      "auto": "none",
+      "steps": 9,
+      "case_splits": 2,
+      "product_steps": 7,
+      "split_vars": [
+        "bnb:max_deg"
+      ]
+    },
+    {
+      "task_id": "graph-136696470ec3",
+      "formula": "if ((is_bipartite) and (is_connected) and (min_deg <= 4)), then (m >= 2*min_deg + 2*tau - 4)",
+      "depth_type": "split_needed",
+      "hardness": 13.5,
+      "auto": "none",
+      "steps": 11,
+      "case_splits": 3,
+      "product_steps": 8,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-b8250f1b7357",
+      "formula": "if ((has_cycle) and (max_deg <= 2*omega)), then (omega >= -3*n - 3*max_deg + 18)",
+      "depth_type": "split_needed",
+      "hardness": 13.0,
+      "auto": "none",
+      "steps": 10,
+      "case_splits": 4,
+      "product_steps": 6,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-efa054872550",
+      "formula": "if ((tau >= 2) and (max_deg <= 3)), then (chi >= -2*n + m + 5)",
+      "depth_type": "split_needed",
+      "hardness": 12.714,
+      "auto": "none",
+      "steps": 15,
+      "case_splits": 5,
+      "product_steps": 10,
+      "split_vars": [
+        "bnb:max_deg"
+      ]
+    },
+    {
+      "task_id": "graph-da0f0439240a",
+      "formula": "if ((max_deg <= 3)), then (2*max_deg <= 3*chi + 3*alpha - 6)",
+      "depth_type": "split_needed",
+      "hardness": 12.5,
+      "auto": "none",
+      "steps": 10,
+      "case_splits": 5,
+      "product_steps": 5,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-30360bae28b2",
+      "formula": "if ((max_deg <= 5)), then (2*omega <= 3*m - 3*min_deg + 4)",
+      "depth_type": "split_needed",
+      "hardness": 12.1,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 3,
+      "product_steps": 5,
+      "split_vars": [
+        "bnb:m"
+      ]
+    },
+    {
+      "task_id": "graph-f931d14cdd46",
+      "formula": "if ((has_cycle) and (omega <= 6)), then (2*omega <= 2*m - 3*min_deg + 6)",
+      "depth_type": "split_needed",
+      "hardness": 12.1,
+      "auto": "none",
+      "steps": 9,
+      "case_splits": 4,
+      "product_steps": 5,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-1ebb6ad53611",
+      "formula": "if ((alpha <= 2*tau)), then (2*m >= -3*chi + 8)",
+      "depth_type": "split_needed",
+      "hardness": 11.4,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 3,
+      "product_steps": 2,
+      "split_vars": [
+        "omega"
+      ]
+    },
+    {
+      "task_id": "graph-bcd14a3d4d8c",
+      "formula": "if ((is_tree) and (n <= 2*alpha) and (max_deg >= 2)), then (2*min_deg <= 3*chi + 3*alpha - 10)",
+      "depth_type": "split_needed",
+      "hardness": 11.375,
+      "auto": "none",
+      "steps": 13,
+      "case_splits": 3,
+      "product_steps": 10,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-f6b40a27d59f",
+      "formula": "if ((n <= 6)), then (2*chi >= 3*n - 6*alpha)",
+      "depth_type": "split_needed",
+      "hardness": 11.3,
+      "auto": "none",
+      "steps": 9,
+      "case_splits": 4,
+      "product_steps": 5,
+      "split_vars": [
+        "bnb:max_deg"
+      ]
+    },
+    {
+      "task_id": "graph-101d0d3b2999",
+      "formula": "if ((is_regular(2)) and (n <= 5)), then (4*n <= 3*chi + 3*alpha + 5)",
+      "depth_type": "split_needed",
+      "hardness": 11.3,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 3,
+      "product_steps": 5,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-6c66ff10bf42",
+      "formula": "if ((is_bipartite) and (alpha <= 2*omega)), then (m >= 3*min_deg - 2)",
+      "depth_type": "split_needed",
+      "hardness": 11.0,
+      "auto": "none",
+      "steps": 11,
+      "case_splits": 2,
+      "product_steps": 9,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-b24019c50a3e",
+      "formula": "if ((is_tree) and (nontrivial)), then (radius <= 3*chi + 3*alpha - 8)",
+      "depth_type": "split_needed",
+      "hardness": 10.667,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-b0eb024f76bd",
+      "formula": "if ((n >= 6)), then (2*chi >= -3*alpha + 12)",
+      "depth_type": "split_needed",
+      "hardness": 10.625,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 4,
+      "product_steps": 4,
+      "split_vars": [
+        "bnb:m"
+      ]
+    },
+    {
+      "task_id": "graph-1b3be7dba347",
+      "formula": "if ((is_bipartite) and (m <= 6)), then (chi <= -3*min_deg + 3*alpha + 2)",
+      "depth_type": "split_needed",
+      "hardness": 10.5,
+      "auto": "none",
+      "steps": 9,
+      "case_splits": 2,
+      "product_steps": 7,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-0c63f8cbbf24",
+      "formula": "if ((is_tree) and (diam <= 6)), then (2*radius >= -3*alpha + 3*diam)",
+      "depth_type": "split_needed",
+      "hardness": 10.3,
+      "auto": "none",
+      "steps": 7,
+      "case_splits": 3,
+      "product_steps": 4,
+      "split_vars": [
+        "bnb:chi"
+      ]
+    },
+    {
+      "task_id": "graph-17c963472891",
+      "formula": "if ((is_connected) and (radius <= 3)), then (2*radius <= 3*chi + 3*alpha - 6)",
+      "depth_type": "split_needed",
+      "hardness": 10.1,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 4,
+      "product_steps": 4,
+      "split_vars": [
+        "omega"
+      ]
+    },
+    {
+      "task_id": "graph-56d5d92eddd2",
+      "formula": "if ((is_tree) and (diam >= 5)), then (n >= 3*min_deg - alpha + 6)",
+      "depth_type": "split_needed",
+      "hardness": 9.6,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 1,
+      "product_steps": 7,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-e87a366d069a",
+      "formula": "if ((is_acyclic) and (max_deg <= 2)), then (m <= 3*chi + 2*alpha - 5)",
+      "depth_type": "split_needed",
+      "hardness": 9.6,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 2,
+      "product_steps": 6,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-f203a42d680a",
+      "formula": "if ((is_connected) and (tau <= 3)), then (2*diam <= 2*chi + 3*alpha - 3)",
+      "depth_type": "split_needed",
+      "hardness": 9.4,
+      "auto": "none",
+      "steps": 6,
+      "case_splits": 3,
+      "product_steps": 3,
+      "split_vars": [
+        "bnb:diam"
+      ]
+    },
+    {
+      "task_id": "graph-983e3309475b",
+      "formula": "if ((has_cycle) and (omega >= max_deg)), then (2*n >= -3*max_deg - chi + 15)",
+      "depth_type": "split_needed",
+      "hardness": 9.333,
+      "auto": "none",
+      "steps": 7,
+      "case_splits": 3,
+      "product_steps": 4,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-e9aeb4c78520",
+      "formula": "if ((max_deg >= 6)), then (2*chi >= -3*alpha + 14)",
+      "depth_type": "split_needed",
+      "hardness": 9.0,
+      "auto": "none",
+      "steps": 6,
+      "case_splits": 2,
+      "product_steps": 4,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-1cf2f8b74f55",
+      "formula": "if ((is_regular(3)) and (tau <= 5)), then (n <= 3*chi + 3*alpha - 9)",
+      "depth_type": "split_needed",
+      "hardness": 8.9,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 3,
+      "product_steps": 5,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-65b92da111a6",
+      "formula": "if ((is_regular(2)) and (alpha <= 5)), then (2*alpha >= -3*chi + 10)",
+      "depth_type": "split_needed",
+      "hardness": 8.875,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 1,
+      "product_steps": 4,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-43d3b76c6654",
+      "formula": "if ((alpha <= 4) and (min_deg <= 3)), then (2*min_deg <= 2*chi + 3*alpha - 5)",
+      "depth_type": "split_needed",
+      "hardness": 8.786,
+      "auto": "none",
+      "steps": 12,
+      "case_splits": 3,
+      "product_steps": 9,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-fc02926e2454",
+      "formula": "if ((tau >= 4)), then (2*chi >= -3*n + 24)",
+      "depth_type": "split_needed",
+      "hardness": 8.75,
+      "auto": "none",
+      "steps": 6,
+      "case_splits": 2,
+      "product_steps": 4,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-81f17b393cab",
+      "formula": "if ((min_deg <= 3)), then (2*min_deg <= 3*chi + 3*alpha - 6)",
+      "depth_type": "split_needed",
+      "hardness": 8.4,
+      "auto": "none",
+      "steps": 7,
+      "case_splits": 3,
+      "product_steps": 4,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-c8cbbb4d8a1e",
+      "formula": "if ((n >= 5)), then (omega <= 3*chi + 3*alpha - 12)",
+      "depth_type": "split_needed",
+      "hardness": 8.4,
+      "auto": "none",
+      "steps": 6,
+      "case_splits": 3,
+      "product_steps": 3,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-42a5fc388f22",
+      "formula": "if ((is_connected) and (diam >= 3)), then (diam <= 3*m - 3*min_deg - 3)",
+      "depth_type": "split_needed",
+      "hardness": 8.4,
+      "auto": "none",
+      "steps": 7,
+      "case_splits": 3,
+      "product_steps": 4,
+      "split_vars": [
+        "omega"
+      ]
+    },
+    {
+      "task_id": "graph-374967332077",
+      "formula": "if ((n >= 5) and (max_deg >= chi)), then (max_deg >= -3*chi - 3*alpha + 17)",
+      "depth_type": "split_needed",
+      "hardness": 8.125,
+      "auto": "none",
+      "steps": 9,
+      "case_splits": 4,
+      "product_steps": 5,
+      "split_vars": [
+        "bnb:m"
+      ]
+    },
+    {
+      "task_id": "graph-8b72c3f0df28",
+      "formula": "if ((is_regular(3)) and (alpha <= 4)), then (n <= 4*chi + 4*alpha - 14)",
+      "depth_type": "split_needed",
+      "hardness": 8.1,
+      "auto": "none",
+      "steps": 6,
+      "case_splits": 1,
+      "product_steps": 5,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-6b77c4fd8977",
+      "formula": "if ((nontrivial) and (is_tree)), then (max_deg <= 3*chi + 3*alpha - 8)",
+      "depth_type": "split_needed",
+      "hardness": 8.0,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:chi"
+      ]
+    },
+    {
+      "task_id": "graph-405b85718158",
+      "formula": "if ((is_regular(2)) and (is_bipartite)), then (2*alpha >= n - 3*chi + 6)",
+      "depth_type": "split_needed",
+      "hardness": 8.0,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 1,
+      "product_steps": 3,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-01319cd273fc",
+      "formula": "if ((tau <= 4) and (max_deg <= 2)), then (m <= 3*chi + 2*alpha - 5)",
+      "depth_type": "split_needed",
+      "hardness": 7.857,
+      "auto": "none",
+      "steps": 10,
+      "case_splits": 3,
+      "product_steps": 7,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-9cca05287e27",
+      "formula": "if ((n >= 5)), then (2*chi >= -m - 3*alpha + 15)",
+      "depth_type": "split_needed",
+      "hardness": 7.8,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 2,
+      "product_steps": 3,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-de1f7ef09737",
+      "formula": "if ((has_cycle) and (alpha <= 2)), then (chi >= -2*m + 3*min_deg + 3)",
+      "depth_type": "split_needed",
+      "hardness": 7.7,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 1,
+      "product_steps": 4,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-6b9dbc5cf496",
+      "formula": "if ((is_regular(2)) and (alpha <= 4)), then (n >= -3*chi - 2*alpha + 14)",
+      "depth_type": "split_needed",
+      "hardness": 7.6,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 1,
+      "product_steps": 4,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-a0e498d98714",
+      "formula": "if ((has_cycle)), then (omega <= 3*chi + 3*alpha - 9)",
+      "depth_type": "split_needed",
+      "hardness": 7.333,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-70f1ece70133",
+      "formula": "if ((is_bipartite) and (min_deg >= 2)), then (2*chi >= min_deg - 3*alpha + 8)",
+      "depth_type": "split_needed",
+      "hardness": 7.3,
+      "auto": "none",
+      "steps": 6,
+      "case_splits": 1,
+      "product_steps": 5,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-715ded48a6e4",
+      "formula": "if ((is_regular(3)) and (tau >= 4)), then (n >= -2*chi + 12)",
+      "depth_type": "split_needed",
+      "hardness": 7.25,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-3b1c91b4fc87",
+      "formula": "if ((tau >= 4) and (min_deg >= 4)), then (chi >= -3*m + 3*alpha + 32)",
+      "depth_type": "split_needed",
+      "hardness": 7.214,
+      "auto": "none",
+      "steps": 7,
+      "case_splits": 2,
+      "product_steps": 5,
+      "split_vars": [
+        "bnb:m"
+      ]
+    },
+    {
+      "task_id": "graph-542a89d5560d",
+      "formula": "if ((is_tree) and (tau <= 5) and (m >= 4)), then (alpha >= 2*min_deg + 1)",
+      "depth_type": "split_needed",
+      "hardness": 7.167,
+      "auto": "none",
+      "steps": 6,
+      "case_splits": 1,
+      "product_steps": 5,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-553848ea5721",
+      "formula": "if ((has_cycle) and (tau <= 3)), then (girth <= 3*chi + 2*alpha - 6)",
+      "depth_type": "split_needed",
+      "hardness": 7.1,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 2,
+      "product_steps": 3,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-2badabc21e26",
+      "formula": "if ((nontrivial) and (is_connected) and (tau <= 1)), then (diam <= 3*chi + 3*alpha - 8)",
+      "depth_type": "split_needed",
+      "hardness": 7.0,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 2,
+      "product_steps": 2,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-be5bc7288fd1",
+      "formula": "if ((n >= 5) and (chi >= max_deg)), then (max_deg <= 3*chi + 2*alpha - 10)",
+      "depth_type": "split_needed",
+      "hardness": 6.75,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 4,
+      "product_steps": 4,
+      "split_vars": [
+        "bnb:m"
+      ]
+    },
+    {
+      "task_id": "graph-425f9c2963bb",
+      "formula": "if ((tau >= 2) and (chi <= 5)), then (chi <= 2*m - 3*min_deg + 3)",
+      "depth_type": "split_needed",
+      "hardness": 6.714,
+      "auto": "none",
+      "steps": 7,
+      "case_splits": 3,
+      "product_steps": 4,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-59a268df3ce4",
+      "formula": "if ((nontrivial) and (is_connected) and (tau >= 3)), then (2*chi >= -m + 2*min_deg + 6)",
+      "depth_type": "split_needed",
+      "hardness": 6.6,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 1,
+      "product_steps": 4,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-baaef6a668df",
+      "formula": "if ((has_cycle) and (alpha <= 2*omega)), then (n >= -chi + 6)",
+      "depth_type": "split_needed",
+      "hardness": 6.2,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 1,
+      "product_steps": 3,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-961608ebc27a",
+      "formula": "if ((alpha <= omega) and (n >= 6)), then (2*chi >= -3*max_deg + 12)",
+      "depth_type": "split_needed",
+      "hardness": 6.143,
+      "auto": "none",
+      "steps": 6,
+      "case_splits": 2,
+      "product_steps": 4,
+      "split_vars": [
+        "omega"
+      ]
+    },
+    {
+      "task_id": "graph-284705398627",
+      "formula": "if ((tau >= 3)), then (n >= -3*chi - 2*alpha + 18)",
+      "depth_type": "split_needed",
+      "hardness": 6.1,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 2,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:chi"
+      ]
+    },
+    {
+      "task_id": "graph-3783cb70184f",
+      "formula": "if ((is_regular(3)) and (not_bipartite) and (alpha <= 2*omega)), then (n >= -3*chi - alpha + 17)",
+      "depth_type": "split_needed",
+      "hardness": 6.083,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:chi"
+      ]
+    },
+    {
+      "task_id": "graph-e9ffc9219e2e",
+      "formula": "if ((n >= 5) and (n >= 2*chi)), then (2*chi >= -2*n - 3*alpha + 23)",
+      "depth_type": "split_needed",
+      "hardness": 6.062,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 4,
+      "product_steps": 4,
+      "split_vars": [
+        "bnb:m"
+      ]
+    },
+    {
+      "task_id": "graph-d4ffcf046d9e",
+      "formula": "if ((is_connected) and (diam <= 5)), then (radius <= 2*chi + 3*alpha - 5)",
+      "depth_type": "split_needed",
+      "hardness": 6.0,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 2,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-279c26bb03c8",
+      "formula": "if ((max_deg <= chi) and (chi <= 3)), then (m <= n + 3*alpha - 3)",
+      "depth_type": "split_needed",
+      "hardness": 6.0,
+      "auto": "none",
+      "steps": 8,
+      "case_splits": 2,
+      "product_steps": 6,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-e11fa1386847",
+      "formula": "if ((is_connected) and (diam <= 2)), then (2*diam <= 3*chi + 3*alpha - 6)",
+      "depth_type": "split_needed",
+      "hardness": 5.6,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 2,
+      "product_steps": 2,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-9c35d169f48d",
+      "formula": "if ((is_k_edge_connected(3)) and (has_cycle)), then (m >= 3*min_deg - 3)",
+      "depth_type": "product_needed",
+      "hardness": 5.5,
+      "auto": "none",
+      "steps": 1,
+      "case_splits": 0,
+      "product_steps": 1,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-acbdf056371c",
+      "formula": "if ((min_deg <= 4)), then (min_deg <= chi + 3*alpha - 4)",
+      "depth_type": "split_needed",
+      "hardness": 5.5,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 2,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-fbe7cfaf6d79",
+      "formula": "if ((omega >= 3) and (m >= 5)), then (chi >= -3*m + 3*min_deg + 12)",
+      "depth_type": "split_needed",
+      "hardness": 5.5,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 2,
+      "product_steps": 3,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-fb080ec28b59",
+      "formula": "if ((n >= 2*m)), then (2*m <= 3*chi + 2*alpha - 5)",
+      "depth_type": "split_needed",
+      "hardness": 5.417,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 3,
+      "product_steps": 2,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-40cc3f47b48b",
+      "formula": "if ((is_regular(2)) and (chi <= omega)), then (n <= 3*chi + 3*alpha - 8)",
+      "depth_type": "split_needed",
+      "hardness": 5.333,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 1,
+      "product_steps": 3,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-de283cc965e4",
+      "formula": "if ((has_cycle) and (girth <= 5)), then (2*girth <= 3*chi + 3*alpha - 4)",
+      "depth_type": "split_needed",
+      "hardness": 5.2,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 2,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:alpha"
+      ]
+    },
+    {
+      "task_id": "graph-df00328dce46",
+      "formula": "if ((chi >= 2*max_deg) and (m <= 5)), then (2*n >= 3*m - 3*chi + 5)",
+      "depth_type": "split_needed",
+      "hardness": 5.188,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 2,
+      "product_steps": 3,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-4146f2c54545",
+      "formula": "if ((is_bipartite) and (n <= 5)), then (alpha >= 3*m - chi - 13)",
+      "depth_type": "product_needed",
+      "hardness": 4.9,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 0,
+      "product_steps": 3,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-0431e88441f5",
+      "formula": "if ((n >= 4)), then (m >= -2*chi - 3*alpha + 12)",
+      "depth_type": "split_needed",
+      "hardness": 4.6,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-4ed633370324",
+      "formula": "if ((tau >= 2)), then (max_deg <= 3*m - 3*min_deg - 1)",
+      "depth_type": "split_needed",
+      "hardness": 4.5,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "bnb:min_deg"
+      ]
+    },
+    {
+      "task_id": "graph-246f765a6e03",
+      "formula": "if ((chi <= max_deg) and (max_deg >= 2*min_deg)), then (2*alpha >= -2*m + 3*min_deg + 5)",
+      "depth_type": "split_needed",
+      "hardness": 4.389,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 2,
+      "product_steps": 2,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-86d4b00cf4f1",
+      "formula": "if ((is_tree) and (alpha <= 3)), then (max_deg >= 3*diam - 13)",
+      "depth_type": "product_needed",
+      "hardness": 4.375,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 0,
+      "product_steps": 2,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-ab9d735f5af4",
+      "formula": "if ((is_tree) and (tau >= 2)), then (min_deg <= 3*alpha - 5)",
+      "depth_type": "product_needed",
+      "hardness": 4.375,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 0,
+      "product_steps": 2,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-1494511131b2",
+      "formula": "if ((m <= 5) and (min_deg >= max_deg)), then (2*omega <= -3*max_deg + 12)",
+      "depth_type": "split_needed",
+      "hardness": 4.357,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-b78efb9ae251",
+      "formula": "if ((tau >= 3) and (max_deg <= 3)), then (m <= 3*n + 3*chi - 15)",
+      "depth_type": "split_needed",
+      "hardness": 4.143,
+      "auto": "none",
+      "steps": 5,
+      "case_splits": 1,
+      "product_steps": 4,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-ec0d472fa23f",
+      "formula": "if ((tau <= 4) and (max_deg >= 2*chi)), then (omega <= -n + 4*alpha - 2)",
+      "depth_type": "split_needed",
+      "hardness": 4.0,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 1,
+      "product_steps": 3,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-d7be204e99a2",
+      "formula": "if ((is_tree) and (tau >= 3)), then (alpha >= min_deg - chi + 4)",
+      "depth_type": "product_needed",
+      "hardness": 4.0,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 0,
+      "product_steps": 3,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-5a584ccddf27",
+      "formula": "if ((is_connected) and (chi <= 2)), then (2*radius >= -3*alpha + 2*diam + 3)",
+      "depth_type": "split_needed",
+      "hardness": 4.0,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "bnb:radius"
+      ]
+    },
+    {
+      "task_id": "graph-e6ff3c250771",
+      "formula": "if ((is_acyclic) and (n >= 5)), then (alpha >= -m + 2*min_deg + 4)",
+      "depth_type": "product_needed",
+      "hardness": 3.9,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 0,
+      "product_steps": 2,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-8976596bdf8f",
+      "formula": "if ((is_connected) and (max_deg >= 4)), then (n <= 3*m - 3*min_deg - 4)",
+      "depth_type": "split_needed",
+      "hardness": 3.9,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:min_deg"
+      ]
+    },
+    {
+      "task_id": "graph-36cbb0be0e75",
+      "formula": "if ((has_cycle) and (tau <= 2*alpha)), then (max_deg <= 2*chi + 3*alpha - 7)",
+      "depth_type": "split_needed",
+      "hardness": 3.75,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-081472283f20",
+      "formula": "if ((max_deg <= 2*omega) and (omega <= 6)), then (omega <= 2*m - 3*min_deg + 3)",
+      "depth_type": "split_needed",
+      "hardness": 3.688,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:n"
+      ]
+    },
+    {
+      "task_id": "graph-9cc444131dd0",
+      "formula": "if ((alpha >= 5) and (tau >= 2)), then (2*min_deg <= m - 2)",
+      "depth_type": "split_needed",
+      "hardness": 3.667,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:min_deg"
+      ]
+    },
+    {
+      "task_id": "graph-5405d821b947",
+      "formula": "if ((max_deg >= 4)), then (2*min_deg <= 3*m - 2*max_deg - 2)",
+      "depth_type": "split_needed",
+      "hardness": 3.5,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:min_deg"
+      ]
+    },
+    {
+      "task_id": "graph-6d1fb7ac0840",
+      "formula": "if ((max_deg >= 5)), then (2*max_deg <= 3*m - 3*min_deg - 2)",
+      "depth_type": "split_needed",
+      "hardness": 3.5,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "bnb:min_deg"
+      ]
+    },
+    {
+      "task_id": "graph-0bd9c0ff9b2c",
+      "formula": "if ((is_regular(2)) and (tau <= 2) and (omega >= alpha)), then (n >= -omega + 6)",
+      "depth_type": "split_needed",
+      "hardness": 3.5,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "omega"
+      ]
+    },
+    {
+      "task_id": "graph-b5f371ba3284",
+      "formula": "if ((has_cycle) and (max_deg <= chi) and (tau <= 2*alpha)), then (girth <= 3*chi + 3*alpha - 8)",
+      "depth_type": "split_needed",
+      "hardness": 3.333,
+      "auto": "none",
+      "steps": 4,
+      "case_splits": 1,
+      "product_steps": 3,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-4a0427c80f88",
+      "formula": "if ((max_deg >= 2)), then (max_deg <= 3*m - 3*min_deg - 1)",
+      "depth_type": "split_needed",
+      "hardness": 3.3,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "bnb:min_deg"
+      ]
+    },
+    {
+      "task_id": "graph-39f68f996bbc",
+      "formula": "if ((tau >= 2)), then (alpha >= -2*n - 3*chi + 16)",
+      "depth_type": "split_needed",
+      "hardness": 3.3,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-b8668d62b0b0",
+      "formula": "if ((tau <= 3) and (n >= 5)), then (2*chi >= -3*alpha + 12)",
+      "depth_type": "split_needed",
+      "hardness": 3.25,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-eb370de1ef00",
+      "formula": "if ((tau <= 3)), then (4*alpha >= 2*n - 3*chi + 5)",
+      "depth_type": "split_needed",
+      "hardness": 3.2,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-a7b4d533d3fb",
+      "formula": "if ((n >= 6) and (alpha >= 2*tau)), then (n <= 3*chi + 2*alpha - 8)",
+      "depth_type": "split_needed",
+      "hardness": 3.0,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 2,
+      "product_steps": 1,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-28e8ae47c842",
+      "formula": "if ((is_k_edge_connected(1)) and (has_cycle)), then (chi <= 2*m - 3*min_deg + 3)",
+      "depth_type": "product_needed",
+      "hardness": 3.0,
+      "auto": "none",
+      "steps": 1,
+      "case_splits": 0,
+      "product_steps": 1,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-abc23574b46d",
+      "formula": "if ((tau <= 2)), then (5*alpha >= 3*n - 2*chi + 2)",
+      "depth_type": "split_needed",
+      "hardness": 2.9,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-176cd2f54a66",
+      "formula": "if ((min_deg >= max_deg) and (min_deg <= 5)), then (2*min_deg <= 2*m - 3*omega + 7)",
+      "depth_type": "split_needed",
+      "hardness": 2.625,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "omega"
+      ]
+    },
+    {
+      "task_id": "graph-4e2975b43915",
+      "formula": "if ((chi <= max_deg) and (chi >= 2)), then (max_deg >= -2*chi - 3*alpha + 12)",
+      "depth_type": "split_needed",
+      "hardness": 2.25,
+      "auto": "none",
+      "steps": 2,
+      "case_splits": 1,
+      "product_steps": 1,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-b36ef4f09f52",
+      "formula": "if ((is_regular(3)) and (chi <= 5)), then (n <= 6*alpha - 2)",
+      "depth_type": "product_needed",
+      "hardness": 2.0,
+      "auto": "none",
+      "steps": 1,
+      "case_splits": 0,
+      "product_steps": 1,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-e86a3fb90b63",
+      "formula": "if ((omega >= chi) and (n >= 4)), then (omega >= -2*chi - 3*alpha + 12)",
+      "depth_type": "split_needed",
+      "hardness": 1.938,
+      "auto": "none",
+      "steps": 3,
+      "case_splits": 1,
+      "product_steps": 2,
+      "split_vars": [
+        "chi"
+      ]
+    },
+    {
+      "task_id": "graph-cd5389afa208",
+      "formula": "if ((n >= 2*chi) and (n <= 5)), then (n >= m - 1)",
+      "depth_type": "product_needed",
+      "hardness": 1.857,
+      "auto": "none",
+      "steps": 1,
+      "case_splits": 0,
+      "product_steps": 1,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-bb7e137e3e58",
+      "formula": "if ((n <= 5) and (chi <= 2)), then (n >= 3*m - 13)",
+      "depth_type": "product_needed",
+      "hardness": 1.75,
+      "auto": "none",
+      "steps": 1,
+      "case_splits": 0,
+      "product_steps": 1,
+      "split_vars": []
+    },
+    {
+      "task_id": "graph-76ea594fcd38",
+      "formula": "if ((n <= 2*alpha) and (n >= 5)), then (2*min_deg <= m + alpha - 4)",
+      "depth_type": "product_needed",
+      "hardness": 1.625,
+      "auto": "none",
+      "steps": 1,
+      "case_splits": 0,
+      "product_steps": 1,
+      "split_vars": []
+    }
+  ],
+  "A5_by_segment": {
+    "-1": {
+      "n": 9,
+      "le_L2": 5,
+      "frac_le_L2": 0.556,
+      "none": 4
+    },
+    "2024": {
+      "n": 56,
+      "le_L2": 40,
+      "frac_le_L2": 0.714,
+      "none": 15
+    },
+    "2025": {
+      "n": 71,
+      "le_L2": 47,
+      "frac_le_L2": 0.662,
+      "none": 20
+    },
+    "2026": {
+      "n": 77,
+      "le_L2": 48,
+      "frac_le_L2": 0.623,
+      "none": 28
+    },
+    "2027": {
+      "n": 57,
+      "le_L2": 36,
+      "frac_le_L2": 0.632,
+      "none": 21
+    },
+    "2028": {
+      "n": 49,
+      "le_L2": 30,
+      "frac_le_L2": 0.612,
+      "none": 19
+    }
+  }
+}

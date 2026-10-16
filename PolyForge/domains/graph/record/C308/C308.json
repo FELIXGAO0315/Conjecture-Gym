@@ -1,5 +1,11 @@
 {
   "id": "C308",
+  "key": "2ab12bd01c5bf5cde875e4c9929909af072dcda8b013e8e103bed6ca34573162",
+  "provenance_keys": {
+    "self": "2ab12bd01c5bf5cde875e4c9929909af072dcda8b013e8e103bed6ca34573162",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T14:24:05.425052+00:00",
   "generator": {
     "version": "1.4.2",

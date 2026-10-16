@@ -1,5 +1,11 @@
 {
   "id": "C256",
+  "key": "e00773f793cb929c01da7b2ca9c3b2be3f27efcc1c4da4aa1a02a96df35de3b7",
+  "provenance_keys": {
+    "self": "e00773f793cb929c01da7b2ca9c3b2be3f27efcc1c4da4aa1a02a96df35de3b7",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T09:26:25.706930+00:00",
   "generator": {
     "version": "1.4.2",

@@ -1,5 +1,11 @@
 {
   "id": "C70",
+  "key": "8e9bd60197e2122e2a71a22e8a6bbac0b7ee19648c67e4c8f3a91c60bfcaa294",
+  "provenance_keys": {
+    "self": "8e9bd60197e2122e2a71a22e8a6bbac0b7ee19648c67e4c8f3a91c60bfcaa294",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T01:15:14.938697+00:00",
   "generator": {
     "version": "1.4.2",

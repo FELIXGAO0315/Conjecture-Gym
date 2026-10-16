@@ -1,5 +1,11 @@
 {
   "id": "C204",
+  "key": "fa0d3920586572b2f7cbb87e8be60b81451f4ee3b31b7962376c83315dabd58d",
+  "provenance_keys": {
+    "self": "fa0d3920586572b2f7cbb87e8be60b81451f4ee3b31b7962376c83315dabd58d",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T05:55:29.792694+00:00",
   "generator": {
     "version": "1.4.2",

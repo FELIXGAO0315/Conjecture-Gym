@@ -1,5 +1,11 @@
 {
   "id": "C140",
+  "key": "283ab2f4c244ec2cefdb25310af548162ba31be767427ab4b4c3d4f31f060359",
+  "provenance_keys": {
+    "self": "283ab2f4c244ec2cefdb25310af548162ba31be767427ab4b4c3d4f31f060359",
+    "instance_of": "edge_card_bound",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T03:10:27.389126+00:00",
   "generator": {
     "version": "1.4.2",

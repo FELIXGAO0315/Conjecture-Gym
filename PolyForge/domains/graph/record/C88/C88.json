@@ -1,5 +1,11 @@
 {
   "id": "C88",
+  "key": "987e001b63951f47650fa40941f9a0561be0df202e0379109517741923dc38c8",
+  "provenance_keys": {
+    "self": "987e001b63951f47650fa40941f9a0561be0df202e0379109517741923dc38c8",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T01:39:59.596718+00:00",
   "generator": {
     "version": "1.4.2",

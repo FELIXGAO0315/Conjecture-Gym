@@ -1,5 +1,11 @@
 {
   "id": "C16",
+  "key": "629c8bac2de953733ceafd3411b096a670db1181a901b4c1b8c09f55c066b22a",
+  "provenance_keys": {
+    "self": "629c8bac2de953733ceafd3411b096a670db1181a901b4c1b8c09f55c066b22a",
+    "instance_of": "handshake_min",
+    "promoted_from": "0b054f04ae73f04046799ebcb1c6db80e696250a2820660f263a21b29f8601b5"
+  },
   "created_at": "2026-10-15T01:24:55.079239+00:00",
   "generator": {
     "version": "1.4.2",

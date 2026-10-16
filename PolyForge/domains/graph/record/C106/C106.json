@@ -1,5 +1,11 @@
 {
   "id": "C106",
+  "key": "89c98be44186d6aa61a7d3d3a1284994ab937fa7da547f0152e7a2d8b5d8c9cf",
+  "provenance_keys": {
+    "self": "89c98be44186d6aa61a7d3d3a1284994ab937fa7da547f0152e7a2d8b5d8c9cf",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T02:09:03.516939+00:00",
   "generator": {
     "version": "1.4.2",

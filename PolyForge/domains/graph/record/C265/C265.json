@@ -1,5 +1,11 @@
 {
   "id": "C265",
+  "key": "f8fd3bfb76171ff8a9be2a93f465e130f260cb36329f201831ecb28f477c4c07",
+  "provenance_keys": {
+    "self": "f8fd3bfb76171ff8a9be2a93f465e130f260cb36329f201831ecb28f477c4c07",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T10:14:05.386977+00:00",
   "generator": {
     "version": "1.4.2",

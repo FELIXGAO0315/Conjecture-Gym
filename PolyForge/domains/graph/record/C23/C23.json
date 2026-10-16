@@ -1,5 +1,11 @@
 {
   "id": "C23",
+  "key": "9f93bea72a8a865fb3aeb3f28f6f4215e660687e152e1e6f279f0d478f74731e",
+  "provenance_keys": {
+    "self": "9f93bea72a8a865fb3aeb3f28f6f4215e660687e152e1e6f279f0d478f74731e",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:19:50.137806+00:00",
   "generator": {
     "version": "1.4.2",

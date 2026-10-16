@@ -1,5 +1,11 @@
 {
   "id": "C305",
+  "key": "a4f15dab3df19e3cca454777245e254645dc933aa5500ad18dab20684f9e73b5",
+  "provenance_keys": {
+    "self": "a4f15dab3df19e3cca454777245e254645dc933aa5500ad18dab20684f9e73b5",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T14:12:56.375263+00:00",
   "generator": {
     "version": "1.4.2",

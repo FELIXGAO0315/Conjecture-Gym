@@ -1,5 +1,11 @@
 {
   "id": "C288",
+  "key": "bfb102fad81f74dbf70bb5a2c1340ff67f9a157876238d92587573f3dae7149f",
+  "provenance_keys": {
+    "self": "bfb102fad81f74dbf70bb5a2c1340ff67f9a157876238d92587573f3dae7149f",
+    "instance_of": null,
+    "promoted_from": "94b334465fd568bbd0a4242f4ca3fbab7a819f91d4e98a3d8ddde5b04e3cedbb"
+  },
   "created_at": "2026-10-15T12:55:34.613287+00:00",
   "generator": {
     "version": "1.4.2",

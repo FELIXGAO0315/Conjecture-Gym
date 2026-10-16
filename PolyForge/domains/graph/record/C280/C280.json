@@ -1,5 +1,11 @@
 {
   "id": "C280",
+  "key": "840f2dcbd7d9ec9ba62f06e9e195743e86cf4a25ecd335901c57ec80e406f7e1",
+  "provenance_keys": {
+    "self": "840f2dcbd7d9ec9ba62f06e9e195743e86cf4a25ecd335901c57ec80e406f7e1",
+    "instance_of": null,
+    "promoted_from": "eaab10882e42e80b3b074f33343233238bd60c18c13b7ec4c5c2dabb8e22ac4e"
+  },
   "created_at": "2026-10-15T12:11:52.596292+00:00",
   "generator": {
     "version": "1.4.2",

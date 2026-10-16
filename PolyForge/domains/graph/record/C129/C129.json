@@ -1,5 +1,11 @@
 {
   "id": "C129",
+  "key": "f11b86b3d28a8c7eb0ec4ea6ff9bcc4cd899158be3dcc8c8a2de5ad0f04b8744",
+  "provenance_keys": {
+    "self": "f11b86b3d28a8c7eb0ec4ea6ff9bcc4cd899158be3dcc8c8a2de5ad0f04b8744",
+    "instance_of": "gallai",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T02:52:24.383998+00:00",
   "generator": {
     "version": "1.4.2",

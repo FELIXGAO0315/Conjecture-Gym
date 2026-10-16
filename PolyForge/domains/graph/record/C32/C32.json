@@ -1,5 +1,11 @@
 {
   "id": "C32",
+  "key": "de08814ba44df51f384ea2c1d9e1cbddde731f50daa9c35cfa3329c517d37f18",
+  "provenance_keys": {
+    "self": "de08814ba44df51f384ea2c1d9e1cbddde731f50daa9c35cfa3329c517d37f18",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:25:53.237652+00:00",
   "generator": {
     "version": "1.4.2",

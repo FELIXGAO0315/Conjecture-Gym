@@ -1,5 +1,11 @@
 {
   "id": "C243",
+  "key": "7c4131c027bf42828efd3fdfa819443e12e1f519c4ada40f15159a08fffa5dfa",
+  "provenance_keys": {
+    "self": "7c4131c027bf42828efd3fdfa819443e12e1f519c4ada40f15159a08fffa5dfa",
+    "instance_of": "handshake_max",
+    "promoted_from": "3beb4e320cfaea10a6b872dd3bd091aa504986243044467e9732b256169d3f0c"
+  },
   "created_at": "2026-10-15T08:12:43.772664+00:00",
   "generator": {
     "version": "1.4.2",

@@ -1,5 +1,11 @@
 {
   "id": "C34",
+  "key": "189e7fb00f1dda8d41150c8dabf631f7dc76abdcf4958a18f7f64a65f8fd01d1",
+  "provenance_keys": {
+    "self": "189e7fb00f1dda8d41150c8dabf631f7dc76abdcf4958a18f7f64a65f8fd01d1",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:32:17.487303+00:00",
   "generator": {
     "version": "1.4.2",

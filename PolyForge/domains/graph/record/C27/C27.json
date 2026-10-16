@@ -1,5 +1,11 @@
 {
   "id": "C27",
+  "key": "084eeac74236571c1f32a261aa4cd0ae3f207cabd5568a52561b61f9a1270df9",
+  "provenance_keys": {
+    "self": "084eeac74236571c1f32a261aa4cd0ae3f207cabd5568a52561b61f9a1270df9",
+    "instance_of": "card_le_alpha_chi",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:23:37.859070+00:00",
   "generator": {
     "version": "1.4.2",

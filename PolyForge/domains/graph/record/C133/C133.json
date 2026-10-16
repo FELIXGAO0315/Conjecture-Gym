@@ -1,5 +1,11 @@
 {
   "id": "C133",
+  "key": "19424b28f28a83f4933dcaa1552c7e87114be684e0f44dbf634ac07d3d119477",
+  "provenance_keys": {
+    "self": "19424b28f28a83f4933dcaa1552c7e87114be684e0f44dbf634ac07d3d119477",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T02:52:40.092363+00:00",
   "generator": {
     "version": "1.4.2",

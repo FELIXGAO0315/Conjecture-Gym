@@ -1,5 +1,11 @@
 {
   "id": "C3",
+  "key": "d3f60d4500fbbf6e04f01dbbbd25f82e7a2733fe9993ad2900f688d017bb8027",
+  "provenance_keys": {
+    "self": "d3f60d4500fbbf6e04f01dbbbd25f82e7a2733fe9993ad2900f688d017bb8027",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:05:31.686100+00:00",
   "generator": {
     "version": "1.4.2",

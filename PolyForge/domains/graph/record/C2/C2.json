@@ -1,5 +1,11 @@
 {
   "id": "C2",
+  "key": "96ffdb33c24034a00ecfb005efbd3db211fba0d5ede84de3628e1d80b130c385",
+  "provenance_keys": {
+    "self": "96ffdb33c24034a00ecfb005efbd3db211fba0d5ede84de3628e1d80b130c385",
+    "instance_of": "handshake_max",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:05:30.893157+00:00",
   "generator": {
     "version": "1.4.2",

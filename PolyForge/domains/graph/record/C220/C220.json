@@ -1,5 +1,11 @@
 {
   "id": "C220",
+  "key": "c9d744f09ea24846ce0b8b53e4346b07e0703e44fb9510efdb1a13b55c42f58e",
+  "provenance_keys": {
+    "self": "c9d744f09ea24846ce0b8b53e4346b07e0703e44fb9510efdb1a13b55c42f58e",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T06:34:01.544731+00:00",
   "generator": {
     "version": "1.4.2",

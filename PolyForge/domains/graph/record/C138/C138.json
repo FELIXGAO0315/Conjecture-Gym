@@ -1,5 +1,11 @@
 {
   "id": "C138",
+  "key": "6b07c3b10b75d2fa62627f664d8206e3ed048c32b7eb75b1446d93f269be9868",
+  "provenance_keys": {
+    "self": "6b07c3b10b75d2fa62627f664d8206e3ed048c32b7eb75b1446d93f269be9868",
+    "instance_of": "card_le_alpha_chi",
+    "promoted_from": "6cca53e3fecd37389b0b9d1991f28a9a7345a620431702e9749e78ea5aec8d1d"
+  },
   "created_at": "2026-10-15T03:02:35.560866+00:00",
   "generator": {
     "version": "1.4.2",

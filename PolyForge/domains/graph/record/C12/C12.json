@@ -1,5 +1,11 @@
 {
   "id": "C12",
+  "key": "b7fb7f29b2e096fa41442e12a154d19cf051b84fe5e35583d765eb3f53b2a154",
+  "provenance_keys": {
+    "self": "b7fb7f29b2e096fa41442e12a154d19cf051b84fe5e35583d765eb3f53b2a154",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:11:12.686211+00:00",
   "generator": {
     "version": "1.4.2",

@@ -1,5 +1,11 @@
 {
   "id": "C7",
+  "key": "d3272d8197cb7910a6ea97447f86f157c7c141c28800e1abcec3aa4fcdd30123",
+  "provenance_keys": {
+    "self": "d3272d8197cb7910a6ea97447f86f157c7c141c28800e1abcec3aa4fcdd30123",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:08:30.494184+00:00",
   "generator": {
     "version": "1.4.2",

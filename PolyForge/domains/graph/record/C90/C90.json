@@ -1,5 +1,11 @@
 {
   "id": "C90",
+  "key": "1b29fc83c44edf5620654197cc2012616b6ae431c5493ce2f2b9a69c82af1dbd",
+  "provenance_keys": {
+    "self": "1b29fc83c44edf5620654197cc2012616b6ae431c5493ce2f2b9a69c82af1dbd",
+    "instance_of": null,
+    "promoted_from": "0543aacfc5be2510ebf4106dbd07c9268bed0c407a0eeef11a0cab5b8a81de27"
+  },
   "created_at": "2026-10-15T01:41:27.546432+00:00",
   "generator": {
     "version": "1.4.2",

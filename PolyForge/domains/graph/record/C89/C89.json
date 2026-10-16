@@ -1,5 +1,11 @@
 {
   "id": "C89",
+  "key": "f78caf599b3f7e5e0d99e77c2ba758895776b170dd3421d4416d0b4d6dbf4664",
+  "provenance_keys": {
+    "self": "f78caf599b3f7e5e0d99e77c2ba758895776b170dd3421d4416d0b4d6dbf4664",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T01:40:03.073293+00:00",
   "generator": {
     "version": "1.4.2",

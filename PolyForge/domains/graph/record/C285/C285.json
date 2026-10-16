@@ -1,5 +1,11 @@
 {
   "id": "C285",
+  "key": "82b8e19f4988466b3f82c73967f8cd83ae4efe486b091d8f8fe223299c664062",
+  "provenance_keys": {
+    "self": "82b8e19f4988466b3f82c73967f8cd83ae4efe486b091d8f8fe223299c664062",
+    "instance_of": null,
+    "promoted_from": "29eacb701b41f5c656146aeaa9ef233ddefb23565ce5afe21a4a86f82a5294ab"
+  },
   "created_at": "2026-10-15T12:45:20.965020+00:00",
   "generator": {
     "version": "1.4.2",

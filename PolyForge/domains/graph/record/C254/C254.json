@@ -1,5 +1,11 @@
 {
   "id": "C254",
+  "key": "d7a6e02e9f5713b30607a69a329750ad6eea0ae46ce41de3e1f45afb7e07e5b9",
+  "provenance_keys": {
+    "self": "d7a6e02e9f5713b30607a69a329750ad6eea0ae46ce41de3e1f45afb7e07e5b9",
+    "instance_of": null,
+    "promoted_from": "451e252a5731ff1fb21c81e0a0517895c05bc40b8a78956d68461ed2005a5997"
+  },
   "created_at": "2026-10-15T08:56:51.260954+00:00",
   "generator": {
     "version": "1.4.2",

@@ -1,5 +1,11 @@
 {
   "id": "C221",
+  "key": "e999cbed213e83b2ec82f93121d2c9d90812593f815a75308b69c3e2d90ee2d7",
+  "provenance_keys": {
+    "self": "e999cbed213e83b2ec82f93121d2c9d90812593f815a75308b69c3e2d90ee2d7",
+    "instance_of": "handshake_max",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T06:34:18.542043+00:00",
   "generator": {
     "version": "1.4.2",

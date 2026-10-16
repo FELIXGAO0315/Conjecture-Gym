@@ -1,5 +1,11 @@
 {
   "id": "C310",
+  "key": "5d7252a048d902dbaac128116aadfeeb6d2201fc6cea992705a9a7bedcf5c600",
+  "provenance_keys": {
+    "self": "5d7252a048d902dbaac128116aadfeeb6d2201fc6cea992705a9a7bedcf5c600",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T14:24:50.958392+00:00",
   "generator": {
     "version": "1.4.2",

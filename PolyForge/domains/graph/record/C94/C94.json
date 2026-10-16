@@ -1,5 +1,11 @@
 {
   "id": "C94",
+  "key": "7743c02cfc80e0e920d909aa2cbcf85d277dae252a4852e30d7117eeb32ae878",
+  "provenance_keys": {
+    "self": "7743c02cfc80e0e920d909aa2cbcf85d277dae252a4852e30d7117eeb32ae878",
+    "instance_of": null,
+    "promoted_from": "95f5e14cc3e2bfec3a92ef0789b7c58863b8a4a2de9e9047aba44e35af720fa0"
+  },
   "created_at": "2026-10-15T01:44:23.128038+00:00",
   "generator": {
     "version": "1.4.2",

@@ -1,5 +1,11 @@
 {
   "id": "C69",
+  "key": "e3d363617e71763a89e80b971cfbbd1231a4451293e020a8c96da6dcc216b0e0",
+  "provenance_keys": {
+    "self": "e3d363617e71763a89e80b971cfbbd1231a4451293e020a8c96da6dcc216b0e0",
+    "instance_of": "bipartite_edges",
+    "promoted_from": "cdd688de8f36dfada5245e5498fd408c4a2bd88fa18dda9620528adb972cbe1a"
+  },
   "created_at": "2026-10-15T01:13:19.148173+00:00",
   "generator": {
     "version": "1.4.2",

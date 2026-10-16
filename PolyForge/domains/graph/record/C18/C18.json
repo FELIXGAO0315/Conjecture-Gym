@@ -1,5 +1,11 @@
 {
   "id": "C18",
+  "key": "bb01bc767548eb8d50cb0839f1977833cebd624d6d8333775f9675a4ccb8579a",
+  "provenance_keys": {
+    "self": "bb01bc767548eb8d50cb0839f1977833cebd624d6d8333775f9675a4ccb8579a",
+    "instance_of": "card_le_alpha_chi",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T05:31:23.006922+00:00",
   "generator": {
     "version": "1.4.2",

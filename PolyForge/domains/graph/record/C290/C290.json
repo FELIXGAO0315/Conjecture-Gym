@@ -1,5 +1,11 @@
 {
   "id": "C290",
+  "key": "4050c27f59f7d2592733398479c5f95929e1bf600e25da369c943a43eef4ef38",
+  "provenance_keys": {
+    "self": "4050c27f59f7d2592733398479c5f95929e1bf600e25da369c943a43eef4ef38",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T13:02:27.952724+00:00",
   "generator": {
     "version": "1.4.2",

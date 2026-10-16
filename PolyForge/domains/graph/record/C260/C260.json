@@ -1,5 +1,11 @@
 {
   "id": "C260",
+  "key": "9803783e3d2502ed415141ae8a0333cfe94b24a5f9f8aa79d37eecb2d36c7662",
+  "provenance_keys": {
+    "self": "9803783e3d2502ed415141ae8a0333cfe94b24a5f9f8aa79d37eecb2d36c7662",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T10:00:31.483704+00:00",
   "generator": {
     "version": "1.4.2",

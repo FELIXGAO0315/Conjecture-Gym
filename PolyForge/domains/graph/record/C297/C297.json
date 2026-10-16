@@ -1,5 +1,11 @@
 {
   "id": "C297",
+  "key": "e8f06da6a55e3358c9555c5e5a8a149b5de291d2866590d38ed5b05699d997ef",
+  "provenance_keys": {
+    "self": "e8f06da6a55e3358c9555c5e5a8a149b5de291d2866590d38ed5b05699d997ef",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T13:31:40.934771+00:00",
   "generator": {
     "version": "1.4.2",

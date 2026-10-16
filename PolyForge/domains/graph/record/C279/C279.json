@@ -1,5 +1,11 @@
 {
   "id": "C279",
+  "key": "c337f60bbd56ac45b7794dcb42e578270685229c262d3cb548cac3cc1d5b1f8b",
+  "provenance_keys": {
+    "self": "c337f60bbd56ac45b7794dcb42e578270685229c262d3cb548cac3cc1d5b1f8b",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T12:04:19.414506+00:00",
   "generator": {
     "version": "1.4.2",

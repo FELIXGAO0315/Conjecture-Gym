@@ -1,5 +1,11 @@
 {
   "id": "C263",
+  "key": "62befdf84bac91817489ad87ad3bf6490695351725d19a868e0fa51d8d0ffd87",
+  "provenance_keys": {
+    "self": "62befdf84bac91817489ad87ad3bf6490695351725d19a868e0fa51d8d0ffd87",
+    "instance_of": "max_lt_card",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T10:02:36.692761+00:00",
   "generator": {
     "version": "1.4.2",

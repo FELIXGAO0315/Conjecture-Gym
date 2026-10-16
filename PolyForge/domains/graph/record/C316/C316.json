@@ -1,5 +1,11 @@
 {
   "id": "C316",
+  "key": "1a5e8bf8c5318ebfd2e5dfff5cb9684c64ff56a4e4e2e26a46e79e7161fb180c",
+  "provenance_keys": {
+    "self": "1a5e8bf8c5318ebfd2e5dfff5cb9684c64ff56a4e4e2e26a46e79e7161fb180c",
+    "instance_of": "card_le_alpha_chi",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T20:25:14.222079+00:00",
   "generator": {
     "version": "1.4.2",

@@ -1,5 +1,11 @@
 {
   "id": "C159",
+  "key": "1a157aff0d77d9d91be2e3f1ae7f06d06ad1ecbbbd7e7c172d86cf325e4879b0",
+  "provenance_keys": {
+    "self": "1a157aff0d77d9d91be2e3f1ae7f06d06ad1ecbbbd7e7c172d86cf325e4879b0",
+    "instance_of": null,
+    "promoted_from": "77fe58814102e889631a8ab1866855dfcf21d4d45dfd5bcad4b30ac38ed4bcfd"
+  },
   "created_at": "2026-10-15T03:44:17.908986+00:00",
   "generator": {
     "version": "1.4.2",

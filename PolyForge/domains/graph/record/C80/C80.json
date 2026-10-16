@@ -1,5 +1,11 @@
 {
   "id": "C80",
+  "key": "aa09c7e7cfe3c6dc50a8b94dc8f79e1290311506ad26868093b7cb0191232ffc",
+  "provenance_keys": {
+    "self": "aa09c7e7cfe3c6dc50a8b94dc8f79e1290311506ad26868093b7cb0191232ffc",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T01:25:23.267934+00:00",
   "generator": {
     "version": "1.4.2",

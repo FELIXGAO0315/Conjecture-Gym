@@ -1,5 +1,11 @@
 {
   "id": "C255",
+  "key": "3ce5b671c67380a0ef8fa18e6202a338cad7fac06967986b7932fe8e04a4fbc9",
+  "provenance_keys": {
+    "self": "3ce5b671c67380a0ef8fa18e6202a338cad7fac06967986b7932fe8e04a4fbc9",
+    "instance_of": null,
+    "promoted_from": "c314cede5441827e27f5645096a6aa8b54d06b08b9d9212abd568daffd4ab5d5"
+  },
   "created_at": "2026-10-15T08:58:11.112030+00:00",
   "generator": {
     "version": "1.4.2",

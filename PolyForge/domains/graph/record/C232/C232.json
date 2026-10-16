@@ -1,5 +1,11 @@
 {
   "id": "C232",
+  "key": "4139edb4d8666659339f0ac022c89fa9684e342fcc42b54a5d29d225bb8efd56",
+  "provenance_keys": {
+    "self": "4139edb4d8666659339f0ac022c89fa9684e342fcc42b54a5d29d225bb8efd56",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T07:33:45.122590+00:00",
   "generator": {
     "version": "1.4.2",

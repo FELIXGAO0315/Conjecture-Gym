@@ -1,5 +1,11 @@
 {
   "id": "C240",
+  "key": "da2df022076330a666b09a6750bcfd94bf08328bac70b285057db438182a4986",
+  "provenance_keys": {
+    "self": "da2df022076330a666b09a6750bcfd94bf08328bac70b285057db438182a4986",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T10:25:05.544920+00:00",
   "generator": {
     "version": "1.4.2",

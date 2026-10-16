@@ -1,5 +1,11 @@
 {
   "id": "C24",
+  "key": "6c18fb4e0500accc3c6119fb67256ce88c9de34a0247238b32a399ae08cdefa3",
+  "provenance_keys": {
+    "self": "6c18fb4e0500accc3c6119fb67256ce88c9de34a0247238b32a399ae08cdefa3",
+    "instance_of": "card_le_alpha_chi",
+    "promoted_from": "926e8820d410169c0a53a618f73b3e60c50cca4c044bc3c4144309fd78936af7"
+  },
   "created_at": "2026-10-15T00:20:01.585675+00:00",
   "generator": {
     "version": "1.4.2",

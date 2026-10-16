@@ -1,5 +1,11 @@
 {
   "id": "C170",
+  "key": "6e59a8804478a0ed4ff199d43c88bba3ba9c2982b8c7e0c92ec64aee078ee3a5",
+  "provenance_keys": {
+    "self": "6e59a8804478a0ed4ff199d43c88bba3ba9c2982b8c7e0c92ec64aee078ee3a5",
+    "instance_of": "card_le_alpha_chi",
+    "promoted_from": "4ec5b8ef7f72861eb037b4dcb324e4170cd256c403c56b214bb35ce1afc733c4"
+  },
   "created_at": "2026-10-15T04:25:13.206304+00:00",
   "generator": {
     "version": "1.4.2",

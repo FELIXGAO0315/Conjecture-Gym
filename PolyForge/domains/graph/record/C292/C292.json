@@ -1,5 +1,11 @@
 {
   "id": "C292",
+  "key": "432a1d3f8d492c8778cdabb3a84fd1990dc2a11d3bb51d9ae53ef89f05260c98",
+  "provenance_keys": {
+    "self": "432a1d3f8d492c8778cdabb3a84fd1990dc2a11d3bb51d9ae53ef89f05260c98",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T13:18:37.271993+00:00",
   "generator": {
     "version": "1.4.2",

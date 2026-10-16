@@ -1,5 +1,11 @@
 {
   "id": "C64",
+  "key": "24d4077e2e53ee5c65f4ee2fd5991fd08ac518b9ac2b48b5ebc5df80fe06acc0",
+  "provenance_keys": {
+    "self": "24d4077e2e53ee5c65f4ee2fd5991fd08ac518b9ac2b48b5ebc5df80fe06acc0",
+    "instance_of": "handshake_max",
+    "promoted_from": "e7ebb161271079252d20e74e6627d6ce22c5677d7b1a6d0e95c50a389f523425"
+  },
   "created_at": "2026-10-15T01:06:20.308880+00:00",
   "generator": {
     "version": "1.4.2",

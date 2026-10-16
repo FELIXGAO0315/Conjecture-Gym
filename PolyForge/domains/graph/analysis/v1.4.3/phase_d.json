@@ -1,0 +1,18 @@
+{
+  "reconstructed": 311,
+  "closure_failures": 10,
+  "scratch_count": 319,
+  "committed_count": 319,
+  "byte_identical_mod_keys_created_at": true,
+  "content_differing_keys": [],
+  "only_in_scratch": [],
+  "only_in_committed": [],
+  "restore_tail": [
+    "restored 9/9 propositions"
+  ],
+  "cleanup_tail": [
+    "renumbered 9 records; final total = 319",
+    "FINAL closure: archived=231 derivable=231 failures=0",
+    "FINAL: basis clean + closure clean"
+  ]
+}

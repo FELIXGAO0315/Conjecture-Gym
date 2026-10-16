@@ -1,5 +1,11 @@
 {
   "id": "C230",
+  "key": "24c834d9c6f8aec4d8ea96cd13be6144b58c5ecafce97dd7cec9da4c3b52373e",
+  "provenance_keys": {
+    "self": "24c834d9c6f8aec4d8ea96cd13be6144b58c5ecafce97dd7cec9da4c3b52373e",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T07:23:45.747983+00:00",
   "generator": {
     "version": "1.4.2",

@@ -1,5 +1,11 @@
 {
   "id": "C60",
+  "key": "fc6e059d6d487f79ca64f7a235b72f6dc5f6ec10c09564f012562acceddec22c",
+  "provenance_keys": {
+    "self": "fc6e059d6d487f79ca64f7a235b72f6dc5f6ec10c09564f012562acceddec22c",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:58:47.500746+00:00",
   "generator": {
     "version": "1.4.2",

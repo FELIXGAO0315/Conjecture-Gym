@@ -1,5 +1,11 @@
 {
   "id": "C39",
+  "key": "5500e6cbde86e2a9c8cc07bf67aa1084f32934d789cd6a39d823aa303e2138b1",
+  "provenance_keys": {
+    "self": "5500e6cbde86e2a9c8cc07bf67aa1084f32934d789cd6a39d823aa303e2138b1",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T00:35:37.090507+00:00",
   "generator": {
     "version": "1.4.2",

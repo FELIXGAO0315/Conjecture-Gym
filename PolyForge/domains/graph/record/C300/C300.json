@@ -1,5 +1,11 @@
 {
   "id": "C300",
+  "key": "54053acb66e55bb08d8da7a5e70b94d2c881cc61e1ec4fa485aa52fd4d497fb5",
+  "provenance_keys": {
+    "self": "54053acb66e55bb08d8da7a5e70b94d2c881cc61e1ec4fa485aa52fd4d497fb5",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T13:43:16.250144+00:00",
   "generator": {
     "version": "1.4.2",

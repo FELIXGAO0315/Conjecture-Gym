@@ -1,5 +1,11 @@
 {
   "id": "C163",
+  "key": "cb9b4044b2b5632490d0eb84bc8372c5402cb29f1f408cb1a8399efe97a8f2e4",
+  "provenance_keys": {
+    "self": "cb9b4044b2b5632490d0eb84bc8372c5402cb29f1f408cb1a8399efe97a8f2e4",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T03:55:23.660080+00:00",
   "generator": {
     "version": "1.4.2",

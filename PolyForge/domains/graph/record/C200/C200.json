@@ -1,5 +1,11 @@
 {
   "id": "C200",
+  "key": "00d7bd3bd326f132828033850ccbdc6f00bfc942e2b563c85d3477c970832f35",
+  "provenance_keys": {
+    "self": "00d7bd3bd326f132828033850ccbdc6f00bfc942e2b563c85d3477c970832f35",
+    "instance_of": "omega_le_chi",
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T05:50:52.566632+00:00",
   "generator": {
     "version": "1.4.2",

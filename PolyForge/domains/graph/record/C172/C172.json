@@ -1,5 +1,11 @@
 {
   "id": "C172",
+  "key": "967de376e84ed9bc6c76387987f0250ccf794843cf6ae2fca16abde1eda55239",
+  "provenance_keys": {
+    "self": "967de376e84ed9bc6c76387987f0250ccf794843cf6ae2fca16abde1eda55239",
+    "instance_of": null,
+    "promoted_from": null
+  },
   "created_at": "2026-10-15T04:29:34.535373+00:00",
   "generator": {
     "version": "1.4.2",
