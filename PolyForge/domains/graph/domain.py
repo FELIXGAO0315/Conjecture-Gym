@@ -100,8 +100,10 @@ class GraphDomain(Domain):
             data = self.assemble_data(prop, "C0", [])
             existing = list(self.snapshot_records) + [c["data"] for c in committed]
             _, used, cert = G.redundancy_certificate(data, existing)
+            id_to_key = {d["id"]: G.record_content_key(d) for d in existing if d.get("id")}
             G.pruned_archive_append(self.record_dir, G.make_prune_entry(
-                data, "redundant_vs_record", used, cert, segment, commit_index))
+                data, "redundant_vs_record", used, cert, segment, commit_index,
+                id_to_key=id_to_key))
         except Exception:
             pass
 

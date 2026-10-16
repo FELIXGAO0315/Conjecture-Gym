@@ -12,6 +12,7 @@ worker entry) is reused from ``PolyForge.generator.generator``.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import random
@@ -1136,6 +1137,48 @@ def conjecture_hash(props, numeric, conclusion):
     return (premise_key(props, numeric), ck)
 
 
+# ── v1.4.3 §B: content key (stable, renumber-independent proposition identity) ──
+def _norm_form(coeffs, rel, rhs):
+    """Canonical form of a linear (in)equality as a JSON-serialisable tuple:
+    primitive integer coefficients in a sign-normalised ``>=`` / ``==`` orientation
+    (``<=`` folds to ``>=``; ``==`` has its lexicographically-first nonzero
+    coefficient made positive).  Two forms are the same proposition iff their
+    ``_norm_form`` is equal."""
+    rel = {"<": "<=", ">": ">=", "=": "=="}.get(rel, rel)
+    c = {v: int(x) for v, x in coeffs.items() if int(x) != 0}
+    r = int(rhs)
+    if rel == "<=":
+        c = {v: -x for v, x in c.items()}; r = -r; rel = ">="
+    prim = _prim({v: Fraction(x) for v, x in c.items()}, Fraction(-r))
+    if prim is None:
+        return ([], rel, str(r))
+    ic, const = prim                       # coprime integer coeffs, scaled const
+    items = sorted((v, int(x)) for v, x in ic.items())
+    if rel == "==" and items and items[0][1] < 0:
+        items = [(v, -x) for v, x in items]; const = -const
+    return (items, rel, str(const))
+
+
+def content_key(props, numeric, conclusion):
+    """Stable sha256 of the canonical STANDARD FORM of a proposition — its property
+    premises, its numeric premises, and its (canonical) conclusion, each reduced to
+    ``_norm_form``.  Independent of record number, display orientation, and the order
+    premises are written, so it survives renumbering and identifies the proposition
+    by content alone (§B2)."""
+    pk = sorted([p["name"], p.get("param")] for p in props)
+    nk = sorted(_norm_form(pr["coeffs"], pr["rel"], pr["rhs"]) for pr in numeric)
+    ck = _norm_form(conclusion["coeffs"], conclusion["rel"], conclusion["rhs"])
+    blob = json.dumps({"props": pk, "numeric": nk, "conclusion": ck},
+                      sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode()).hexdigest()
+
+
+def record_content_key(data):
+    """``content_key`` of a record dict (uses its canonical premises + conclusion)."""
+    props, numeric, canon = _record_props_canon(data)
+    return content_key(props, numeric, canon)
+
+
 def conjecture_skeleton(props, numeric, conclusion):
     prem = frozenset((p["name"],) for p in props)
     num = frozenset((_skel_lhs(pr["coeffs"]), pr["rel"], "0" if pr["rel"] == "=" else "*")
@@ -2024,20 +2067,36 @@ def redundancy_certificate(data, records):
         DED.INVENTORY, DED.PRODUCT_FACTS, DED.CONDITIONAL_THEOREMS, DED.INVENTORY_BY_NAME = saved
 
 
-def make_prune_entry(data, reason, used_ids, cert, segment=None, commit_index=None):
-    """Build a §D1 archive record for a pruned/rejected proposition ``data``."""
-    import hashlib
+def make_prune_entry(data, reason, used_ids, cert, segment=None, commit_index=None,
+                     id_to_key=None):
+    """Build a §D1 archive record for a pruned/rejected proposition ``data``.
+
+    v1.4.3 §B2: carries the proposition's stable content ``key`` and resolves every
+    certificate reference (``records_used`` and each ``rule == 'record'`` step) to the
+    referenced record's content key via ``id_to_key`` (a ``{display_id: key}`` map of
+    the records usable at prune time).  The display ids are retained alongside the keys
+    for provenance."""
     props, numeric, canon = _record_props_canon(data)
     content = json.dumps({"props": sorted(p["name"] for p in props), "numeric": numeric,
                           "canon": {"coeffs": {k: int(v) for k, v in canon["coeffs"].items()},
                                     "rel": canon["rel"], "rhs": int(canon["rhs"])}}, sort_keys=True)
+    id_to_key = id_to_key or {}
+    steps = []
+    for s in cert:
+        s = dict(s)
+        if s.get("rule") == "record" and s.get("id") in id_to_key:
+            s["key"] = id_to_key[s["id"]]
+        steps.append(s)
     return {"standard_form": data["conjecture"]["formula"], "original_id": data.get("id"),
+            "key": content_key(props, numeric, canon),
             "reason": reason, "segment": segment, "commit_index": commit_index,
             "props": [{"name": p["name"], **({"param": p["param"]} if "param" in p else {})} for p in props],
             "numeric": numeric,
             "canonical": {"coeffs": {k: int(v) for k, v in canon["coeffs"].items()},
                           "rel": canon["rel"], "rhs": int(canon["rhs"])},
-            "certificate": {"records_used": used_ids, "steps": cert},
+            "certificate": {"records_used": used_ids,
+                            "records_used_keys": [id_to_key.get(i) for i in used_ids],
+                            "steps": steps},
             "content_hash": hashlib.sha256(content.encode()).hexdigest()[:16]}
 
 
@@ -2096,12 +2155,14 @@ def apply_reverse_prune(record_dir, new_data, segment=None, commit_index=None):
     records = load_records(record_dir)
     victims = reverse_prune_targets(new_data, records)
     by_id = {d["id"]: d for d in records}
+    id_to_key = {d["id"]: record_content_key(d) for d in records}
     for vid, used in victims:
         vdata = by_id.get(vid)
         if vdata is not None:
             _, cused, cert = redundancy_certificate(vdata, [d for d in records if d["id"] != vid])
             pruned_archive_append(record_dir, make_prune_entry(
-                vdata, "pruned_by_newer", used or cused, cert, segment, commit_index))
+                vdata, "pruned_by_newer", used or cused, cert, segment, commit_index,
+                id_to_key=id_to_key))
         vdir = record_dir / vid
         if vdir.exists():
             shutil.rmtree(vdir)
@@ -2751,8 +2812,19 @@ def assemble_data(proposal, target, supersedes):
     steps = list(proposal["tb"])
     apply_bridging(steps, {"coeffs": disp["coeffs"], "rel": disp["rel"], "rhs": disp["rhs"]},
                    props, disp_text)
+    # v1.4.3 §B2: stable, renumber-independent content key (identity by the canonical
+    # standard form incl. premises).  Display ids (C1…) remain contiguous labels; all
+    # cross-references are made through this key.
+    key = content_key(props, numeric, canon)
+    promoted = proposal.get("promoted_from")
     return {
         "id": target,
+        "key": key,
+        "provenance_keys": {
+            "self": key,
+            "instance_of": proposal.get("instance_of"),      # an Inventory lemma name, not a record
+            "promoted_from": (content_key(props, numeric, promoted) if promoted else None),
+        },
         "created_at": datetime.now(timezone.utc).isoformat(),
         "generator": {"version": GENERATOR_VERSION, "seed": proposal["seed"]},
         "rendered_with": RENDERED_WITH,

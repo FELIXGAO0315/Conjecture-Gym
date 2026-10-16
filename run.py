@@ -327,6 +327,7 @@ def main(argv):
     pruned_log = []                          # (victim, by_record, [used_ids]) in prune order
     rp_timing = {"rp": 0.0, "commit": 0.0}   # §I.5 reverse-prune vs commit wall-clock
     fwd_timing = {"t": 0.0}                   # §P7 main-process forward redundancy check
+    gen_wall_timing = {"t": 0.0}              # v1.4.3 §F1 main-thread wall idle-waiting on generation
     compile_failed_idx = []                  # premise indices whose Lean compile failed
     protected = set()                        # §6 (v0.7): C-names cited in some lemmas_used
 
@@ -566,7 +567,9 @@ def main(argv):
             if halt and not inflight and not ready and not pending:
                 break
             if not progressed:
+                _t_idle = time.time()
                 time.sleep(0.02)
+                gen_wall_timing["t"] += time.time() - _t_idle
         flush()
         # resume the next phase at a deterministic index: everything up to the last
         # new write has been committed; indices dispatched speculatively beyond it
@@ -686,12 +689,20 @@ def main(argv):
     t_gen = sample_time_total; t_fwd = fwd_timing["t"]; t_rev = rp_timing["rp"]
     t_comp = batch_time_total
     t_other = max(0.0, elapsed - t_fwd - t_rev - t_comp)
+    # v1.4.3 §F1: generation wall-clock = the wall the main thread spent idle-waiting on
+    # the parallel workers (t_gen_cpu is the worker CPU *sum*, which overlaps the main
+    # loop and is not a wall-clock quantity).  ``t_gen_cpu`` vs ``t_gen_wall`` are the
+    # per-bucket CPU-vs-wall instrumentation; ``t_other_resid`` is the loop's remaining
+    # dispatch/collect/sequence/write overhead.
+    t_gen_wall = gen_wall_timing["t"]
+    t_other_resid = max(0.0, t_other - t_gen_wall)
     print(f"\nSEGMENT STATS  written={added}  replaced={replaced}  pruned={pruned}  "
           f"net={added - pruned}  record_total={final_total}  premise_groups={sampled}  "
           f"main_hard_written={main_added}  main_groups={main_groups}  "
           f"main_end_reason={main_end_reason}  elapsed_s_informational={elapsed:.1f}  "
-          f"t_gen_cpu={t_gen:.1f}  t_forward={t_fwd:.1f}  t_reverse={t_rev:.1f}  "
-          f"t_compile={t_comp:.1f}  t_other={t_other:.1f}")
+          f"t_gen_cpu={t_gen:.1f}  t_gen_wall={t_gen_wall:.1f}  t_forward={t_fwd:.1f}  "
+          f"t_reverse={t_rev:.1f}  t_compile={t_comp:.1f}  t_other={t_other:.1f}  "
+          f"t_other_resid={t_other_resid:.1f}")
 
     _print_summary(domain, stats, sampled, added, replaced, elapsed, sample_time_total,
                    writes_by_depth, new_skel_segments, batch_count,
