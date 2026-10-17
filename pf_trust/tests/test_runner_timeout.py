@@ -39,3 +39,20 @@ def test_timeout_maps_to_unknown(tmp_path):
     assert res["g"].verdict is Verdict.UNKNOWN
     for p in _alive():
         subprocess.run(["kill", "-9", p])
+
+
+def test_parse_summary_empty_axioms_is_proven():
+    # v1.4.7 regression: a PROVEN declaration with an EMPTY axiom set prints a trailing
+    # tab ("name\tPRESENT\t"); parse_summary must read it as PROVEN, not drop the batch.
+    from pf_trust.lean_batch import parse_summary, Verdict
+    tag = "deadbeef"
+    out = (f"file.lean:9:0: info: PF_BEGIN_{tag}\n"
+           f"g0\tPRESENT\t\n"                 # proven, zero axioms (trailing tab)
+           f"g1\tPRESENT\tpropext\n"
+           f"g2\tMISSING\t\n"
+           f"PF_END_{tag}\n")
+    rows = parse_summary(out, tag, ["g0", "g1", "g2"])
+    assert rows is not None, "empty-axioms PROVEN line must not drop the batch"
+    assert rows["g0"].verdict is Verdict.PROVEN and rows["g0"].axioms == ()
+    assert rows["g1"].verdict is Verdict.PROVEN
+    assert rows["g2"].verdict is Verdict.NOT_PROVEN

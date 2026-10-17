@@ -128,7 +128,12 @@ def parse_summary(output: str, tag: str, expected: Sequence[str]) -> dict[str, G
     body = output.split(begin, 1)[1].split(end, 1)[0]
     rows: dict[str, GoalResult] = {}
     for raw in body.splitlines():
-        line = raw.strip()
+        # v1.4.7: strip line-endings and spaces only, NOT tabs — a PROVEN declaration with
+        # an EMPTY axiom set prints "name\tPRESENT\t" (trailing tab = empty axioms field);
+        # `raw.strip()` would eat that tab, drop the batch to 2 columns and (unsoundly for
+        # liveness) mark the whole batch untrusted.  An empty axiom set is legitimately
+        # PROVEN (∅ ⊆ ALLOWED_AXIOMS).
+        line = raw.strip(" \r\n")
         if not line:
             continue
         cols = line.split("\t")
