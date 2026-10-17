@@ -35,6 +35,7 @@ from __future__ import annotations
 import os
 import re
 import secrets
+import signal
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -189,11 +190,60 @@ def verify(goals: Sequence[Goal], header: str, runner: Runner,
     return results
 
 
+def _timed_group_run(argv: Sequence[str], cwd: str, timeout: float,
+                     grace: float = 5.0) -> tuple[int, str]:
+    """Run ``argv`` in its OWN process session and, on timeout, kill the WHOLE group.
+
+    v1.4.7 STEP 1: ``subprocess.run(timeout=...)`` kills only the direct child (``lake``);
+    the orphaned ``lean`` grandchild keeps the stdout pipe open, so ``communicate()``
+    blocks forever (the v1.4.6 hang).  Here the child gets ``start_new_session=True`` so
+    ``lake`` and its ``lean`` grandchild share a new process group; on timeout we send
+    SIGTERM to the group, wait a short grace, then SIGKILL, and drain the pipes.  A
+    timeout returns a non-summary output so ``verify()`` maps the batch to UNKNOWN
+    (fail-closed)."""
+    proc = subprocess.Popen(list(argv), cwd=cwd, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True, start_new_session=True)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+        return proc.returncode, (out or "") + "\n" + (err or "")
+    except subprocess.TimeoutExpired:
+        try:
+            pgid = os.getpgid(proc.pid)
+        except ProcessLookupError:
+            pgid = None
+        if pgid is not None:
+            try:
+                os.killpg(pgid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        try:
+            out, err = proc.communicate(timeout=grace)
+        except subprocess.TimeoutExpired:
+            if pgid is not None:
+                try:
+                    os.killpg(pgid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            try:
+                out, err = proc.communicate(timeout=grace)
+            except subprocess.TimeoutExpired:
+                out, err = "", ""
+        return 124, "pf_trust: lake/lean exceeded timeout; process group killed (fail-closed)\n" + (err or "")
+    finally:
+        if proc.poll() is None:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
+
+
 def lake_runner(project_dir: str, extra_args: Iterable[str] = ()) -> Runner:
     """Runner that compiles a temporary file with `lake env lean` inside project_dir.
 
     extra_args are passed to `lean` before the file (e.g. a maxErrors option as
-    defense in depth). Correctness does not depend on them.
+    defense in depth). Correctness does not depend on them.  On timeout the whole
+    lake/lean process group is killed (see ``_timed_group_run``) and the temp file is
+    always removed, so a slow/hung Lean cannot leak processes or files or block forever.
     """
     extra = list(extra_args)
 
@@ -202,11 +252,8 @@ def lake_runner(project_dir: str, extra_args: Iterable[str] = ()) -> Runner:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(source)
-            proc = subprocess.run(
-                ["lake", "env", "lean", *extra, path],
-                cwd=project_dir, capture_output=True, text=True, timeout=timeout,
-            )
-            return proc.returncode, proc.stdout + "\n" + proc.stderr
+            return _timed_group_run(["lake", "env", "lean", *extra, path],
+                                    cwd=project_dir, timeout=timeout)
         finally:
             try:
                 os.remove(path)
