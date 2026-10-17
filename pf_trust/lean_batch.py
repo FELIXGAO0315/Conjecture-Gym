@@ -1,0 +1,236 @@
+"""Fail-closed batched Lean verification.
+
+Why this exists
+---------------
+The v1.4.5 report found that `omega_decide_batch` decided "proven" from the
+ABSENCE of error messages. Once Lean stops reporting errors (maxErrors), every
+later failing goal looked proven. This module never infers success from silence.
+
+Decision rule (the only one)
+----------------------------
+A goal is PROVEN only if a summary block, printed by a final `#eval` command
+after all goals, lists the goal's declaration as present in the environment with
+axioms contained in ALLOWED_AXIOMS (so no `sorryAx`). Everything else is
+NOT_PROVEN (summary says present with sorryAx / missing) or UNKNOWN (no
+trustworthy summary at all).
+
+The batch as a whole is trusted only if:
+  * the summary block (tagged with a fresh random tag) appears exactly once,
+  * it lists exactly the expected declaration names,
+  * the true canary is PROVEN and the false canary is NOT_PROVEN.
+Otherwise the batch is split in halves and retried; a single goal that still has
+no trustworthy result is UNKNOWN. Callers must treat UNKNOWN as "not proven"
+whenever a wrong "proven" would be unsound (pruning, oracle reward).
+
+What is NOT verified here
+-------------------------
+The Lean meta code in `_SUMMARY_TEMPLATE` was written without access to the
+project's pinned toolchain. Run `selftest()` against the real toolchain first.
+If the summary command does not elaborate there, the batch fails closed
+(UNKNOWN everywhere), so a wrong template can cost time but cannot produce a
+false "proven".
+"""
+from __future__ import annotations
+
+import os
+import re
+import secrets
+import subprocess
+import tempfile
+from dataclasses import dataclass
+from enum import Enum
+from typing import Callable, Iterable, Sequence
+
+ALLOWED_AXIOMS = frozenset({"propext", "Classical.choice", "Quot.sound"})
+_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+class Verdict(str, Enum):
+    PROVEN = "proven"
+    NOT_PROVEN = "not_proven"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class Goal:
+    name: str        # plain Lean identifier, unique within the batch
+    statement: str   # Lean proposition (everything after the colon)
+    proof: str       # tactic block body, e.g. "omega"; may be multi-line
+
+
+@dataclass(frozen=True)
+class GoalResult:
+    name: str
+    verdict: Verdict
+    axioms: tuple[str, ...] = ()
+    detail: str = ""
+
+
+# runner(source_text, timeout_seconds) -> (returncode, combined stdout+stderr)
+Runner = Callable[[str, float], tuple[int, str]]
+
+
+_SUMMARY_TEMPLATE = """\
+open Lean Elab Command in
+#eval show CommandElabM Unit from do
+  let env ← getEnv
+  let names : List Name := [{names}]
+  let mut lines : Array String := #[]
+  for n in names do
+    if env.contains n then
+      let axs ← Lean.collectAxioms n
+      lines := lines.push (toString n ++ "\\tPRESENT\\t" ++ String.intercalate "," (axs.toList.map toString))
+    else
+      lines := lines.push (toString n ++ "\\tMISSING\\t")
+  logInfo (String.intercalate "\\n" (("{begin}" :: lines.toList) ++ ["{end}"]))
+"""
+
+
+def _indent(text: str, n: int = 2) -> str:
+    pad = " " * n
+    return "\n".join(pad + line if line.strip() else line for line in text.splitlines())
+
+
+def render_batch(header: str, goals: Sequence[Goal], tag: str) -> tuple[str, list[str]]:
+    """Return (lean_source, expected_names). Canaries are appended after real goals."""
+    names = [g.name for g in goals]
+    for n in names:
+        if not _NAME_RE.match(n):
+            raise ValueError(f"goal name is not a plain Lean identifier: {n!r}")
+    if len(set(names)) != len(names):
+        raise ValueError("duplicate goal names in batch")
+    can_t, can_f = f"pf_canary_true_{tag}", f"pf_canary_false_{tag}"
+    if can_t in names or can_f in names:
+        raise ValueError("goal name collides with canary name")
+
+    parts = [header.rstrip(), ""]
+    for g in goals:
+        parts.append(f"theorem {g.name} : {g.statement} := by\n{_indent(g.proof)}\n")
+    parts.append(f"theorem {can_t} : (1 : Int) ≤ 2 := by\n  omega\n")
+    parts.append(f"theorem {can_f} : (2 : Int) ≤ 1 := by\n  omega\n")
+    expected = names + [can_t, can_f]
+    parts.append(
+        _SUMMARY_TEMPLATE.format(
+            names=", ".join(f"`{n}" for n in expected),
+            begin=f"PF_BEGIN_{tag}",
+            end=f"PF_END_{tag}",
+        )
+    )
+    return "\n".join(parts), expected
+
+
+def parse_summary(output: str, tag: str, expected: Sequence[str]) -> dict[str, GoalResult] | None:
+    """Parse the tagged summary. Returns None if it is absent, duplicated or malformed."""
+    begin, end = f"PF_BEGIN_{tag}", f"PF_END_{tag}"
+    if output.count(begin) != 1 or output.count(end) != 1:
+        return None
+    body = output.split(begin, 1)[1].split(end, 1)[0]
+    rows: dict[str, GoalResult] = {}
+    for raw in body.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        cols = line.split("\t")
+        if len(cols) != 3 or cols[1] not in ("PRESENT", "MISSING"):
+            return None
+        name, status, axs = cols
+        if name in rows:
+            return None
+        axioms = tuple(a for a in axs.split(",") if a)
+        if status == "MISSING":
+            rows[name] = GoalResult(name, Verdict.NOT_PROVEN, (), "missing from environment")
+        elif set(axioms) <= ALLOWED_AXIOMS:
+            rows[name] = GoalResult(name, Verdict.PROVEN, axioms)
+        else:
+            rows[name] = GoalResult(name, Verdict.NOT_PROVEN, axioms, "disallowed axioms")
+    if set(rows) != set(expected):
+        return None
+    return rows
+
+
+def _run_once(goals: Sequence[Goal], header: str, runner: Runner, timeout: float):
+    tag = secrets.token_hex(8)
+    src, expected = render_batch(header, goals, tag)
+    try:
+        _rc, out = runner(src, timeout)  # rc is ignored on purpose: failing goals make it nonzero
+    except subprocess.TimeoutExpired:
+        return None, "timeout"
+    rows = parse_summary(out, tag, expected)
+    if rows is None:
+        return None, "no trustworthy summary"
+    if rows[f"pf_canary_true_{tag}"].verdict is not Verdict.PROVEN:
+        return None, "true canary not proven"
+    if rows[f"pf_canary_false_{tag}"].verdict is not Verdict.NOT_PROVEN:
+        return None, "false canary proven"
+    return {g.name: rows[g.name] for g in goals}, ""
+
+
+def verify(goals: Sequence[Goal], header: str, runner: Runner,
+           timeout: float = 600.0, max_batch: int = 400) -> dict[str, GoalResult]:
+    """Verify goals in batches of at most max_batch, fail-closed, splitting on distrust."""
+    results: dict[str, GoalResult] = {}
+
+    def solve(chunk: Sequence[Goal]) -> None:
+        got, why = _run_once(chunk, header, runner, timeout)
+        if got is not None:
+            results.update(got)
+            return
+        if len(chunk) == 1:
+            g = chunk[0]
+            results[g.name] = GoalResult(g.name, Verdict.UNKNOWN, (), why)
+            return
+        mid = len(chunk) // 2
+        solve(chunk[:mid])
+        solve(chunk[mid:])
+
+    goals = list(goals)
+    for i in range(0, len(goals), max_batch):
+        solve(goals[i:i + max_batch])
+    return results
+
+
+def lake_runner(project_dir: str, extra_args: Iterable[str] = ()) -> Runner:
+    """Runner that compiles a temporary file with `lake env lean` inside project_dir.
+
+    extra_args are passed to `lean` before the file (e.g. a maxErrors option as
+    defense in depth). Correctness does not depend on them.
+    """
+    extra = list(extra_args)
+
+    def run(source: str, timeout: float) -> tuple[int, str]:
+        fd, path = tempfile.mkstemp(suffix=".lean", prefix="pf_batch_", dir=project_dir)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(source)
+            proc = subprocess.run(
+                ["lake", "env", "lean", *extra, path],
+                cwd=project_dir, capture_output=True, text=True, timeout=timeout,
+            )
+            return proc.returncode, proc.stdout + "\n" + proc.stderr
+        finally:
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass
+
+    return run
+
+
+def selftest(header: str, runner: Runner, n_false: int = 150) -> dict:
+    """Reproduce the maxErrors scenario against the REAL toolchain.
+
+    n_false unprovable goals, then interleaved provable/unprovable goals after
+    them. Every goal must be classified correctly in a single trusted batch.
+    """
+    goals = [Goal(f"st_false_{i}", f"({i + 1} : Int) ≤ 0", "omega") for i in range(n_false)]
+    tail = []
+    for i in range(10):
+        tail.append(Goal(f"st_tail_true_{i}", f"({i} : Int) ≤ {i + 1}", "omega"))
+        tail.append(Goal(f"st_tail_false_{i}", f"({i + 1} : Int) ≤ {i}", "omega"))
+    goals += tail
+    expected = {g.name: (Verdict.PROVEN if "_true_" in g.name else Verdict.NOT_PROVEN) for g in goals}
+    got, why = _run_once(goals, header, runner, timeout=1800.0)
+    if got is None:
+        return {"ok": False, "reason": f"single batch not trusted: {why}"}
+    wrong = [n for n, v in expected.items() if got[n].verdict is not v]
+    return {"ok": not wrong, "misclassified": wrong, "n_goals": len(goals)}

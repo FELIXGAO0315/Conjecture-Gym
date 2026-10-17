@@ -96,34 +96,40 @@ def lean_theorem(name, facts, goal, variables):
     return f"theorem {name} {decls} {hyps} : {_render(*goal)} := by omega"
 
 
-def omega_decide_batch(cases):
-    """cases: list of (name, facts, goal, vars).  Returns {name: entailed_bool} by
-    compiling one Lean file with ``omega`` on each and parsing which failed.
+_OMEGA_HEADER = "import Mathlib"
+_lean_runner = None
 
-    The caller's ``name`` is used only as the result key; the Lean theorem on line i+1
-    is named ``thm_{i}`` (always a valid identifier) so an arbitrary caller key — e.g.
-    one containing ``::`` or other non-identifier characters — can never produce a Lean
-    parse error that would cascade and mis-attribute pass/fail by line."""
-    # Lean stops reporting after `maxErrors` (default 100); with many failing goals in a
-    # batch, later failing theorems would then appear error-free and be mis-read as
-    # proved.  The in-file `set_option maxErrors` does NOT lift the frontend cap, but the
-    # command-line `-D maxErrors=...` does — pass it so EVERY failing theorem is reported.
-    lines = [lean_theorem(f"thm_{i}", f, g, v) for i, (_n, f, g, v) in enumerate(cases)]
-    src = "\n".join(lines) + "\n"
-    tmp = Path("/tmp/claude-1000/-home-felix-gao-Conjecture-Gym/8510a703-7b76-43e8-a494-f5f779f22746/scratchpad/omega_closure.lean")
-    tmp.parent.mkdir(parents=True, exist_ok=True)
-    tmp.write_text(src)
-    res = subprocess.run(["lake", "env", "lean", "-D", "maxErrors=100000000", str(tmp)],
-                         cwd=str(_LEAN_DIR), capture_output=True, text=True)
-    failed = set()
-    for m in re.finditer(r"\.lean:(\d+):\d+: error", res.stdout + res.stderr):
-        failed.add(int(m.group(1)))
-    if "maximum number of errors" in (res.stdout + res.stderr):
-        raise RuntimeError("Lean error cap still hit — maxErrors not lifted; batch result unreliable")
+
+def _goal_statement(facts, goal, variables):
+    """A closed proposition for an omega case: ``∀ (vars : Int), f0 → … → goal``.
+    (lean_batch renders ``theorem name : <stmt> := by <proof>`` with no binder slot,
+    so the hypotheses/binders are folded into the statement and introduced in the proof.)"""
+    binder = ("(" + " ".join(_lean_var(v) for v in variables) + " : Int), ") if variables else ""
+    parts = [f"({_render(*f)})" for f in facts] + [f"({_render(*goal)})"]
+    return "∀ " + binder + " → ".join(parts) if variables else " → ".join(parts)
+
+
+def omega_decide_batch(cases):
+    """cases: list of (name, facts, goal, vars).  Returns ``({name: entailed_bool}, "", "")``.
+
+    v1.4.6: routed through ``pf_trust.lean_batch.verify`` — a goal counts as entailed ONLY
+    when the fail-closed summary positively confirms its declaration is present with axioms
+    ⊆ ALLOWED_AXIOMS (no `sorryAx`); NOT_PROVEN and UNKNOWN both map to ``False`` (a wrong
+    "entailed" would be unsound; "not entailed" is only incomplete).  Decision never comes
+    from the absence of error messages.  ``-D maxErrors`` is passed as defense-in-depth so a
+    mostly-failing batch does not abort and force splitting (speed only; correctness does
+    not depend on it)."""
+    from pf_trust import lean_batch as LB
+    global _lean_runner
+    if _lean_runner is None:
+        _lean_runner = LB.lake_runner(str(_LEAN_DIR), extra_args=["-D", "maxErrors=100000000"])
+    goals = [LB.Goal(f"thm_{i}", _goal_statement(f, g, v), "intros; omega")
+             for i, (_n, f, g, v) in enumerate(cases)]
+    res = LB.verify(goals, _OMEGA_HEADER, _lean_runner, max_batch=400)
     out = {}
     for i, (n, _f, _g, _v) in enumerate(cases):
-        out[n] = (i + 1) not in failed          # that theorem's line errored ⇒ not entailed
-    return out, src, res.stdout + res.stderr
+        out[n] = res[f"thm_{i}"].verdict is LB.Verdict.PROVEN
+    return out, "", ""
 
 
 def complete_entails(props, numeric, canon, record_views, max_rounds=64):
@@ -192,27 +198,16 @@ def _vars_of(facts, goal):
     return sorted(s)
 
 
-def props_dischargeable(R_props, T_props, pset):
-    """Can T's premises discharge R's property premises?  Non-parametric properties go
-    through the implication lattice (name ∈ ``pset``).  PARAMETRIC properties must match
-    the parameter — ``is_regular(d)`` needs T to carry ``is_regular(d)`` with the SAME d
-    (2-regular does not imply 3-regular); ``is_k_edge_connected(k)`` needs T to carry it
-    with k' ≥ k.  (v1.4.5 §V2: the name-only subset check — also used by the pipeline's
-    ``_avail_for`` — is unsound for parametric properties.)"""
-    T_by = {p["name"]: p.get("param") for p in T_props}
-    for p in R_props:
-        name = p["name"]; param = p.get("param")
-        if name not in pset:
-            return False
-        if param is not None:
-            tp = T_by.get(name)
-            if name == "is_k_edge_connected":
-                if tp is None or tp < param:
-                    return False
-            else:   # is_regular (and any other parametric): exact parameter match
-                if tp != param:
-                    return False
-    return True
+def props_dischargeable(R_props, T_props, pset=None):
+    """Can T's premises discharge R's property premises?  v1.4.6 §3: delegates to
+    ``pf_trust.props.dischargeable`` (the single decision rule) with our
+    ``property_closure`` as the non-parametric lattice; parametric properties
+    (is_regular(d) exact, is_k_edge_connected(k) monotone) are matched by pf_trust,
+    never stripped by the lattice.  ``pset`` is accepted for signature compatibility
+    but ignored (the closure is recomputed from T's non-parametric names)."""
+    from pf_trust.props import dischargeable as _pf_dischargeable
+    return _pf_dischargeable(G._prop_strs(R_props), G._prop_strs(T_props),
+                             closure=G.property_closure)
 
 
 def collect_facts_complete(props, numeric, canon, record_views):
