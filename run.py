@@ -423,6 +423,16 @@ def main(argv):
             skel_index[skel] = {"name": target_name,
                                 "formula": data["conjecture"]["formula"],
                                 "supersedes": supersedes, **metrics}
+            # v1.4.5 §G1: a replacement removes the old record — archive it (reason
+            # replaced_by) through the single archive path BEFORE it is overwritten, with
+            # the replacer's content key and a certificate that the replacer implies the
+            # replaced; if no certificate can be produced the entry is uncertified and the
+            # replacement decision is NEVER changed.  Behaviour-neutral: the written record
+            # is unchanged.
+            if mode == "replace":
+                _arch = getattr(domain, "archive_replacement", None)
+                if _arch is not None:
+                    _arch(target_name, data, base_seed, idx)
             CG.write_record(data, lean_full, domain.record_dir, domain.lean_dir)
             committed.append({"skeleton": skel, "data": data})
             for r in prop["lemma_refs"]:             # §6: protect the lemmas it depends on

@@ -193,6 +193,12 @@ def run_audits(stop_reason):
     from PolyForge.anvil import deducer as D
     from PolyForge.domains.graph import generator as G
     dom = GraphDomain(); D.configure(dom)
+    # v1.4.5 §G2: full backup (record C-dirs + pruned.jsonl + .production_state.jsonl)
+    # BEFORE any post-run step that could mutate the record (closure-failure restore,
+    # basis-audit prune, renumber).  ``backup`` copies the whole record dir.
+    backup(RUN_DIR / "backup_before_postrun")
+    print(f"§G2 post-run backup written to {RUN_DIR / 'backup_before_postrun'} "
+          f"(record + pruned.jsonl + .production_state.jsonl)", flush=True)
     summary = {"seeds": SEEDS, "target": TARGET, "max_groups": MAX_GROUPS, "safety_min": SAFETY_MIN,
                "segments": load_state(), "stop_reason": stop_reason}
 

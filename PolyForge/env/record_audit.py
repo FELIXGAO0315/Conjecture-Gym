@@ -50,6 +50,15 @@ def main(argv):
         if not fix:
             print("BASIS ISSUES (run with --fix)"); break
         victim = dups[0][1] if dups else red[0][0]
+        # v1.4.5 §G1: archive before removing (single archive path, content-keyed)
+        vdata = next((d for d in recs if d["id"] == victim), None)
+        if vdata is not None:
+            others = [d for d in recs if d["id"] != victim]
+            _, cused, cert = G.redundancy_certificate(vdata, others)
+            id_to_key = {d["id"]: G.record_content_key(d) for d in others if d.get("id")}
+            used = red[0][1] if (not dups and red) else []
+            G.archive_removal(rec, vdata, "pruned_basis_audit",
+                              used_ids=used or cused, cert=cert, id_to_key=id_to_key)
         shutil.rmtree(rec / victim, ignore_errors=True)
         print(f"  pruned {victim}")
     if fix:

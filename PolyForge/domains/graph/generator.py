@@ -1154,7 +1154,13 @@ def _norm_form(coeffs, rel, rhs):
         return ([], rel, str(r))
     ic, const = prim                       # coprime integer coeffs, scaled const
     items = sorted((v, int(x)) for v, x in ic.items())
-    if rel == "==" and items and items[0][1] < 0:
+    if rel == ">=":
+        # v1.4.5 §G3: integer tightening.  The bound is `sum(ic*x) >= -const`; over ℤ with
+        # coprime coefficients that is equivalent to `sum(ic*x) >= ceil(-const)` (e.g.
+        # 2x >= 3 ≡ x >= 2).  Normalise the constant so ℤ-equivalent bounds share a key.
+        from math import ceil
+        const = Fraction(-ceil(-const))
+    elif rel == "==" and items and items[0][1] < 0:
         items = [(v, -x) for v, x in items]; const = -const
     return (items, rel, str(const))
 
@@ -2100,13 +2106,44 @@ def make_prune_entry(data, reason, used_ids, cert, segment=None, commit_index=No
             "content_hash": hashlib.sha256(content.encode()).hexdigest()[:16]}
 
 
-def pruned_archive_append(record_dir, entry):
+def _pruned_archive_append(record_dir, entry):
     """§D1: append one JSON line to ``record_dir/pruned.jsonl`` (append-only; never
-    deleted — a data file of the pipeline, not a report)."""
+    deleted — a data file of the pipeline, not a report).  INTERNAL: all removals go
+    through ``archive_removal`` (v1.4.5 §G1); do not call this directly."""
     record_dir = Path(record_dir)
     record_dir.mkdir(parents=True, exist_ok=True)
     with open(record_dir / "pruned.jsonl", "a") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+# backward-compatible alias (the archive writer); kept so external readers importing the
+# old name still work, but every in-tree removal path uses ``archive_removal`` (§G1).
+pruned_archive_append = _pruned_archive_append
+
+
+def archive_removal(record_dir, removed_data, reason, *, used_ids=None, cert=None,
+                    replacer_key=None, flag=None, segment=None, commit_index=None,
+                    id_to_key=None):
+    """v1.4.5 §G1: THE single archive path for EVERY record removal — reverse prune
+    (``pruned_by_newer``), forward reject (``redundant_vs_record``), replacement
+    (``replaced_by``, with the replacer's content key and a certificate that the
+    replacer implies the replaced), audit prune (``pruned_basis_audit``) and
+    restore-induced prune.  Entries reference content keys.  If no certificate can be
+    produced, the entry is written with ``certificate=null`` and ``flag="uncertified"``
+    and the removal decision is NEVER changed.  Returns the appended entry."""
+    entry = make_prune_entry(removed_data, reason, used_ids or [], cert or [],
+                             segment, commit_index, id_to_key=id_to_key)
+    if replacer_key is not None:
+        entry["removed_by_key"] = replacer_key
+    if cert is None:
+        entry["certificate"] = {"records_used": used_ids or [],
+                                "records_used_keys": [(id_to_key or {}).get(i) for i in (used_ids or [])],
+                                "steps": None}
+        entry["flag"] = "uncertified"
+    if flag is not None:
+        entry["flag"] = flag
+    _pruned_archive_append(record_dir, entry)
+    return entry
 
 
 def load_pruned_archive(record_dir):
@@ -2160,9 +2197,9 @@ def apply_reverse_prune(record_dir, new_data, segment=None, commit_index=None):
         vdata = by_id.get(vid)
         if vdata is not None:
             _, cused, cert = redundancy_certificate(vdata, [d for d in records if d["id"] != vid])
-            pruned_archive_append(record_dir, make_prune_entry(
-                vdata, "pruned_by_newer", used or cused, cert, segment, commit_index,
-                id_to_key=id_to_key))
+            archive_removal(record_dir, vdata, "pruned_by_newer",
+                            used_ids=used or cused, cert=cert, segment=segment,
+                            commit_index=commit_index, id_to_key=id_to_key)
         vdir = record_dir / vid
         if vdir.exists():
             shutil.rmtree(vdir)

@@ -93,6 +93,28 @@ class GraphDomain(Domain):
                                      if d.get("id") not in drop]
         return victims
 
+    def archive_replacement(self, old_id, replacer_data, segment=None, commit_index=None):
+        """§G1: archive the record being overwritten by an in-place replacement
+        (reason ``replaced_by``), with the replacer's content key and a certificate that
+        the replacer implies the replaced (uncertified if none can be produced).  Reads
+        the old record from disk BEFORE it is overwritten.  Never raises; never changes
+        the replacement decision."""
+        try:
+            import json as _json
+            p = self.record_dir / old_id / f"{old_id}.json"
+            if not p.exists():
+                return
+            old = _json.loads(p.read_text())
+            der, used, cert = G.redundancy_certificate(old, [replacer_data])
+            rk = G.record_content_key(replacer_data)
+            G.archive_removal(self.record_dir, old, "replaced_by",
+                              used_ids=(used or [replacer_data["id"]]) if der else None,
+                              cert=cert if der else None, replacer_key=rk,
+                              id_to_key={replacer_data["id"]: rk},
+                              segment=segment, commit_index=commit_index)
+        except Exception:
+            pass
+
     def archive_forward_reject(self, prop, committed, segment=None, commit_index=None):
         """§D1: archive a main-process forward redundancy rejection
         (``redundant_vs_record_main``) to record/pruned.jsonl.  Never raises."""
@@ -101,9 +123,9 @@ class GraphDomain(Domain):
             existing = list(self.snapshot_records) + [c["data"] for c in committed]
             _, used, cert = G.redundancy_certificate(data, existing)
             id_to_key = {d["id"]: G.record_content_key(d) for d in existing if d.get("id")}
-            G.pruned_archive_append(self.record_dir, G.make_prune_entry(
-                data, "redundant_vs_record", used, cert, segment, commit_index,
-                id_to_key=id_to_key))
+            G.archive_removal(self.record_dir, data, "redundant_vs_record",
+                              used_ids=used, cert=cert, segment=segment,
+                              commit_index=commit_index, id_to_key=id_to_key)
         except Exception:
             pass
 
