@@ -1,0 +1,9 @@
+{
+  "oracle_reward1": 319,
+  "n_tasks": 319,
+  "anti_cheat_pass": true,
+  "recompile_ok": 20,
+  "recompile_total": 20,
+  "all_green": true,
+  "note": "unchanged from v1.4.5; REPL verifier decides positively via collectAxioms (never affected by the truncation bug); no reference proof fails"
+}

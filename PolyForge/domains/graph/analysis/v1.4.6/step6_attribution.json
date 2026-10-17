@@ -1,0 +1,129 @@
+{
+  "rows": [
+    {
+      "prop": "if ((tau >= 2)), then (alpha >= -2*n - 3*chi + 16)",
+      "source": "311_loss",
+      "verdict": "OTHER",
+      "chain": "pruned_by_newer during production via a record itself later pruned/renumbered; restricted non-composition; not replacement, not a parametric pair"
+    },
+    {
+      "prop": "if ((n >= 2*chi) and (tau >= 2)), then (2*chi >= -3*n - 3*alpha + 22)",
+      "source": "311_loss",
+      "verdict": "OTHER",
+      "chain": "pruned_by_newer during production via a record itself later pruned/renumbered; restricted non-composition; not replacement, not a parametric pair"
+    },
+    {
+      "prop": "if ((n >= 4)), then (alpha >= -2*m + 3*min_deg + 3)",
+      "source": "311_loss",
+      "verdict": "OTHER",
+      "chain": "pruned_by_newer during production via a record itself later pruned/renumbered; restricted non-composition; not replacement, not a parametric pair"
+    },
+    {
+      "prop": "if ((is_acyclic) and (n >= 5)), then (omega <= 2*m - 3*min_deg + 1)",
+      "source": "311_loss",
+      "verdict": "OTHER",
+      "chain": "pruned_by_newer during production via a record itself later pruned/renumbered; restricted non-composition; not replacement, not a parametric pair"
+    },
+    {
+      "prop": "if ((max_deg >= 3)), then (2*min_deg <= m)",
+      "source": "311_loss",
+      "verdict": "OTHER",
+      "chain": "pruned_by_newer during production via a record itself later pruned/renumbered; restricted non-composition; not replacement, not a parametric pair"
+    },
+    {
+      "prop": "if ((n >= 3) and (alpha >= 2*omega)), then (chi >= -alpha + 4)",
+      "source": "311_loss",
+      "verdict": "OTHER",
+      "chain": "pruned_by_newer during production via a record itself later pruned/renumbered; restricted non-composition; not replacement, not a parametric pair"
+    },
+    {
+      "prop": "if ((has_cycle)), then (omega <= 3*chi + 3*alpha - 9)",
+      "source": "311_loss",
+      "verdict": "OTHER",
+      "chain": "pruned_by_newer during production via a record itself later pruned/renumbered; restricted non-composition; not replacement, not a parametric pair"
+    },
+    {
+      "prop": "if ((is_k_edge_connected(1)) and (has_cycle)), then (chi <= 2*m - 3*min_deg + 3)",
+      "source": "311_loss",
+      "verdict": "OTHER",
+      "chain": "pruned_by_newer during production via a record itself later pruned/renumbered; restricted non-composition; not replacement, not a parametric pair"
+    },
+    {
+      "prop": "if ((is_regular(2)) and (m >= 4)), then (omega <= 3*chi + 3*alpha - 10)",
+      "source": "C3_gap",
+      "verdict": "PARAM_BUG",
+      "chain": null
+    },
+    {
+      "prop": "if ((has_cycle) and (is_k_edge_connected(1))), then (m >= 2*min_deg - 1)",
+      "source": "C3_gap",
+      "verdict": "PARAM_BUG",
+      "chain": null
+    },
+    {
+      "prop": "if ((is_regular(2)) and (m <= 6)), then (4*alpha >= 3*n - 3*chi - 1)",
+      "source": "C3_gap",
+      "verdict": "PARAM_BUG",
+      "chain": null
+    },
+    {
+      "prop": "if ((is_bipartite) and (n <= 6)), then (m <= 3*alpha)",
+      "source": "replacement",
+      "verdict": "REPLACEMENT",
+      "chain": null
+    },
+    {
+      "prop": "if ((max_deg >= 2)), then (2*chi >= -3*alpha + 9)",
+      "source": "replacement",
+      "verdict": "REPLACEMENT",
+      "chain": null
+    },
+    {
+      "prop": "if ((max_deg >= 3)), then (max_deg <= 3*m - 3*min_deg - 3)",
+      "source": "replacement",
+      "verdict": "REPLACEMENT",
+      "chain": null
+    },
+    {
+      "prop": "if ((n >= 3)), then (omega <= 3*chi + 3*alpha - 9)",
+      "source": "replacement",
+      "verdict": "REPLACEMENT",
+      "chain": null
+    },
+    {
+      "prop": "if ((n >= 4)), then (2*min_deg <= m)",
+      "source": "replacement",
+      "verdict": "REPLACEMENT",
+      "chain": null
+    },
+    {
+      "prop": "if ((n >= 4)), then (omega <= 3*chi + 3*alpha - 10)",
+      "source": "replacement",
+      "verdict": "REPLACEMENT",
+      "chain": null
+    },
+    {
+      "prop": "if ((n >= 6) and (alpha >= 5)), then (chi >= -alpha + 7)",
+      "source": "replacement",
+      "verdict": "REPLACEMENT",
+      "chain": null
+    },
+    {
+      "prop": "if ((not_bipartite) and (max_deg <= 6)), then (max_deg >= -3*n + m + 6)",
+      "source": "replacement",
+      "verdict": "REPLACEMENT",
+      "chain": null
+    },
+    {
+      "prop": "if ((tau >= 2)), then (n >= -3*chi - 2*alpha + 14)",
+      "source": "replacement",
+      "verdict": "REPLACEMENT",
+      "chain": null
+    }
+  ],
+  "counts": {
+    "OTHER": 8,
+    "PARAM_BUG": 3,
+    "REPLACEMENT": 9
+  }
+}
