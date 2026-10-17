@@ -1,0 +1,41 @@
+{
+  "coded_implications": [
+    [
+      "has_cycle",
+      "nontrivial"
+    ],
+    [
+      "is_acyclic",
+      "is_bipartite"
+    ],
+    [
+      "is_tree",
+      "is_acyclic"
+    ],
+    [
+      "is_tree",
+      "is_bipartite"
+    ],
+    [
+      "is_tree",
+      "is_connected"
+    ]
+  ],
+  "violations": [],
+  "missing_but_universal": [
+    {
+      "impl": [
+        "not_bipartite",
+        "has_cycle"
+      ],
+      "support": 1103
+    },
+    {
+      "impl": [
+        "not_bipartite",
+        "nontrivial"
+      ],
+      "support": 1103
+    }
+  ]
+}

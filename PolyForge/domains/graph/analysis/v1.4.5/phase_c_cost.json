@@ -1,0 +1,43 @@
+{
+  "C1": {
+    "single_per_pair_ms": {
+      "median": 802.8,
+      "p90": 839.3,
+      "max": 5934.3
+    },
+    "batched": {
+      "30": {
+        "wall_s": 1.34,
+        "per_pair_ms": 44.8
+      },
+      "100": {
+        "wall_s": 2.64,
+        "per_pair_ms": 26.4
+      },
+      "200": {
+        "wall_s": 4.48,
+        "per_pair_ms": 22.4
+      },
+      "400": {
+        "wall_s": 8.29,
+        "per_pair_ms": 20.7
+      }
+    },
+    "best_batch": 400
+  },
+  "C2": {
+    "backend": "PuLP/CBC (installed)",
+    "pairs_tested": 400,
+    "agree": 400,
+    "disagree": 0,
+    "disagreements": [],
+    "two_stage": "restricted _restricted_entails (pure Python, sound subset) first; omega only on failure; content-key-pair cache"
+  },
+  "C3": {
+    "targets": 431,
+    "usability_calls": 82453,
+    "restricted_fallthrough": 77773,
+    "fallthrough_rate": 0.9432,
+    "note": "fall-through = restricted stage (sound subset) fails -> complete omega needed"
+  }
+}

@@ -1,0 +1,394 @@
+{
+  "elapsed_s": 3654.8,
+  "losses_8_recheck": [
+    {
+      "verdict": "loss",
+      "usable": 4,
+      "formula": "if ((tau >= 2)), then (alpha >= -2*n - 3*chi + 16)"
+    },
+    {
+      "verdict": "loss",
+      "usable": 5,
+      "formula": "if ((n >= 2*chi) and (tau >= 2)), then (2*chi >= -3*n - 3*alpha + 22)"
+    },
+    {
+      "verdict": "loss",
+      "usable": 5,
+      "formula": "if ((n >= 4)), then (alpha >= -2*m + 3*min_deg + 3)"
+    },
+    {
+      "verdict": "loss",
+      "usable": 22,
+      "formula": "if ((is_acyclic) and (n >= 5)), then (omega <= 2*m - 3*min_deg + 1)"
+    },
+    {
+      "verdict": "loss",
+      "usable": 9,
+      "formula": "if ((max_deg >= 3)), then (2*min_deg <= m)"
+    },
+    {
+      "verdict": "loss",
+      "usable": 3,
+      "formula": "if ((n >= 3) and (alpha >= 2*omega)), then (chi >= -alpha + 4)"
+    },
+    {
+      "verdict": "loss",
+      "usable": 4,
+      "formula": "if ((has_cycle)), then (omega <= 3*chi + 3*alpha - 9)"
+    },
+    {
+      "verdict": "entailed",
+      "usable": 5,
+      "formula": "if ((n >= 4)), then (m >= -2*chi - 3*alpha + 12)"
+    },
+    {
+      "verdict": "loss",
+      "usable": 8,
+      "formula": "if ((is_k_edge_connected(1)) and (has_cycle)), then (chi <= 2*m - 3*min_deg + 3)"
+    }
+  ],
+  "C3_complete_319": {
+    "entailed": 228,
+    "total": 231,
+    "failures": [
+      "if ((is_regular(2)) and (m >= 4)), then (omega <= 3*chi + 3*alpha - 10)",
+      "if ((has_cycle) and (is_k_edge_connected(1))), then (m >= 2*min_deg - 1)",
+      "if ((is_regular(2)) and (m <= 6)), then (4*alpha >= 3*n - 3*chi - 1)"
+    ]
+  },
+  "M1": {
+    "redundant_count": 20,
+    "inventory_entailed_excluded": 62,
+    "inv_entailed_and_coverable_not_counted": 62,
+    "records": [
+      {
+        "id": "C103",
+        "formula": "if ((is_acyclic) and (omega <= max_deg)), then (2*omega <= -n + 4*alpha)",
+        "depth_type": "product_needed",
+        "auto_level": "L3",
+        "entailing_set": [
+          "C170"
+        ],
+        "minimized": true,
+        "usable_n": 14
+      },
+      {
+        "id": "C113",
+        "formula": "if ((n >= 5)), then (2*chi >= -m - 3*alpha + 15)",
+        "depth_type": "split_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C91"
+        ],
+        "minimized": true,
+        "usable_n": 9
+      },
+      {
+        "id": "C177",
+        "formula": "if ((n >= 5) and (n >= 2*chi)), then (2*chi >= -2*n - 3*alpha + 23)",
+        "depth_type": "split_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C91"
+        ],
+        "minimized": true,
+        "usable_n": 11
+      },
+      {
+        "id": "C189",
+        "formula": "if ((is_regular(3)) and (chi <= 5)), then (n <= 6*alpha - 2)",
+        "depth_type": "product_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C78"
+        ],
+        "minimized": true,
+        "usable_n": 36
+      },
+      {
+        "id": "C211",
+        "formula": "if ((chi <= max_deg) and (chi >= 2)), then (max_deg >= -2*chi - 3*alpha + 12)",
+        "depth_type": "split_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C149"
+        ],
+        "minimized": true,
+        "usable_n": 7
+      },
+      {
+        "id": "C227",
+        "formula": "if ((is_regular(3)) and (chi <= 2)), then (6*alpha >= 3*n - 4*chi + 8)",
+        "depth_type": "product_needed",
+        "auto_level": "L2",
+        "entailing_set": [
+          "C170"
+        ],
+        "minimized": true,
+        "usable_n": 43
+      },
+      {
+        "id": "C248",
+        "formula": "if ((n >= 2*m)), then (2*m <= 3*chi + 2*alpha - 5)",
+        "depth_type": "split_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C93"
+        ],
+        "minimized": true,
+        "usable_n": 2
+      },
+      {
+        "id": "C254",
+        "formula": "if ((is_bipartite) and (alpha >= 2*omega) and (chi <= omega)), then (2*omega >= 2*n - 5*alpha + 8)",
+        "depth_type": "product_needed",
+        "auto_level": "L2",
+        "entailing_set": [
+          "C214"
+        ],
+        "minimized": true,
+        "usable_n": 12
+      },
+      {
+        "id": "C27",
+        "formula": "if ((omega >= chi) and (n >= 4)), then (omega >= -2*chi - 3*alpha + 12)",
+        "depth_type": "split_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C149",
+          "C191"
+        ],
+        "minimized": true,
+        "usable_n": 6
+      },
+      {
+        "id": "C286",
+        "formula": "if ((max_deg <= 2) and (max_deg <= min_deg)), then (2*min_deg >= -3*n + 3*m + 3)",
+        "depth_type": "product_needed",
+        "auto_level": "L2",
+        "entailing_set": [
+          "C2"
+        ],
+        "minimized": true,
+        "usable_n": 18
+      },
+      {
+        "id": "C293",
+        "formula": "if ((alpha >= 2) and (n >= 6)), then (omega <= 3*chi + 2*alpha - 10)",
+        "depth_type": "split_needed",
+        "auto_level": "L2",
+        "entailing_set": [
+          "C91"
+        ],
+        "minimized": true,
+        "usable_n": 13
+      },
+      {
+        "id": "C298",
+        "formula": "if ((omega <= 2) and (max_deg <= omega)), then (2*omega >= -3*n + 3*m + 4)",
+        "depth_type": "product_needed",
+        "auto_level": "L2",
+        "entailing_set": [
+          "C2"
+        ],
+        "minimized": true,
+        "usable_n": 18
+      },
+      {
+        "id": "C299",
+        "formula": "if ((n >= 5) and (chi >= max_deg)), then (max_deg <= 3*chi + 2*alpha - 10)",
+        "depth_type": "split_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C91"
+        ],
+        "minimized": true,
+        "usable_n": 11
+      },
+      {
+        "id": "C301",
+        "formula": "if ((is_connected) and (chi <= 2)), then (2*radius >= -3*alpha + 2*diam + 3)",
+        "depth_type": "split_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C170"
+        ],
+        "minimized": true,
+        "usable_n": 10
+      },
+      {
+        "id": "C312",
+        "formula": "if ((n >= 2*chi) and (tau >= 2)), then (3*n >= -2*chi - 3*alpha + 22)",
+        "depth_type": "split_needed",
+        "auto_level": "L2",
+        "entailing_set": [
+          "C149",
+          "C311"
+        ],
+        "minimized": true,
+        "usable_n": 6
+      },
+      {
+        "id": "C318",
+        "formula": "if ((n >= 4)), then (m >= -2*chi - 3*alpha + 12)",
+        "depth_type": "split_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C149",
+          "C191"
+        ],
+        "minimized": true,
+        "usable_n": 5
+      },
+      {
+        "id": "C32",
+        "formula": "if ((is_tree) and (alpha >= tau) and (diam >= 2)), then (omega <= 3*chi + 2*alpha - 8)",
+        "depth_type": "split_needed",
+        "auto_level": "L3",
+        "entailing_set": [
+          "C214"
+        ],
+        "minimized": true,
+        "usable_n": 21
+      },
+      {
+        "id": "C42",
+        "formula": "if ((tau <= 2)), then (5*alpha >= 3*n - 2*chi + 2)",
+        "depth_type": "split_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C7",
+          "C11",
+          "C13"
+        ],
+        "minimized": true,
+        "usable_n": 4
+      },
+      {
+        "id": "C74",
+        "formula": "if ((is_acyclic) and (max_deg <= 2*min_deg)), then (2*min_deg >= 2*max_deg - 3*alpha + 3)",
+        "depth_type": "split_needed",
+        "auto_level": "L3",
+        "entailing_set": [
+          "C170"
+        ],
+        "minimized": true,
+        "usable_n": 11
+      },
+      {
+        "id": "C9",
+        "formula": "if ((tau <= 3) and (n >= 5)), then (2*chi >= -3*alpha + 12)",
+        "depth_type": "split_needed",
+        "auto_level": "none",
+        "entailing_set": [
+          "C91"
+        ],
+        "minimized": true,
+        "usable_n": 16
+      }
+    ]
+  },
+  "M2": {
+    "ascending_remove_earlier_first": {
+      "basis_size": 299,
+      "removed": [
+        "C9",
+        "C27",
+        "C32",
+        "C42",
+        "C74",
+        "C103",
+        "C113",
+        "C177",
+        "C189",
+        "C211",
+        "C227",
+        "C248",
+        "C254",
+        "C286",
+        "C293",
+        "C298",
+        "C299",
+        "C301",
+        "C312",
+        "C318"
+      ]
+    },
+    "descending": {
+      "basis_size": 299,
+      "removed": [
+        "C318",
+        "C312",
+        "C301",
+        "C299",
+        "C298",
+        "C293",
+        "C286",
+        "C254",
+        "C248",
+        "C227",
+        "C211",
+        "C189",
+        "C177",
+        "C113",
+        "C103",
+        "C74",
+        "C42",
+        "C32",
+        "C27",
+        "C9"
+      ]
+    },
+    "overlap_removed": [
+      "C9",
+      "C27",
+      "C32",
+      "C42",
+      "C74",
+      "C103",
+      "C113",
+      "C177",
+      "C189",
+      "C211",
+      "C227",
+      "C248",
+      "C254",
+      "C286",
+      "C293",
+      "C298",
+      "C299",
+      "C301",
+      "C312",
+      "C318"
+    ],
+    "restored_ids_C312_320": [
+      "C311",
+      "C312",
+      "C313",
+      "C314",
+      "C315",
+      "C316",
+      "C317",
+      "C318",
+      "C319"
+    ],
+    "restored_removed_asc": [
+      "C312",
+      "C318"
+    ],
+    "restored_removed_desc": [
+      "C312",
+      "C318"
+    ],
+    "c191_in_final_record": true
+  },
+  "M3_V2a": {
+    "n_pairs": 4215,
+    "violations": []
+  },
+  "V2b": {
+    "sample": 300,
+    "with_witness": 270,
+    "undetermined_on_atlas": 30
+  }
+}

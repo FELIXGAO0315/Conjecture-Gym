@@ -1,0 +1,209 @@
+{
+  "B3": {
+    "uniform_U_solved": 0,
+    "diagnosis": "uniform-U = aesop(add forward [unconditional _int lemmas]) + uniform nlinarith hints. On rounding_only tasks that L1 solves it fails for two reasons: (a) its hint list is UNCONDITIONAL-only and omits the PROPERTY-CONDITIONED facts the proof needs (e.g. graph-c9872a37adb0 needs is_acyclic=>chi<=2 `acyclic_chi_int`; graph-ae046c7f4207 needs not_bipartite=>chi>=3 `not_bipartite_chi_int`), which are added per-statement only by set_active_inventory; (b) aesop is not a linear-integer closer, so even with facts in context it does not discharge the arithmetic. Confirmed by aesop trace: 'failed to prove the goal after exhaustive search' -> unsolved goals.",
+    "fair_U": "instantiate every GraphLemmas lemma whose hypotheses are dischargeable from the STATEMENT (= the active inventory for the statement's property closure), then {omega,linarith,nlinarith}. This is EXACTLY L1's PUBLIC construction (l1_preamble). So U-fair == L1.",
+    "U_fair_solved_319": 61,
+    "note": "U-fair coincides with L1; the distinct 'U' level collapses into L1."
+  },
+  "B4": {
+    "candidate_tasks_none_after_B3": 107,
+    "worst_case": "<=64 plans/task x 30s = 32 min/task raw, capped 15 min/task; serial worst = 26.8 h, parallel on 14 cores worst = 1.9 h",
+    "status": "DEFERRED this round (session budget). Worst-case parallel ~1.9 h (< 6h threshold); not a correctness item \u2014 L4 only attempts to shrink 'none'. none stays 107 pending L4."
+  },
+  "B5": {
+    "none_tasks": 107,
+    "note": "PolyForge split variables for the 'none' tasks (from v1.4.3 A4): see split_vars per task. Thresholds vs L4 candidate set: not evaluated (B4 deferred).",
+    "sample": [
+      {
+        "formula": "if ((is_regular(3))), then (3*alpha >= -2*chi + 11)",
+        "depth_type": "split_needed",
+        "hardness": 43.75,
+        "split_vars": [
+          "bnb:alpha"
+        ],
+        "case_splits": 6
+      },
+      {
+        "formula": "if ((max_deg <= 4)), then (2*min_deg <= 2*chi + 3*alpha - 4)",
+        "depth_type": "split_needed",
+        "hardness": 26.3,
+        "split_vars": [
+          "bnb:n"
+        ],
+        "case_splits": 6
+      },
+      {
+        "formula": "if ((alpha <= 2*tau) and (m >= 5)), then (2*m >= -3*chi - 3*",
+        "depth_type": "split_needed",
+        "hardness": 23.562,
+        "split_vars": [
+          "bnb:m"
+        ],
+        "case_splits": 6
+      },
+      {
+        "formula": "if ((nontrivial) and (is_connected) and (radius <= 6)), then",
+        "depth_type": "split_needed",
+        "hardness": 17.9,
+        "split_vars": [
+          "bnb:m"
+        ],
+        "case_splits": 3
+      },
+      {
+        "formula": "if ((is_connected) and (n >= 3)), then (chi <= 3*m - 3*min_d",
+        "depth_type": "split_needed",
+        "hardness": 17.9,
+        "split_vars": [
+          "chi"
+        ],
+        "case_splits": 7
+      },
+      {
+        "formula": "if ((not_bipartite) and (tau <= 5)), then (2*alpha >= -m + 3",
+        "depth_type": "split_needed",
+        "hardness": 15.8,
+        "split_vars": [
+          "omega"
+        ],
+        "case_splits": 4
+      },
+      {
+        "formula": "if ((is_connected) and (m <= 5)), then (2*max_deg >= -3*chi ",
+        "depth_type": "split_needed",
+        "hardness": 14.7,
+        "split_vars": [
+          "chi"
+        ],
+        "case_splits": 2
+      },
+      {
+        "formula": "if ((has_cycle) and (girth >= 5)), then (2*chi >= -3*alpha +",
+        "depth_type": "split_needed",
+        "hardness": 14.625,
+        "split_vars": [
+          "bnb:alpha"
+        ],
+        "case_splits": 4
+      }
+    ]
+  },
+  "B6": {
+    "public_ladder": "L0 \u2282 L1(=U-fair) \u2282 L2 \u2282 L3, ALL PUBLIC; no privileged level",
+    "counts": {
+      "L0": 0,
+      "L1": 61,
+      "L2": 145,
+      "L3": 6,
+      "none": 107
+    },
+    "by_depth_type": {
+      "split_needed": {
+        "L0": 0,
+        "U": 0,
+        "L1": 1,
+        "L2": 59,
+        "L3": 4,
+        "none": 96
+      },
+      "product_needed": {
+        "L0": 0,
+        "U": 0,
+        "L1": 0,
+        "L2": 85,
+        "L3": 2,
+        "none": 11
+      },
+      "rounding_only": {
+        "L0": 0,
+        "U": 0,
+        "L1": 60,
+        "L2": 1,
+        "L3": 0,
+        "none": 0
+      }
+    },
+    "by_legacy_tier": {
+      "medium": {
+        "L0": 0,
+        "U": 0,
+        "L1": 11,
+        "L2": 58,
+        "L3": 6,
+        "none": 25
+      },
+      "easy": {
+        "L0": 0,
+        "U": 0,
+        "L1": 50,
+        "L2": 60,
+        "L3": 0,
+        "none": 3
+      },
+      "hard": {
+        "L0": 0,
+        "U": 0,
+        "L1": 0,
+        "L2": 27,
+        "L3": 0,
+        "none": 79
+      }
+    },
+    "hardness_quantiles": {
+      "L0": null,
+      "U": null,
+      "L1": {
+        "n": 61,
+        "min": 0.688,
+        "p25": 1.167,
+        "median": 1.4,
+        "p75": 1.8,
+        "max": 3.1
+      },
+      "L2": {
+        "n": 145,
+        "min": 0.571,
+        "p25": 1.571,
+        "median": 2.312,
+        "p75": 3.5,
+        "max": 15.9
+      },
+      "L3": {
+        "n": 6,
+        "min": 2.5,
+        "p25": 3.083,
+        "median": 3.292,
+        "p75": 3.5,
+        "max": 3.7
+      },
+      "none": {
+        "n": 107,
+        "min": 1.625,
+        "p25": 4.25,
+        "median": 7.1,
+        "p75": 10.2,
+        "max": 43.75
+      }
+    },
+    "spearman": {
+      "rho": 0.7116,
+      "p": 1.5903093203000716e-50
+    },
+    "none_before_L4": 107,
+    "none_after_L4": "deferred",
+    "decision": "primary difficulty axis = lowest PUBLIC level that solves the task; all levels PUBLIC so all are both strategy and upper bound. No task dropped; no core subset."
+  },
+  "B7": {
+    "export": "automation-ladder export, all 319 tasks, every level tagged PUBLIC; legacy tertile export unchanged",
+    "levels_unchanged_from_v143": "L0-L3 definitions identical; U-fair collapses into L1; no task had auto_level=U, so auto_level values are identical to v1.4.3",
+    "split": "StratifiedGroupKFold by public auto_level, group by skeleton, seed 1337; train 253 / test 66, 0 straddling (reused; tasks identical)",
+    "oracle_reward1": 319,
+    "n_tasks": 319,
+    "anti_cheat_pass": true,
+    "recompile_ok": 20,
+    "recompile_total": 20,
+    "all_green": true,
+    "note": "oracle/anti-cheat/recompile reused from v1.4.3 export (byte-identical task set): 319/319 reward1, anti-cheat PASS, recompile 20/20"
+  }
+}

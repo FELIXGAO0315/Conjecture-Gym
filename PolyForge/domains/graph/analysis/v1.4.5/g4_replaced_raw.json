@@ -1,0 +1,95 @@
+{
+  "supersedes_formulas": [
+    "if ((alpha >= 5)), then (m >= 2*min_deg)",
+    "if ((is_acyclic) and (n >= 6)), then (2*chi >= n - 2*alpha + 4)",
+    "if ((is_bipartite) and (n <= 6)), then (m <= 3*alpha)",
+    "if ((is_connected) and (diam <= 1)), then (2*diam <= 3*chi + 3*alpha - 6)",
+    "if ((is_regular(2))), then (3*alpha >= -2*chi + 9)",
+    "if ((is_regular(3)) and (tau >= 3)), then (n >= -2*chi + 10)",
+    "if ((max_deg <= 4)), then (m <= 3*n - 3)",
+    "if ((max_deg >= 2)), then (2*chi >= -3*alpha + 9)",
+    "if ((max_deg >= 3)), then (max_deg <= 3*m - 3*min_deg - 3)",
+    "if ((n >= 3)), then (omega <= 3*chi + 3*alpha - 9)",
+    "if ((n >= 4)), then (2*min_deg <= m)",
+    "if ((n >= 4)), then (omega <= 3*chi + 3*alpha - 10)",
+    "if ((n >= 5) and (alpha >= 3)), then (2*chi >= -3*alpha + 13)",
+    "if ((n >= 6) and (alpha >= 5)), then (chi >= -alpha + 7)",
+    "if ((not_bipartite) and (max_deg <= 6)), then (max_deg >= -3*n + m + 6)",
+    "if ((tau <= 5)), then (2*alpha >= n - 3*chi + 4)",
+    "if ((tau >= 2)), then (n >= -3*chi - 2*alpha + 14)"
+  ],
+  "log_replacements": [
+    [
+      "if ((n <= 5)), then (n >= 3*m - 25)",
+      "if ((n <= 6)), then (3*n >= m + 3)"
+    ],
+    [
+      "if ((is_bipartite) and (n <= 6)), then (m <= 3*alpha)",
+      "if ((is_bipartite) and (n <= 5)), then (m <= 3*alpha - 2)"
+    ],
+    [
+      "if ((alpha >= 5)), then (m >= 2*min_deg)",
+      "if ((alpha >= 4)), then (2*min_deg <= m)"
+    ],
+    [
+      "if ((is_regular(3)) and (tau >= 3)), then (n >= -2*chi + 10)",
+      "if ((is_regular(3)) and (tau >= 4)), then (n >= -2*chi + 12)"
+    ],
+    [
+      "if ((not_bipartite) and (max_deg <= 6)), then (max_deg >= -3*n + m + 6)",
+      "if ((not_bipartite) and (max_deg <= 5)), then (m <= 3*n + max_deg - 8)"
+    ],
+    [
+      "if ((max_deg >= 2)), then (2*chi >= -3*alpha + 9)",
+      "if ((max_deg >= 6)), then (2*chi >= -3*alpha + 14)"
+    ],
+    [
+      "if ((is_acyclic) and (n >= 6)), then (2*chi >= n - 2*alpha + 4)",
+      "if ((is_acyclic) and (n >= 4)), then (n <= 2*chi + 2*alpha - 4)"
+    ],
+    [
+      "if ((is_connected) and (diam <= 1)), then (2*diam <= 3*chi + 3*alpha - 6)",
+      "if ((is_connected) and (diam <= 2)), then (2*diam <= 3*chi + 3*alpha - 6)"
+    ],
+    [
+      "if ((n >= 4)), then (2*min_deg <= m)",
+      "if ((n >= 6)), then (3*min_deg <= m)"
+    ],
+    [
+      "if ((is_regular(2))), then (3*alpha >= -2*chi + 9)",
+      "if ((is_regular(3))), then (3*alpha >= -2*chi + 11)"
+    ],
+    [
+      "if ((n >= 3)), then (omega <= 3*chi + 3*alpha - 9)",
+      "if ((n >= 4)), then (omega <= 3*chi + 3*alpha - 10)"
+    ],
+    [
+      "if ((n >= 5) and (alpha >= 3)), then (2*chi >= -3*alpha + 13)",
+      "if ((n >= 6) and (alpha >= 5)), then (chi >= -alpha + 7)"
+    ],
+    [
+      "if ((tau <= 5)), then (2*alpha >= n - 3*chi + 4)",
+      "if ((tau <= 6)), then (n <= 3*chi + 2*alpha - 4)"
+    ],
+    [
+      "if ((max_deg <= 4)), then (m <= 3*n - 3)",
+      "if ((max_deg <= 5)), then (m <= 3*n - 3)"
+    ],
+    [
+      "if ((max_deg >= 3)), then (max_deg <= 3*m - 3*min_deg - 3)",
+      "if ((max_deg >= 2)), then (max_deg <= 3*m - 3*min_deg - 1)"
+    ],
+    [
+      "if ((n >= 4)), then (omega <= 3*chi + 3*alpha - 10)",
+      "if ((n >= 5)), then (omega <= 3*chi + 3*alpha - 12)"
+    ],
+    [
+      "if ((tau >= 2)), then (n >= -3*chi - 2*alpha + 14)",
+      "if ((tau >= 3)), then (n >= -3*chi - 2*alpha + 18)"
+    ],
+    [
+      "if ((n >= 6) and (alpha >= 5)), then (chi >= -alpha + 7)",
+      "if ((alpha >= 4) and (n >= 6)), then (chi >= -alpha + 6)"
+    ]
+  ]
+}
