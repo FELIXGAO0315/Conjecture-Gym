@@ -98,20 +98,31 @@ def lean_theorem(name, facts, goal, variables):
 
 def omega_decide_batch(cases):
     """cases: list of (name, facts, goal, vars).  Returns {name: entailed_bool} by
-    compiling one Lean file with ``omega`` on each and parsing which failed."""
-    lines = [lean_theorem(n, f, g, v) for (n, f, g, v) in cases]
+    compiling one Lean file with ``omega`` on each and parsing which failed.
+
+    The caller's ``name`` is used only as the result key; the Lean theorem on line i+1
+    is named ``thm_{i}`` (always a valid identifier) so an arbitrary caller key — e.g.
+    one containing ``::`` or other non-identifier characters — can never produce a Lean
+    parse error that would cascade and mis-attribute pass/fail by line."""
+    # Lean stops reporting after `maxErrors` (default 100); with many failing goals in a
+    # batch, later failing theorems would then appear error-free and be mis-read as
+    # proved.  The in-file `set_option maxErrors` does NOT lift the frontend cap, but the
+    # command-line `-D maxErrors=...` does — pass it so EVERY failing theorem is reported.
+    lines = [lean_theorem(f"thm_{i}", f, g, v) for i, (_n, f, g, v) in enumerate(cases)]
     src = "\n".join(lines) + "\n"
     tmp = Path("/tmp/claude-1000/-home-felix-gao-Conjecture-Gym/8510a703-7b76-43e8-a494-f5f779f22746/scratchpad/omega_closure.lean")
     tmp.parent.mkdir(parents=True, exist_ok=True)
     tmp.write_text(src)
-    res = subprocess.run(["lake", "env", "lean", str(tmp)], cwd=str(_LEAN_DIR),
-                         capture_output=True, text=True)
+    res = subprocess.run(["lake", "env", "lean", "-D", "maxErrors=100000000", str(tmp)],
+                         cwd=str(_LEAN_DIR), capture_output=True, text=True)
     failed = set()
     for m in re.finditer(r"\.lean:(\d+):\d+: error", res.stdout + res.stderr):
         failed.add(int(m.group(1)))
+    if "maximum number of errors" in (res.stdout + res.stderr):
+        raise RuntimeError("Lean error cap still hit — maxErrors not lifted; batch result unreliable")
     out = {}
     for i, (n, _f, _g, _v) in enumerate(cases):
-        out[n] = (i + 1) not in failed          # line i+1 errored ⇒ not entailed
+        out[n] = (i + 1) not in failed          # that theorem's line errored ⇒ not entailed
     return out, src, res.stdout + res.stderr
 
 
@@ -181,6 +192,29 @@ def _vars_of(facts, goal):
     return sorted(s)
 
 
+def props_dischargeable(R_props, T_props, pset):
+    """Can T's premises discharge R's property premises?  Non-parametric properties go
+    through the implication lattice (name ∈ ``pset``).  PARAMETRIC properties must match
+    the parameter — ``is_regular(d)`` needs T to carry ``is_regular(d)`` with the SAME d
+    (2-regular does not imply 3-regular); ``is_k_edge_connected(k)`` needs T to carry it
+    with k' ≥ k.  (v1.4.5 §V2: the name-only subset check — also used by the pipeline's
+    ``_avail_for`` — is unsound for parametric properties.)"""
+    T_by = {p["name"]: p.get("param") for p in T_props}
+    for p in R_props:
+        name = p["name"]; param = p.get("param")
+        if name not in pset:
+            return False
+        if param is not None:
+            tp = T_by.get(name)
+            if name == "is_k_edge_connected":
+                if tp is None or tp < param:
+                    return False
+            else:   # is_regular (and any other parametric): exact parameter match
+                if tp != param:
+                    return False
+    return True
+
+
 def collect_facts_complete(props, numeric, canon, record_views):
     """Complete-encoding + complete-usability variant of ``collect_facts``.  Returns
     ``(facts, goal, vars)`` where usable record conclusions and fired conditionals are
@@ -194,9 +228,9 @@ def collect_facts_complete(props, numeric, canon, record_views):
         goal = ({v: int(c) for v, c in canon["coeffs"].items() if int(c) != 0}, canon["rel"], int(canon["rhs"]))
         bvars = _vars_of(base, goal)
 
-        # ── complete usability: property subset (lattice) + omega on numeric premises ──
+        # ── complete usability: property discharge (lattice + param match) + omega ──
         cand = [E for E in record_views if E["id"] is not None
-                and {p["name"] for p in E["props"]}.issubset(pset)]
+                and props_dischargeable(E["props"], props, pset)]
         ucases = []
         for E in cand:
             for j, pr in enumerate(E["numeric"]):
