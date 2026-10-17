@@ -408,9 +408,24 @@ def main(argv):
                 if ex["name"] in protected:          # §6: a used lemma is never replaced
                     stats["lemma_protected"] += 1
                     return False
-                mode, target_name = "replace", ex["name"]
-                old_entry = ex
-                supersedes = [ex["formula"]] + list(ex.get("supersedes", []))
+                # v1.4.6 §5.2: replace the old record only if the new one alone entails it
+                # (policies.may_replace: param-aware usability + complete omega); otherwise
+                # KEEP BOTH (write the new as a fresh record, leave the old untouched).
+                _may = getattr(domain, "may_replace", None)
+                allow = True
+                if _may is not None:
+                    tentative = domain.assemble_data(
+                        prop, ex["name"], [ex["formula"]] + list(ex.get("supersedes", [])))
+                    try:
+                        allow = _may(ex["name"], tentative)
+                    except Exception:
+                        allow = False            # fail-closed: never delete a true theorem
+                if allow:
+                    mode, target_name = "replace", ex["name"]
+                    old_entry = ex
+                    supersedes = [ex["formula"]] + list(ex.get("supersedes", []))
+                else:
+                    stats["replace_blocked_kept_both"] += 1   # §5.2: keep both
             if mode == "new":
                 target_name = f"C{next_id}"
                 next_id += 1

@@ -117,6 +117,26 @@ def property_closure(props: set) -> set:
     return out
 
 
+def _prop_strs(props):
+    out = []
+    for p in props:
+        prm = p.get("param")
+        out.append(p["name"] if prm is None else f"{p['name']}({prm})")
+    return out
+
+
+def props_dischargeable(required_props, available_props):
+    """v1.4.6 §3: parameter-aware property usability.  Does every graph with all
+    ``available_props`` also have all ``required_props``?  Non-parametric premises go
+    through our ``property_closure`` lattice; parametric ones (is_regular(d),
+    is_k_edge_connected(k)) must match the parameter (a 2-regular graph is NOT
+    3-regular).  Delegates to ``pf_trust.props.dischargeable`` so there is ONE decision
+    rule, replacing the old unsound name-only ``issubset`` prefilter."""
+    from pf_trust.props import dischargeable as _pf_dischargeable
+    return _pf_dischargeable(_prop_strs(required_props), _prop_strs(available_props),
+                             closure=property_closure)
+
+
 def dedup_properties(props):
     """§IV.1: drop a property premise implied by another (e.g. is_acyclic when
     is_tree is present; is_connected when is_tree; nontrivial when has_cycle)."""
@@ -1831,7 +1851,7 @@ def _premises_imply(A, B):
     criterion (property-closure subset + restricted numeric entailment).  §II: cached by
     the content-based premise keys, so the result is reused across commits and is
     identical with or without the cache."""
-    if not {p["name"] for p in B["props"]}.issubset(A["pset"]):
+    if not props_dischargeable(B["props"], A["props"]):
         return False
     key = (premise_key(A["props"], A["numeric"]), premise_key(B["props"], B["numeric"]))
     hit = _IMPL_CACHE.get(key)
@@ -2039,7 +2059,7 @@ def _avail_for(S, views):
     for E in views:
         if E["id"] == S["id"]:
             continue
-        if not {p["name"] for p in E["props"]}.issubset(S["pset"]):
+        if not props_dischargeable(E["props"], S["props"]):
             continue
         if not all(_restricted_entails(S["numeric"], pr) for pr in E["numeric"]):
             continue

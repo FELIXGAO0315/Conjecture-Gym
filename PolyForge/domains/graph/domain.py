@@ -93,6 +93,37 @@ class GraphDomain(Domain):
                                      if d.get("id") not in drop]
         return victims
 
+    def may_replace(self, old_id, new_data):
+        """v1.4.6 §5.2: a new record may REPLACE an old one (same skeleton) only when the
+        new record alone entails the old — via pf_trust.policies.may_replace:
+        (a) the new record is usable for the old (old's premises imply new's premises,
+        PARAMETER-AWARE: G._premises_imply), and (b) the old's conclusion follows, by the
+        COMPLETE check (omega via lean_batch), from old's premises + restricted inventory +
+        the new's conclusion.  Otherwise both are kept.  A wrong True would delete a true
+        theorem, so UNKNOWN maps to NOT_ENTAILED (keep both)."""
+        import json as _json
+        from pf_trust import policies as POL
+        from pf_trust.lean_batch import Verdict
+        from PolyForge.env import closure_complete as CC
+        p = self.record_dir / old_id / f"{old_id}.json"
+        if not p.exists():
+            return True   # cannot find the old record on disk: fall back to legacy replace
+        old = _json.loads(p.read_text())
+        old_view = G._record_premise_view(old)
+        new_view = G._record_premise_view(new_data)
+
+        def usable(o, n):
+            return G._premises_imply(o, n)   # old's premises imply new's (param-aware now)
+
+        def entails_by(o, records):
+            # old's canonical conclusion from old premises + inventory + the given records
+            facts, goal, vs, _m = CC.collect_facts_complete(
+                o["props"], o["numeric"], o["canon"], records)
+            proven = CC.omega_decide_batch([("t", facts, goal, vs)])[0]["t"]
+            return POL.from_lean(Verdict.PROVEN if proven else Verdict.NOT_PROVEN)
+
+        return POL.may_replace(old_view, new_view, usable, entails_by)
+
     def archive_replacement(self, old_id, replacer_data, segment=None, commit_index=None):
         """§G1: archive the record being overwritten by an in-place replacement
         (reason ``replaced_by``), with the replacer's content key and a certificate that
