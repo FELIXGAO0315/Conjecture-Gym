@@ -1,0 +1,10 @@
+# PolyForge v1.5 locked dependencies (test + analysis only; the pipeline itself
+# adds no new RUNTIME dependency). Pinned and asserted by pf_trust/pins.py; the
+# startup assertion (assert_pins) refuses to run on drift from these versions.
+#
+# Python interpreter: CPython 3.13 (compared at major.minor by pins.py).
+# Lean toolchain + Mathlib are pinned by repo files (lean/lean-toolchain,
+# lean/lake-manifest.json) and asserted against analysis/v1.5/pins.json.
+graphcalc==1.3.1
+pytest==8.4.2
+z3-solver==5.3.1.0
