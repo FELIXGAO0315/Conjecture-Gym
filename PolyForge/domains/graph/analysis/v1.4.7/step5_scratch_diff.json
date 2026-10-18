@@ -1,0 +1,23 @@
+{
+  "seeds": [
+    2024,
+    2025
+  ],
+  "old_record_count": 61,
+  "new_record_count": 61,
+  "record_growth_pct": 0.0,
+  "old_archive_reasons": {
+    "redundant_vs_record": 19,
+    "pruned_by_newer": 2
+  },
+  "new_archive_reasons": {
+    "redundant_vs_record": 19,
+    "pruned_by_newer": 2
+  },
+  "new_replaced_by": 0,
+  "old_replaced_by": 0,
+  "records_gained_in_new": [],
+  "records_lost_in_new": [],
+  "n_gained": 0,
+  "n_lost": 0
+}
