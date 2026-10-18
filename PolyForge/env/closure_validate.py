@@ -93,11 +93,19 @@ def verify_lattice(graphs):
 
 # ── batched omega (chunked so a single Lean file never grows unbounded) ──────────
 def omega_chunked(cases, chunk=1200):
+    import os as _os, time as _t
     out = {}
-    for i in range(0, len(cases), chunk):
+    n = len(cases); t0 = _t.time(); nchunks = (n + chunk - 1) // chunk
+    for ci, i in enumerate(range(0, n, chunk)):
         part = cases[i:i + chunk]
         dec, _s, _l = CC.omega_decide_batch(part)
         out.update(dec)
+        if _os.environ.get("PF_HEARTBEAT"):
+            el = _t.time() - t0
+            done = ci + 1
+            eta = (el / done) * (nchunks - done) if done else 0.0
+            print(f"[omega_chunked] chunk {done}/{nchunks} ({len(out)}/{n} goals) "
+                  f"elapsed={el:.0f}s eta={eta:.0f}s", flush=True)
     return out
 
 

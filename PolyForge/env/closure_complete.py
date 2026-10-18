@@ -98,6 +98,7 @@ def lean_theorem(name, facts, goal, variables):
 
 _OMEGA_HEADER = "import Mathlib"
 _lean_runner = None
+_UNKNOWN_LOG = []   # v1.4.7: names whose lean_batch verdict was UNKNOWN (measurement only)
 
 
 def _goal_statement(facts, goal, variables):
@@ -128,7 +129,10 @@ def omega_decide_batch(cases):
     res = LB.verify(goals, _OMEGA_HEADER, _lean_runner, max_batch=400)
     out = {}
     for i, (n, _f, _g, _v) in enumerate(cases):
-        out[n] = res[f"thm_{i}"].verdict is LB.Verdict.PROVEN
+        v = res[f"thm_{i}"].verdict
+        if v is LB.Verdict.UNKNOWN:
+            _UNKNOWN_LOG.append(n)          # fail-closed (maps to not-entailed) but recorded
+        out[n] = v is LB.Verdict.PROVEN
     return out, "", ""
 
 
