@@ -1,0 +1,152 @@
+{
+  "phase": "C6 / C4 investigation",
+  "summary": "6 live two-sided disagreements (of 37,582 issued queries), ALL in the single direction (Lean omega = NOT_PROVEN, z3 = ENTAILED). Investigated per C4.",
+  "cause": "Lean's `omega` TACTIC practical incompleteness on large LIA goals. Verified standalone (single goal, max_batch=1, 300s, no batch/truncation effects): on the EXACT same facts/goal objects that z3 receives, `by intros; omega` fails and Lean error-recovers with sorryAx (-> correctly classified NOT_PROVEN by the axiom whitelist). z3 (a complete SMT decision procedure for linear integer arithmetic) proves the entailment (facts and not-goal UNSAT). Same facts feed both deciders, so this is NOT an encoding mismatch.",
+  "soundness": "SOUND direction. omega failing -> NOT_PROVEN is conservative: it can only keep a (really redundant) record, never delete a true theorem and never emit a false PROVEN. Confirmed: dangerous_false_positive_candidates = 0 (no PROVEN that z3 refutes).",
+  "impact_on_judgments": "NONE. These 6 are C3 usability sub-queries. The reported M1=20, M2=299/299, C3=228/231 match v1.4.7 EXACTLY (per_judgment_disagree over the 550 M1+C3 judgments = 0). v1.4.7 used the same Lean omega, so the same conservatism is present in both and changes no reported number.",
+  "characteristics": "29-70 hypotheses over all 11 base integer invariants; goals are linear combinations with mixed-sign coefficients (e.g. 3*alpha - 2*diam + 2*radius >= 5).",
+  "cases": [
+    {
+      "verdict": "not_proven",
+      "z3": "entailed",
+      "n_facts": 55,
+      "goal": [
+        [
+          [
+            "alpha",
+            3
+          ],
+          [
+            "diam",
+            -2
+          ],
+          [
+            "radius",
+            2
+          ]
+        ],
+        ">=",
+        5
+      ]
+    },
+    {
+      "verdict": "not_proven",
+      "z3": "entailed",
+      "n_facts": 29,
+      "goal": [
+        [
+          [
+            "m",
+            2
+          ],
+          [
+            "min_deg",
+            -2
+          ],
+          [
+            "omega",
+            -3
+          ]
+        ],
+        ">=",
+        -7
+      ]
+    },
+    {
+      "verdict": "not_proven",
+      "z3": "entailed",
+      "n_facts": 41,
+      "goal": [
+        [
+          [
+            "chi",
+            1
+          ],
+          [
+            "max_deg",
+            3
+          ],
+          [
+            "n",
+            2
+          ]
+        ],
+        ">=",
+        15
+      ]
+    },
+    {
+      "verdict": "not_proven",
+      "z3": "entailed",
+      "n_facts": 46,
+      "goal": [
+        [
+          [
+            "alpha",
+            3
+          ],
+          [
+            "diam",
+            -3
+          ],
+          [
+            "radius",
+            2
+          ]
+        ],
+        ">=",
+        0
+      ]
+    },
+    {
+      "verdict": "not_proven",
+      "z3": "entailed",
+      "n_facts": 52,
+      "goal": [
+        [
+          [
+            "alpha",
+            3
+          ],
+          [
+            "chi",
+            3
+          ],
+          [
+            "max_deg",
+            2
+          ],
+          [
+            "n",
+            -3
+          ]
+        ],
+        ">=",
+        1
+      ]
+    },
+    {
+      "verdict": "not_proven",
+      "z3": "entailed",
+      "n_facts": 70,
+      "goal": [
+        [
+          [
+            "alpha",
+            4
+          ],
+          [
+            "chi",
+            3
+          ],
+          [
+            "n",
+            -3
+          ]
+        ],
+        ">=",
+        -1
+      ]
+    }
+  ]
+}

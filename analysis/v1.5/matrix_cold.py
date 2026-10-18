@@ -61,6 +61,7 @@ print(f"[init] loaded {len(_cache)} cold cached certs; commit={PF_COMMIT} "
 _runner = LB.lake_runner(str(CC._LEAN_DIR), extra_args=["-D", "maxErrors=100000000"])
 _cf = open(COLD_CACHE, "a")
 STATE = {"batches": 0, "queries": 0, "unknown": 0, "disagree": 0, "t0": time.time()}
+_live = set()   # keys actually ISSUED by THIS run (excludes stale cross-commit orphans)
 
 
 def _ckey(base, goal):
@@ -85,6 +86,7 @@ def entail_many(queries, label=""):
     out, todo = {}, []
     for qk, base, goal, vs in queries:
         ck = _ckey(base, goal)
+        _live.add(ck)                       # this run issued this key
         if ck in _cache:
             out[qk] = (_cache[ck]["verdict"] == "proven")
         else:
@@ -105,8 +107,10 @@ def entail_many(queries, label=""):
             rec = {"k": ck, "verdict": vs_name, "z3": z["status"], "agree": agree,
                    "witness": witness, "recheck_ok": recheck_ok}
             # For NOT_PROVEN, persist the (base, goal) too so verify_all can RE-CHECK the
-            # witness independently in pure Python (C3). Keeps the cache small otherwise.
-            if v is not LB.Verdict.PROVEN and witness is not None:
+            # witness independently in pure Python (C3). Also persist them for ANY
+            # Lean/z3 disagreement so it is always inspectable (C4). Keeps the cache
+            # small for the common agreeing-PROVEN case.
+            if (v is not LB.Verdict.PROVEN and witness is not None) or not agree:
                 rec["base"] = [[sorted(c.items()), r, h] for (c, r, h) in base]
                 rec["goal"] = [sorted(goal[0].items()), goal[1], goal[2]]
             _cache[ck] = rec
@@ -253,17 +257,28 @@ def run():
     def sat(view, g):
         return G._graph_matches(g[0], g[1], view["props"], view["numeric"])
     pairs = [(vb[t], vb[r]) for t in usable for r in usable[t]]
-    gsv = AUD.graph_soundness_violations(pairs, lambda t, r: True, graphs, sat)
+    # Inlined (vs AUD.graph_soundness_violations) so we can HEARTBEAT this long
+    # pure-Python loop — otherwise the supervisor's stall detector kills it (v1.5 fix).
+    gsv = []
+    for i, (t, r) in enumerate(pairs):
+        if i % 500 == 0:
+            HB.beat({"stage": "graph_soundness", "pair": i, "of": len(pairs)})
+        for g in graphs:
+            if sat(t, g) and not sat(r, g):
+                gsv.append((t, r, g)); break
     gs_viol = [(t["id"], r["id"], g[0].get("atlas_index")) for (t, r, g) in gsv]
 
     # ── 6. monotonicity (restricted vs complete) ──
     print("[stage] monotonicity", flush=True)
     G.clear_impl_cache()
     mono = []
+    npairs = 0
     for T in views:
         tv = {"props": T["props"], "pset": bases[T["id"]][0],
               "params": {p["name"]: p.get("param") for p in T["props"] if "param" in p}, "numeric": T["numeric"]}
+        HB.beat({"stage": "monotonicity", "T": T["id"], "pairs_done": npairs})
         for R in views:
+            npairs += 1
             if R["id"] == T["id"]:
                 continue
             if G._premises_imply(tv, {"props": R["props"], "numeric": R["numeric"]}):
@@ -276,10 +291,12 @@ def run():
     # invariant values (a genuine simple-3-polytope/graph counterexample) rather than
     # only an arithmetic one. Informational: does NOT change any verdict.
     print("[stage] realizability", flush=True)
+    HB.beat({"stage": "realizability"})
     real_counts = realizability_counts(graphs)
 
     # ── 8. loss attribution (ported step4) ──
     print("[stage] loss attribution", flush=True)
+    HB.beat({"stage": "loss_attribution"})
     attribution = loss_attribution(bases, usable, views, c3_fail, c3_ent)
 
     # ── diffs vs v1.4.7 ──
@@ -289,8 +306,10 @@ def run():
 
     out = {
         "pins": PINS, "encoding_version": ENCODING_VERSION, "pf_commit": PF_COMMIT, "toolchain": TOOLCHAIN,
-        "totals": {"distinct_queries": len(_cache), "unknown": STATE["unknown"],
-                   "disagreements_lean_vs_z3": STATE["disagree"]},
+        "totals": {"distinct_queries_issued_this_run": len(_live),
+                   "distinct_queries_in_cache": len(_cache),
+                   "unknown": STATE["unknown"],
+                   "disagreements_lean_vs_z3_fresh": STATE["disagree"]},
         "two_sided": two_sided_summary(),
         "M1": {"count": len(redundant), "ids": sorted(new_m1, key=lambda x: int(x[1:])), "inv_entailed": len(inv_ent)},
         "M2": {"asc_basis": len(basis_asc), "asc_removed": rem_asc, "desc_basis": len(basis_desc), "desc_removed": rem_desc},
@@ -314,8 +333,9 @@ def run():
     # its three-valued verdict, z3 status, agreement, and (for NOT_PROVEN) the witness
     # + base/goal so the re-check can be re-run independently.
     with open(CERTS, "w") as cfout:
-        for rec in _cache.values():
-            cfout.write(json.dumps(rec) + "\n")
+        for k in _live:                       # only keys this run issued (no orphans)
+            if k in _cache:
+                cfout.write(json.dumps(_cache[k]) + "\n")
     DONE.write_text(json.dumps({"ts": int(time.time()), "queries": len(_cache)}))
     print("MATRIX_COLD DONE:", json.dumps({k: out[k] for k in ("totals", "two_sided")}), flush=True)
     print(json.dumps({"M1": out["M1"]["count"], "M2": [out["M2"]["asc_basis"], out["M2"]["desc_basis"]],
@@ -334,7 +354,7 @@ def realizability_counts(graphs):
     try:
         real = []
         for gg, _props in graphs:
-            real.append({k: int(gg[k]) for k in base_vars if k in gg})
+            real.append({k: int(gg[k]) for k in base_vars if k in gg and gg[k] is not None})
         for rec in _cache.values():
             w = rec.get("witness")
             if rec["verdict"] != "not_proven" or not w:
@@ -353,7 +373,8 @@ def realizability_counts(graphs):
 def two_sided_summary():
     proven = notp = unk = 0
     proven_unsat = notp_witness = notp_witness_ok = disagree = 0
-    for rec in _cache.values():
+    # iterate only the keys THIS run issued (ignore stale cross-commit cache orphans)
+    for rec in (_cache[k] for k in _live if k in _cache):
         if rec["verdict"] == "proven":
             proven += 1
             if rec["z3"] == "entailed":

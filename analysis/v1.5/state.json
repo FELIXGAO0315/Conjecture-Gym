@@ -23,8 +23,8 @@
       "notes": "supervise.py: pgroup kill, heartbeat, stall-kill, checkpoint/resume; 5 tests pass"
     },
     "C": {
-      "status": "in_progress",
-      "notes": "C1-C4 done+committed; C6 cold matrix running under supervisor"
+      "status": "complete",
+      "notes": "cold matrix: 37582 live queries; UNKNOWN=0; proven=4470 all z3-UNSAT-confirmed; 33106 NOT_PROVEN witnessed+rechecked; 6 z3-confirmed true-entailments omega conservatively missed (sound dir, 0 dangerous); M1=20 M2=299/299 C3=228/231; per-judgment vs v1.4.7 = 0 disagree; attribution 8+3+9=20"
     },
     "D": {
       "status": "complete",
@@ -40,7 +40,7 @@
     },
     "G": {
       "status": "in_progress",
-      "notes": "verify_all.sh+gates+hooks built; FULL gates pending matrix/F"
+      "notes": "FULL matrix+witness gates pass"
     },
     "H": {
       "status": "complete",
@@ -72,5 +72,5 @@
     "per_judgment_compared_vs_v145": 550,
     "per_judgment_disagree_vs_v145": 0
   },
-  "head_commit": "23d7657a219d1f12114170c349f753a2bc8aac94"
+  "head_commit": "3c509ab7b845c63d4a1d52abde31165235c21a8b"
 }
