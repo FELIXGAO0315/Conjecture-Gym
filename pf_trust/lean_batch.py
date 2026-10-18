@@ -44,6 +44,9 @@ from typing import Callable, Iterable, Sequence
 
 ALLOWED_AXIOMS = frozenset({"propext", "Classical.choice", "Quot.sound"})
 _NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# A per-batch nonce is hex, so it can never occur in an attacker-controlled goal name
+# or in Mathlib; it namespaces generated theorems and frames the summary (B1/B2).
+_NONCE_RE = re.compile(r"^[0-9a-f]{16,}$")
 
 
 class Verdict(str, Enum):
@@ -67,8 +70,47 @@ class GoalResult:
     detail: str = ""
 
 
+@dataclass(frozen=True)
+class Rendered:
+    """Output of render_batch (v1.5: carries the nonce namespacing + canary plan)."""
+    source: str
+    nonce: str
+    expected: tuple[str, ...]            # INTERNAL (nonce-namespaced) names, incl. canaries
+    name_map: dict                       # internal name -> external (caller-facing) name
+    canary_expected: dict                # internal canary name -> expected Verdict
+
+
 # runner(source_text, timeout_seconds) -> (returncode, combined stdout+stderr)
 Runner = Callable[[str, float], tuple[int, str]]
+
+
+# ── B4: mandatory in-batch canaries ──────────────────────────────────────────
+# Every batch carries these five. Their real-toolchain axiom sets were measured
+# (v1.5 Phase B probe):
+#   true  : omega 1≤2            -> PROVEN, axioms {propext, Quot.sound}
+#   false : omega 2≤1 (fails)    -> NOT_PROVEN
+#   zero  : True by trivial      -> PROVEN, axioms ∅   (forces the EMPTY-axiom
+#                                   "name\tPRESENT\t" line into EVERY batch — the
+#                                   exact shape the v1.4.6 trailing-tab bug corrupted)
+#   sorry : 2≤1 by sorry         -> NOT_PROVEN, axioms {sorryAx}
+#   stdax : ∀p, p∨¬p by Classical.em -> PROVEN, axioms {propext,Classical.choice,Quot.sound}
+# If ANY canary misreads, the whole batch is untrusted (fail-closed → split/UNKNOWN).
+_CANARIES = (
+    ("true",  "(1 : Int) ≤ 2",         "omega",                        Verdict.PROVEN),
+    ("false", "(2 : Int) ≤ 1",         "omega",                        Verdict.NOT_PROVEN),
+    ("zero",  "True",                   "trivial",                      Verdict.PROVEN),
+    ("sorry", "(2 : Int) ≤ 1",         "sorry",                        Verdict.NOT_PROVEN),
+    ("stdax", "∀ p : Prop, p ∨ ¬ p",   "intro p; exact Classical.em p", Verdict.PROVEN),
+)
+
+
+def canary_name(suffix: str, nonce: str) -> str:
+    return f"pf_canary_{suffix}_{nonce}"
+
+
+def _internal(name: str, nonce: str) -> str:
+    """Namespace a caller-facing goal name under the per-batch nonce (B1)."""
+    return f"pf{nonce}_{name}"
 
 
 _SUMMARY_TEMPLATE = """\
@@ -92,37 +134,50 @@ def _indent(text: str, n: int = 2) -> str:
     return "\n".join(pad + line if line.strip() else line for line in text.splitlines())
 
 
-def render_batch(header: str, goals: Sequence[Goal], tag: str) -> tuple[str, list[str]]:
-    """Return (lean_source, expected_names). Canaries are appended after real goals."""
+def render_batch(header: str, goals: Sequence[Goal], nonce: str) -> Rendered:
+    """Render a batch. Every generated theorem is namespaced under the per-batch
+    ``nonce`` (B1: ``env.contains`` can then only be true for a constant THIS batch
+    declared — a goal named to collide with a Mathlib constant is declared under its
+    own nonce name and looked up there, so the collision cannot make it PROVEN). The
+    summary is framed with nonce-bearing sentinels (B2). Canaries are appended."""
+    if not _NONCE_RE.match(nonce):
+        raise ValueError(f"nonce must be >=16 hex chars (got {nonce!r})")
     names = [g.name for g in goals]
     for n in names:
         if not _NAME_RE.match(n):
             raise ValueError(f"goal name is not a plain Lean identifier: {n!r}")
     if len(set(names)) != len(names):
         raise ValueError("duplicate goal names in batch")
-    can_t, can_f = f"pf_canary_true_{tag}", f"pf_canary_false_{tag}"
-    if can_t in names or can_f in names:
-        raise ValueError("goal name collides with canary name")
 
+    name_map: dict = {}
     parts = [header.rstrip(), ""]
     for g in goals:
-        parts.append(f"theorem {g.name} : {g.statement} := by\n{_indent(g.proof)}\n")
-    parts.append(f"theorem {can_t} : (1 : Int) ≤ 2 := by\n  omega\n")
-    parts.append(f"theorem {can_f} : (2 : Int) ≤ 1 := by\n  omega\n")
-    expected = names + [can_t, can_f]
+        iname = _internal(g.name, nonce)
+        name_map[iname] = g.name
+        parts.append(f"theorem {iname} : {g.statement} := by\n{_indent(g.proof)}\n")
+
+    canary_expected: dict = {}
+    for suffix, statement, proof, verdict in _CANARIES:
+        cname = canary_name(suffix, nonce)
+        canary_expected[cname] = verdict
+        parts.append(f"theorem {cname} : {statement} := by\n{_indent(proof)}\n")
+
+    expected = tuple(name_map) + tuple(canary_expected)
     parts.append(
         _SUMMARY_TEMPLATE.format(
             names=", ".join(f"`{n}" for n in expected),
-            begin=f"PF_BEGIN_{tag}",
-            end=f"PF_END_{tag}",
+            begin=f"PF_BEGIN_{nonce}",
+            end=f"PF_END_{nonce}",
         )
     )
-    return "\n".join(parts), expected
+    return Rendered("\n".join(parts), nonce, expected, name_map, canary_expected)
 
 
-def parse_summary(output: str, tag: str, expected: Sequence[str]) -> dict[str, GoalResult] | None:
-    """Parse the tagged summary. Returns None if it is absent, duplicated or malformed."""
-    begin, end = f"PF_BEGIN_{tag}", f"PF_END_{tag}"
+def parse_summary(output: str, nonce: str, expected: Sequence[str]) -> dict[str, GoalResult] | None:
+    """Parse the nonce-framed summary. Returns None (→ untrusted → fail-closed) if it
+    is absent, duplicated, malformed, carries a row whose name does not bear the nonce
+    (B1/B2 namespace check), or does not list exactly the expected names once each."""
+    begin, end = f"PF_BEGIN_{nonce}", f"PF_END_{nonce}"
     if output.count(begin) != 1 or output.count(end) != 1:
         return None
     body = output.split(begin, 1)[1].split(end, 1)[0]
@@ -140,35 +195,40 @@ def parse_summary(output: str, tag: str, expected: Sequence[str]) -> dict[str, G
         if len(cols) != 3 or cols[1] not in ("PRESENT", "MISSING"):
             return None
         name, status, axs = cols
-        if name in rows:
+        # B1/B2: a trustworthy row names a constant THIS batch declared, so its name
+        # must bear the secret nonce. A spoofed PRESENT line (e.g. inside an error
+        # message that an attacker could influence) cannot carry the nonce.
+        if nonce not in name:
+            return None
+        if name in rows:          # B2: a name may appear at most once
             return None
         axioms = tuple(a for a in axs.split(",") if a)
         if status == "MISSING":
             rows[name] = GoalResult(name, Verdict.NOT_PROVEN, (), "missing from environment")
-        elif set(axioms) <= ALLOWED_AXIOMS:
+        elif set(axioms) <= ALLOWED_AXIOMS:          # B7: axioms ⊆ {propext,Classical.choice,Quot.sound}
             rows[name] = GoalResult(name, Verdict.PROVEN, axioms)
         else:
             rows[name] = GoalResult(name, Verdict.NOT_PROVEN, axioms, "disallowed axioms")
-    if set(rows) != set(expected):
+    if set(rows) != set(expected):   # B2: exactly the expected names, no extras/missing
         return None
     return rows
 
 
 def _run_once(goals: Sequence[Goal], header: str, runner: Runner, timeout: float):
-    tag = secrets.token_hex(8)
-    src, expected = render_batch(header, goals, tag)
+    nonce = secrets.token_hex(16)
+    r = render_batch(header, goals, nonce)
     try:
-        _rc, out = runner(src, timeout)  # rc is ignored on purpose: failing goals make it nonzero
+        _rc, out = runner(r.source, timeout)  # rc ignored on purpose: failing goals make it nonzero
     except subprocess.TimeoutExpired:
         return None, "timeout"
-    rows = parse_summary(out, tag, expected)
+    rows = parse_summary(out, nonce, r.expected)
     if rows is None:
         return None, "no trustworthy summary"
-    if rows[f"pf_canary_true_{tag}"].verdict is not Verdict.PROVEN:
-        return None, "true canary not proven"
-    if rows[f"pf_canary_false_{tag}"].verdict is not Verdict.NOT_PROVEN:
-        return None, "false canary proven"
-    return {g.name: rows[g.name] for g in goals}, ""
+    # B4: EVERY canary must read as expected, else the whole batch is untrusted.
+    for cname, want in r.canary_expected.items():
+        if rows[cname].verdict is not want:
+            return None, f"canary {cname} misread: got {rows[cname].verdict.value}, want {want.value}"
+    return {ext: rows[iname] for iname, ext in r.name_map.items()}, ""
 
 
 def verify(goals: Sequence[Goal], header: str, runner: Runner,

@@ -1,9 +1,12 @@
+import re
+
 import pytest
 
 from pf_trust.lean_batch import Goal, Verdict, render_batch, selftest, verify
 from pf_trust.tests.fake_lean import make_runner, old_method
 
 HEADER = "import Mathlib"
+NONCE = "0123456789abcdef0123456789abcdef"
 
 
 def goals(n_false, n_true_after):
@@ -28,10 +31,12 @@ def test_correct_under_every_maxerrors_mode(mode):
 
 def test_old_method_is_fooled_by_truncation():
     gs = goals(150, 10)
-    src, _ = render_batch(HEADER, gs, "abcd")
-    _, out = make_runner("truncate")(src, 10)
-    old = old_method(src, out)
-    wrongly_proven = [g.name for g in gs if old[g.name] and not truth(g)]
+    r = render_batch(HEADER, gs, NONCE)
+    _, out = make_runner("truncate")(r.source, 10)
+    old = old_method(r.source, out)  # keyed by INTERNAL (nonce-namespaced) names
+    truth_by_internal = {m.group(1): int(m.group(2)) <= int(m.group(3))
+                         for m in re.finditer(r"theorem (\S+) : \((-?\d+) : Int\) ≤ (-?\d+)", r.source)}
+    wrongly_proven = [n for n, proven in old.items() if proven and not truth_by_internal[n]]
     assert wrongly_proven, "fake runner should reproduce the v1.4.4 bug"
 
 
@@ -48,9 +53,16 @@ def test_selftest_passes_on_fake_and_detects_broken():
 
 def test_rejects_bad_names():
     with pytest.raises(ValueError):
-        render_batch(HEADER, [Goal("bad name", "True", "trivial")], "ab")
+        render_batch(HEADER, [Goal("bad name", "True", "trivial")], NONCE)
     with pytest.raises(ValueError):
-        render_batch(HEADER, [Goal("x", "True", "t"), Goal("x", "True", "t")], "ab")
+        render_batch(HEADER, [Goal("x", "True", "t"), Goal("x", "True", "t")], NONCE)
+
+
+def test_rejects_short_nonce():
+    # B1: a nonce that is too short (not >=16 hex) is refused — it could not reliably
+    # namespace generated theorems away from Mathlib / attacker-chosen names.
+    with pytest.raises(ValueError):
+        render_batch(HEADER, [Goal("g", "True", "trivial")], "abcd")
 
 
 def test_rc_nonzero_is_not_treated_as_crash():

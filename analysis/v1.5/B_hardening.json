@@ -1,0 +1,51 @@
+{
+  "phase": "B + R2",
+  "measured": {
+    "fast_suite": {"command": "pytest pf_trust/tests tests --ignore=test_hardening_real", "result": "55 passed", "log": "analysis/v1.5/artifacts/fast_pytest.log"},
+    "real_lean_suite": {"command": "pytest pf_trust/tests/test_hardening_real.py", "result": "5 passed in 58.03s", "log": "analysis/v1.5/artifacts/b_real_tests.log"},
+    "toolchain": {"lean": "v4.34.0", "mathlib_rev": "5ed2965256430c3649e86755f9576b54eca72435"}
+  },
+  "items": {
+    "B1_name_collision": {
+      "fix": "render_batch namespaces every generated theorem under a per-batch secret nonce (pf<nonce>_name); parse_summary refuses any summary row whose name does not bear the nonce. env.contains can then only be true for a constant THIS batch declared, so a goal named to collide with a Mathlib constant is declared+looked-up under its own nonce name and the pre-existing constant is never consulted.",
+      "where": "pf_trust/lean_batch.py render_batch/_internal/parse_summary",
+      "tests": ["test_hardening.py::test_b1_names_are_nonce_namespaced", "test_b1_bare_colliding_name_in_summary_is_rejected", "test_b1_collision_with_false_statement_is_not_proven", "test_hardening_real.py::test_b1_name_collision_with_false_statement_is_not_proven (REAL: Nat collision + false stmt -> NOT_PROVEN)", "test_b1_name_collision_with_true_statement_still_certified_by_this_batch (REAL)"],
+      "type_is_intended": "Guaranteed by construction: Lean elaborates `theorem pf<nonce>_name : STATEMENT := by PROOF`, so if the nonce-named constant exists its type IS the written statement; the nonce closes the only gap (looking up a different, pre-existing constant)."
+    },
+    "B2_summary_spoofing": {
+      "fix": "summary framed by nonce-bearing PF_BEGIN_<nonce>/PF_END_<nonce>; parse only inside the frame; frame must appear exactly once; every expected name exactly once; duplicates/extras/missing -> None (untrusted); rows must bear the nonce.",
+      "tests": ["test_b2_fake_present_line_in_error_is_not_parsed", "test_b2_duplicate_frame_is_untrusted", "test_b2_extra_and_duplicate_rows_untrusted"]
+    },
+    "B3_parser_fuzz": {
+      "fix": "parse_summary hardened; fuzz over {0,1,many axioms} x {PRESENT,MISSING} x whitespace/CRLF/trailing-tab x unicode names (seeded, 400 trials).",
+      "tests": ["test_b3_parser_fuzz"]
+    },
+    "B4_canaries": {
+      "fix": "every batch carries 5 mandatory canaries with MEASURED real-toolchain axiom sets: true(omega->propext,Quot.sound/PROVEN), false(omega fails/NOT_PROVEN), zero(True by trivial -> EMPTY axioms/PROVEN -> forces the trailing-tab line into every batch), sorry(sorryAx/NOT_PROVEN), stdax(Classical.em->propext,Classical.choice,Quot.sound/PROVEN). Any canary misread -> whole batch untrusted.",
+      "tests": ["test_b4_any_canary_misread_untrusts_batch (parametrized)", "test_hardening_real.py::test_b4_canaries_pass_on_real_toolchain (REAL)"]
+    },
+    "B5_split_bisection": {
+      "termination": "verify().solve halves the chunk on distrust; base case len==1 -> singleton; recursion depth <= log2(max_batch); always terminates.",
+      "singleton_untrusted": "a singleton that is still untrusted -> UNKNOWN, never PROVEN.",
+      "tests": ["test_b5_always_untrusted_terminates_and_is_unknown (injected always-untrusted runner)", "test_b5_bisection_isolates_one_bad_goal"]
+    },
+    "B6_timeouts": {
+      "fix": "runner timeout -> _timed_group_run kills the whole process group -> no trustworthy summary -> UNKNOWN; no orphans.",
+      "tests": ["test_runner_timeout.py::test_group_kill_returns_and_leaves_no_grandchild", "test_timeout_maps_to_unknown"]
+    },
+    "B7_axiom_whitelist": {
+      "fix": "ALLOWED_AXIOMS == {propext, Classical.choice, Quot.sound} exactly; anything else (sorryAx or custom) -> NOT_PROVEN.",
+      "tests": ["test_b7_allowed_axiom_set_is_exact", "test_b7_disallowed_axioms_are_not_proven (parametrized incl. custom axiom)", "test_hardening_real.py::test_b7_custom_axiom_is_not_proven (REAL: proof via declared `axiom pfEvilAxiom` -> NOT_PROVEN)"]
+    },
+    "B8_why_tab_bug_was_missed": {
+      "root_cause": "v1.4.6 parse_summary used raw.strip(), which eats the TRAILING TAB of a zero-axiom PROVEN line 'name\\tPRESENT\\t' -> 2 columns -> whole batch untrusted.",
+      "why_all_probes_missed_it": "The bug only manifests on an EMPTY-axiom PRESENT line. That line only appears for a proof that uses ZERO axioms (e.g. `trivial`/`rfl`). MEASURED: omega proofs carry {propext,Quot.sound} (non-empty), Classical.em carries 3 axioms. Every v1.4.6 probe, selftest-170, p1-p4, and the original 18 tests used ONLY omega goals (and omega canaries) -> never a zero-axiom provable goal -> the trailing-tab line was never produced -> the bug was dormant.",
+      "why_caught_now": "B4's mandatory zero-axiom canary forces the 'name\\tPRESENT\\t' line into EVERY batch; B3's fuzz includes the {0 axioms} x trailing-tab case directly.",
+      "regression_demo": ["test_b8_zero_axiom_line_breaks_old_parser_not_new", "test_b8_canary_zero_would_break_every_batch_under_old_parser (reintroduces raw.strip() and shows it drops the batch while the current parser does not)"]
+    },
+    "R2_supervisor": {
+      "impl": "pf_trust/supervise.py: run_resumable/supervise_once run jobs in their own session (start_new_session=True), enforce a wall-clock limit, monitor a heartbeat file (Heartbeat.beat, atomic), kill the whole group on stall (default 10 min) or timeout, and resume from the job's checkpoint. Integer-second timing only.",
+      "tests": ["test_supervise.py::test_hung_grandchild_is_killed (whole group killed; marked grandchild does not survive)", "test_kill_then_resume_completes (2+ kills, resumes to completion from checkpoint)", "test_wall_timeout_kills_even_while_beating", "test_clean_job_completes_without_restart", "test_checkpoint_roundtrip_is_atomic"]
+    }
+  }
+}

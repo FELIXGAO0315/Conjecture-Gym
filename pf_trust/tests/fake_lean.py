@@ -2,8 +2,11 @@
 
 It understands goals of the form `(a : Int) ≤ b` proved by `omega`, adds failed
 theorems to the environment with sorryAx (Lean's error recovery), and can
-simulate the maxErrors failure modes. It does NOT test real Lean behaviour;
-`lean_batch.selftest` does that against the real toolchain.
+simulate the maxErrors failure modes. It also simulates the v1.5 mandatory
+canaries (by name suffix) with their MEASURED real-toolchain axiom sets — so the
+Python tests exercise, in every batch, the zero-axiom `name\\tPRESENT\\t`
+trailing-tab line that the v1.4.6 parser corrupted. It does NOT test real Lean
+behaviour; `lean_batch.selftest` does that against the real toolchain.
 """
 import re
 
@@ -11,6 +14,22 @@ THM = re.compile(r"^theorem (\S+) : \((-?\d+) : Int\) ≤ (-?\d+) := by", re.M)
 NAMES = re.compile(r"let names : List Name := \[(.*?)\]")
 BEGIN = re.compile(r'"(PF_BEGIN_[0-9a-f]+)"')
 END = re.compile(r'"(PF_END_[0-9a-f]+)"')
+
+# canary suffix -> (status, axioms) matching the measured real toolchain.
+_CANARY = {
+    "canary_true":  ("PRESENT", ["propext", "Quot.sound"]),
+    "canary_false": ("PRESENT", ["sorryAx"]),
+    "canary_zero":  ("PRESENT", []),                       # empty axioms -> trailing tab
+    "canary_sorry": ("PRESENT", ["sorryAx"]),
+    "canary_stdax": ("PRESENT", ["propext", "Classical.choice", "Quot.sound"]),
+}
+
+
+def _canary_for(name):
+    for suffix, val in _CANARY.items():
+        if suffix in name:
+            return val
+    return None
 
 
 def make_runner(mode="ok", max_errors=100):
@@ -34,10 +53,17 @@ def make_runner(mode="ok", max_errors=100):
         names = [n.strip().lstrip("`") for n in NAMES.search(src).group(1).split(",")]
         lines = []
         for n in names:
-            if n in env:
-                lines.append(f"{n}\tPRESENT\t{','.join(env[n])}")
+            can = _canary_for(n)
+            if can is not None:
+                status, axs = can
+            elif n in env:
+                status, axs = "PRESENT", env[n]
             else:
+                status, axs = "MISSING", []
+            if status == "MISSING":
                 lines.append(f"{n}\tMISSING\t")
+            else:
+                lines.append(f"{n}\tPRESENT\t{','.join(axs)}")
         begin, end = BEGIN.search(src).group(1), END.search(src).group(1)
         out.append("f.lean:99:0: info: " + "\n".join([begin, *lines, end]))
         return (1 if n_err else 0), "\n".join(out)

@@ -2,8 +2,8 @@
   "version": "v1.5",
   "phases": {
     "A": {
-      "status": "in_progress",
-      "notes": "pins.py + pins.json + requirements-lock.txt + superseded.json + state.json; assert_pins passes.",
+      "status": "complete",
+      "notes": "pins+state+superseded+lock; assert_pins passes; 27 existing tests pass",
       "artifacts": [
         "pf_trust/pins.py",
         "analysis/v1.5/pins.json",
@@ -11,13 +11,16 @@
         "analysis/v1.5/superseded.json",
         "pf_trust/state.py",
         "analysis/v1.5/state.json"
-      ]
+      ],
+      "commit": "e1a3d16"
     },
     "B": {
-      "status": "pending"
+      "status": "complete",
+      "notes": "B1-B8 hardened; 22 fast + 5 real-lean tests pass"
     },
     "R2": {
-      "status": "pending"
+      "status": "complete",
+      "notes": "supervise.py: pgroup kill, heartbeat, stall-kill, checkpoint/resume; 5 tests pass"
     },
     "C": {
       "status": "pending"
@@ -63,5 +66,5 @@
     "per_judgment_compared_vs_v145": 550,
     "per_judgment_disagree_vs_v145": 0
   },
-  "head_commit": "0f7398a69a6c1d1c2341c18f312a30008489b1a7"
+  "head_commit": "e1a3d16c9b24656aafbeeb7cd2ad8be4b006c2ff"
 }
