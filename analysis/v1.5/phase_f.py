@@ -28,7 +28,9 @@ EXPORT = ROOT / "PolyForge/domains/graph/analysis/v1.4.3/export_ladder"
 OUT = ROOT / "analysis" / "v1.5"
 ART = OUT / "artifacts"
 HB = Heartbeat(os.environ.get("PF_HEARTBEAT", str(ART / "phase_f.hb")))
-NPROCS = str(min(14, (os.cpu_count() or 4)))
+# Each REPL worker loads Mathlib (~1.5-2 GB resident). On a 15 GB box, 14 workers
+# thrash -> REPL-start timeouts -> spurious 0-solve + crash. Cap conservatively.
+NPROCS = str(min(4, (os.cpu_count() or 4)))
 
 
 def _run(argv):
@@ -40,9 +42,14 @@ def _run(argv):
 def main():
     ART.mkdir(parents=True, exist_ok=True)
     HB.beat({"stage": "oracle"})
-    # 1. oracle / anti-cheat / recompile
-    rc = _run([sys.executable, "-m", "PolyForge.env.oracle_check", str(EXPORT),
-               "--nprocs", NPROCS, "--json", str(OUT / "oracle.json")])
+    # 1. oracle / anti-cheat / recompile (skip if already green, so restarts resume fast)
+    ojson = OUT / "oracle.json"
+    already = ojson.exists() and json.loads(ojson.read_text()).get("all_green")
+    if already:
+        print("oracle already all_green -> skipping", flush=True); rc = 0
+    else:
+        rc = _run([sys.executable, "-m", "PolyForge.env.oracle_check", str(EXPORT),
+                   "--nprocs", NPROCS, "--json", str(ojson)])
     print("oracle_check rc", rc, flush=True)
 
     # 2. L0-L3 ladder
