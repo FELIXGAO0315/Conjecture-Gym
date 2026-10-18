@@ -1,0 +1,47 @@
+[
+  {
+    "gate": "version_pins",
+    "status": "PASS",
+    "detail": "}"
+  },
+  {
+    "gate": "pytest_all",
+    "status": "PASS",
+    "detail": "79 passed in 125.06s (0:02:05)"
+  },
+  {
+    "gate": "published_byte_identical",
+    "status": "PASS",
+    "detail": "byte-identical to tag"
+  },
+  {
+    "gate": "tag_unmoved",
+    "status": "PASS",
+    "detail": "1ba72d0b3c3d7aedbcd3e5cb9c4a444d9bd694dd (want 1ba72d0b3c3d7aedbcd3e5cb9c4a444d9bd694dd)"
+  },
+  {
+    "gate": "matrix_cold_verified",
+    "status": "PASS",
+    "detail": "invariants hold (M1=20 M2=[299, 299] C3=228/231)"
+  },
+  {
+    "gate": "witness_recheck",
+    "status": "PASS",
+    "detail": "witness_ok=33106 bad=0 dangerous=0 lean_conservative=6"
+  },
+  {
+    "gate": "oracle_anticheat_recompile",
+    "status": "PASS",
+    "detail": "oracle 319/319, anti_cheat=PASS, recompile 20/20"
+  },
+  {
+    "gate": "baselines_l0_l3",
+    "status": "FAIL",
+    "detail": "L0-L3 counts={'L0': 0, 'U': 0, 'L1': 61, 'L2': 'interrupted', 'L3': 'not_run', 'none': 'unknown_pending_L2_L3'} none=None diff_vs_v143=None"
+  },
+  {
+    "gate": "baselines_l4",
+    "status": "FAIL",
+    "detail": "OPEN: no non-LLM L4 driver exists (see baselines.json l4_status)"
+  }
+]

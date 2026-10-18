@@ -40,8 +40,8 @@
       "notes": "oracle/anti-cheat/recompile GREEN; L0=0 U=0 L1=61 measured; L2/L3 interrupted by user decision; L4 no driver (open)"
     },
     "G": {
-      "status": "in_progress",
-      "notes": "FULL matrix+witness gates pass"
+      "status": "complete",
+      "notes": "verify_all FULL x2 identical hash 36dcca85; 7/9 gates green; 2 honest-open (baselines partial, L4). pre-push hook installed."
     },
     "H": {
       "status": "complete",
@@ -74,5 +74,5 @@
     "per_judgment_compared_vs_v145": 550,
     "per_judgment_disagree_vs_v145": 0
   },
-  "head_commit": "f7a059e7e226129679ca08ed3526c8bdaca47553"
+  "head_commit": "4ecbea96ead00a56b31c808b08e1de9d244ecf2c"
 }
