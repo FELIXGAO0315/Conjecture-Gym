@@ -1,0 +1,92 @@
+{
+  "loss8_311": [
+    {
+      "formula": "if ((tau >= 2)), then (alpha >= -2*n - 3*chi + 16)",
+      "inv_entailed": false,
+      "entailed_311": false,
+      "verdict": "loss"
+    },
+    {
+      "formula": "if ((n >= 2*chi) and (tau >= 2)), then (2*chi >= -3*n - 3*alpha + 22)",
+      "inv_entailed": false,
+      "entailed_311": false,
+      "verdict": "loss"
+    },
+    {
+      "formula": "if ((n >= 4)), then (alpha >= -2*m + 3*min_deg + 3)",
+      "inv_entailed": false,
+      "entailed_311": false,
+      "verdict": "loss"
+    },
+    {
+      "formula": "if ((is_acyclic) and (n >= 5)), then (omega <= 2*m - 3*min_deg + 1)",
+      "inv_entailed": false,
+      "entailed_311": false,
+      "verdict": "loss"
+    },
+    {
+      "formula": "if ((max_deg >= 3)), then (2*min_deg <= m)",
+      "inv_entailed": false,
+      "entailed_311": false,
+      "verdict": "loss"
+    },
+    {
+      "formula": "if ((n >= 3) and (alpha >= 2*omega)), then (chi >= -alpha + 4)",
+      "inv_entailed": false,
+      "entailed_311": false,
+      "verdict": "loss"
+    },
+    {
+      "formula": "if ((has_cycle)), then (omega <= 3*chi + 3*alpha - 9)",
+      "inv_entailed": false,
+      "entailed_311": false,
+      "verdict": "loss"
+    },
+    {
+      "formula": "if ((n >= 4)), then (m >= -2*chi - 3*alpha + 12)",
+      "inv_entailed": false,
+      "entailed_311": true,
+      "verdict": "entailed"
+    },
+    {
+      "formula": "if ((is_k_edge_connected(1)) and (has_cycle)), then (chi <= 2*m - 3*min_deg + 3)",
+      "inv_entailed": false,
+      "entailed_311": false,
+      "verdict": "loss"
+    }
+  ],
+  "n_loss8": 8,
+  "n_artifact": 1,
+  "C3_failures": [
+    "if ((is_regular(2)) and (m >= 4)), then (omega <= 3*chi + 3*alpha - 10)",
+    "if ((has_cycle) and (is_k_edge_connected(1))), then (m >= 2*min_deg - 1)",
+    "if ((is_regular(2)) and (m <= 6)), then (4*alpha >= 3*n - 3*chi - 1)"
+  ],
+  "C3_shortfall_231_minus_228": 3,
+  "C3_shortfall_eq_param_gaps": true,
+  "replacement_recovered": 18,
+  "replacement_losses": 9,
+  "replacement_loss_formulas": [
+    "if ((is_bipartite) and (n <= 6)), then (m <= 3*alpha)",
+    "if ((max_deg >= 2)), then (2*chi >= -3*alpha + 9)",
+    "if ((max_deg >= 3)), then (max_deg <= 3*m - 3*min_deg - 3)",
+    "if ((n >= 3)), then (omega <= 3*chi + 3*alpha - 9)",
+    "if ((n >= 4)), then (2*min_deg <= m)",
+    "if ((n >= 4)), then (omega <= 3*chi + 3*alpha - 10)",
+    "if ((n >= 6) and (alpha >= 5)), then (chi >= -alpha + 7)",
+    "if ((not_bipartite) and (max_deg <= 6)), then (max_deg >= -3*n + m + 6)",
+    "if ((tau >= 2)), then (n >= -3*chi - 2*alpha + 14)"
+  ],
+  "attribution": {
+    "OTHER_311_losses": 8,
+    "PARAM_BUG_C3_gaps": 3,
+    "REPLACEMENT": 9,
+    "total": 20
+  },
+  "artifact_location": "the 1 bounded-rounds artifact of the 9 unique 311 closure failures is ENTAILED by the 311 (inv/records), hence NOT a loss and NOT in the 20; 9 unique = 8 losses + 1 artifact",
+  "name_only_pruned_published": {
+    "count": 0,
+    "cases": []
+  },
+  "published_records_pruned_name_only": 0
+}
