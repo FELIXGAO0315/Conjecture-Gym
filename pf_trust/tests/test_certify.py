@@ -1,6 +1,8 @@
 """v1.5 PHASE C3/C4 — the z3 two-sided certificate + pure-Python re-check."""
 from fractions import Fraction
 
+import pytest
+
 from pf_trust.certify import entailment_status, recheck_witness
 
 
@@ -49,3 +51,13 @@ def test_recheck_is_exact_fraction_arithmetic():
     goal = ({"x": 1}, ">=", 1)
     assert entailment_status(facts, goal)["status"] == "entailed"
     assert recheck_witness(facts, ({"x": 1}, ">=", 2), {"x": 1})["ok"]
+
+
+def test_non_integer_inputs_are_rejected_not_truncated():
+    # v1.5 audit hardening: a float must RAISE, never be silently truncated.
+    with pytest.raises(TypeError):
+        recheck_witness([({"a": 1}, ">=", 0)], ({"a": 1}, ">=", 1), {"a": 2.9})
+    with pytest.raises(TypeError):
+        recheck_witness([({"a": 1.5}, ">=", 0)], ({"a": 1}, ">=", 1), {"a": 2})
+    with pytest.raises(TypeError):
+        entailment_status([({"a": 1}, ">=", 0.5)], ({"a": 1}, ">=", 1))

@@ -16,6 +16,10 @@ def replace_decision(domain, old_name, tentative) -> bool:
     a wrong True would delete a true theorem, so uncertainty must never replace."""
     _may = getattr(domain, "may_replace", None)
     if _may is None:
+        # Legacy domains (e.g. hex) have no entailment-checked replacement; preserve the
+        # historical allow so hex behaviour is unchanged (HARD CONSTRAINT: do not touch
+        # hex). v1.5 audit: make this latent path OBSERVABLE rather than silent.
+        discardlog.record("replace", "no_may_replace_legacy_allow", {"old": old_name})
         return True
     try:
         return bool(_may(old_name, tentative))

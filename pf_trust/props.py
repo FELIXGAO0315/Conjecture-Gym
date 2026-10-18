@@ -24,7 +24,10 @@ _PROP_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(\s*([^)]*)\s*\))?\s*
 # need, have: tuples of ints. True only when `have` implies `need` on every graph.
 PARAM_RULES: dict[str, Callable[[tuple[int, ...], tuple[int, ...]], bool]] = {
     "is_regular": lambda need, have: need == have,                       # d-regular is d-regular only
-    "is_k_edge_connected": lambda need, have: have[0] >= need[0],        # k'-edge-conn ⇒ k-edge-conn, k ≤ k'
+    # k'-edge-conn ⇒ k-edge-conn (k ≤ k'). v1.5 audit hardening: require the exact
+    # single-arg arity, so a malformed multi-arg form never discharges by inspecting
+    # only have[0] (which would ignore the extra argument).
+    "is_k_edge_connected": lambda need, have: len(need) == len(have) == 1 and have[0] >= need[0],
 }
 
 Prop = tuple[str, tuple[int, ...]]

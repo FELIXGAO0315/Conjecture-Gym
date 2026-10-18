@@ -106,7 +106,11 @@ def test_replacement_d_crash_keeps_both():
 def test_replace_decision_missing_may_replace_defaults_allow():
     class NoGate:
         pass
-    assert replace_decision(NoGate(), "X", {}) is True
+    discardlog.enable(capture_mem=True); discardlog.reset_mem()
+    assert replace_decision(NoGate(), "X", {}) is True       # legacy allow (hex unchanged)
+    # v1.5 audit: the latent legacy-allow path is now OBSERVABLE, not silent
+    assert any(r["reason"] == "no_may_replace_legacy_allow" for r in discardlog.records())
+    discardlog.enable(None)
 
 
 # ─────────────────────── parameter awareness ────────────────────────────────

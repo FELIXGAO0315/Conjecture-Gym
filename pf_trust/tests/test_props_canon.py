@@ -103,3 +103,17 @@ def test_key_invariances():
     assert k == content_key(["is_tree", "is_regular(2)"], p + [Lin({}, 1, ">=")], concl)
     assert k != content_key(["is_tree", "is_regular(3)"], p, concl)
     assert k != content_key(["is_tree", "is_regular(2)"], p, Lin({"m": 1, "n": -1}, 1, ">="))
+
+
+def test_is_k_edge_connected_rejects_malformed_arity():
+    # v1.5 audit hardening: a malformed 2-arg form must NOT discharge a 1-arg need by
+    # inspecting only the first argument.
+    from pf_trust.props import dischargeable
+    def closure(s):
+        return set(s)
+    # well-formed monotone case still works
+    assert dischargeable(["is_k_edge_connected(3)"], ["is_k_edge_connected(5)"], closure) is True
+    # malformed 2-arg available does NOT discharge a 1-arg need
+    assert dischargeable(["is_k_edge_connected(3)"], ["is_k_edge_connected(5,9)"], closure) is False
+    # malformed 2-arg need is not discharged by a 1-arg available either
+    assert dischargeable(["is_k_edge_connected(3,1)"], ["is_k_edge_connected(5)"], closure) is False

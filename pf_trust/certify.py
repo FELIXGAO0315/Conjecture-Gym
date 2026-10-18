@@ -27,16 +27,27 @@ from typing import Mapping, Sequence
 Fact = tuple[Mapping[str, int], str, int]
 
 
+def _int(x) -> int:
+    """Accept only genuine integers (bools count). Reject floats/strings so a
+    non-integer can never be SILENTLY truncated into a different value (v1.5 audit
+    hardening): a float input is a caller bug, not something to round."""
+    if isinstance(x, bool):
+        return int(x)
+    if isinstance(x, int):
+        return x
+    raise TypeError(f"integer required, got {type(x).__name__}: {x!r}")
+
+
 def _lhs_value(coeffs: Mapping[str, int], model: Mapping[str, int]) -> Fraction:
-    # exact: integer coeffs * integer assignment
-    return sum((Fraction(int(c)) * Fraction(int(model[v])) for v, c in coeffs.items()),
+    # exact: integer coeffs * integer assignment (no floats admitted)
+    return sum((Fraction(_int(c)) * Fraction(_int(model[v])) for v, c in coeffs.items()),
                Fraction(0))
 
 
 def _holds(fact: Fact, model: Mapping[str, int]) -> bool:
     coeffs, rel, rhs = fact
     lhs = _lhs_value(coeffs, model)
-    rhs = Fraction(int(rhs))
+    rhs = Fraction(_int(rhs))
     if rel == ">=":
         return lhs >= rhs
     if rel == "<=":
@@ -53,7 +64,7 @@ def _holds(fact: Fact, model: Mapping[str, int]) -> bool:
 def recheck_witness(facts: Sequence[Fact], goal: Fact, model: Mapping[str, int]) -> dict:
     """PURE-PYTHON exact re-check that ``model`` is a genuine counterexample:
     every fact holds and the goal FAILS. Returns a structured verdict."""
-    model = {k: int(v) for k, v in model.items()}
+    model = {k: _int(v) for k, v in model.items()}      # reject non-integer witnesses
     bad_fact = next((i for i, f in enumerate(facts) if not _holds(f, model)), None)
     goal_holds = _holds(goal, model)
     ok = bad_fact is None and not goal_holds
@@ -65,9 +76,9 @@ def recheck_witness(facts: Sequence[Fact], goal: Fact, model: Mapping[str, int])
 
 def _z3_expr(solver_vars, coeffs, rel, rhs):
     import z3
-    terms = [int(c) * solver_vars[v] for v, c in coeffs.items()]
+    terms = [_int(c) * solver_vars[v] for v, c in coeffs.items()]
     lhs = z3.Sum(terms) if terms else z3.IntVal(0)
-    rhs = z3.IntVal(int(rhs))
+    rhs = z3.IntVal(_int(rhs))
     return {">=": lhs >= rhs, "<=": lhs <= rhs, "==": lhs == rhs,
             ">": lhs > rhs, "<": lhs < rhs}[rel]
 
