@@ -48,8 +48,8 @@
       "notes": "independent auditor: NO confirmed findings; 3 low-sev latent closed (2 fixed+tested, 1 made observable without touching hex)"
     },
     "I": {
-      "status": "in_progress",
-      "notes": "errata.json written; final report pending F+verify"
+      "status": "complete",
+      "notes": "errata.json + superseded.json complete; final Chinese report delivered in chat"
     }
   },
   "pins": {
@@ -74,5 +74,5 @@
     "per_judgment_compared_vs_v145": 550,
     "per_judgment_disagree_vs_v145": 0
   },
-  "head_commit": "4ecbea96ead00a56b31c808b08e1de9d244ecf2c"
+  "head_commit": "efeac77a656e7fafa462a86b3980095ed2d48cbd"
 }

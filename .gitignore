@@ -14,3 +14,7 @@ analysis/v1.5/artifacts/*.ckpt
 analysis/v1.5/artifacts/*.superlog
 analysis/v1.5/artifacts/*.driver.log
 analysis/v1.5/artifacts/*.superresult
+
+# v1.5 runtime markers
+analysis/v1.5/artifacts/*.done
+analysis/v1.5/artifacts/*.tmp
