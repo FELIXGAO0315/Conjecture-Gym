@@ -23,10 +23,13 @@
       "notes": "supervise.py: pgroup kill, heartbeat, stall-kill, checkpoint/resume; 5 tests pass"
     },
     "C": {
-      "status": "pending"
+      "status": "in_progress",
+      "notes": "C1-C4 done+committed; C6 cold matrix running under supervisor"
     },
     "D": {
-      "status": "pending"
+      "status": "complete",
+      "commit": "8598f04",
+      "notes": "replacement a-d, param-awareness, discard logging; 11 tests"
     },
     "E": {
       "status": "pending"
@@ -35,7 +38,8 @@
       "status": "pending"
     },
     "G": {
-      "status": "pending"
+      "status": "in_progress",
+      "notes": "verify_all.sh+gates+hooks built; FULL gates pending matrix/F"
     },
     "H": {
       "status": "pending"
@@ -66,5 +70,5 @@
     "per_judgment_compared_vs_v145": 550,
     "per_judgment_disagree_vs_v145": 0
   },
-  "head_commit": "e1a3d16c9b24656aafbeeb7cd2ad8be4b006c2ff"
+  "head_commit": "8598f04a10678036485ac3724514505906769490"
 }
