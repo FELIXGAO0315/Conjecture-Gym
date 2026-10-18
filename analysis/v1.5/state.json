@@ -35,14 +35,16 @@
       "status": "pending"
     },
     "F": {
-      "status": "pending"
+      "status": "in_progress",
+      "notes": "phase_f.py built (oracle+L0-L3 via supervisor); L4 has no non-LLM driver in tree -> recorded, not faked"
     },
     "G": {
       "status": "in_progress",
       "notes": "verify_all.sh+gates+hooks built; FULL gates pending matrix/F"
     },
     "H": {
-      "status": "pending"
+      "status": "in_progress",
+      "notes": "independent auditor subagent running"
     },
     "I": {
       "status": "pending"
@@ -70,5 +72,5 @@
     "per_judgment_compared_vs_v145": 550,
     "per_judgment_disagree_vs_v145": 0
   },
-  "head_commit": "8598f04a10678036485ac3724514505906769490"
+  "head_commit": "299df5ab7b98894ffa0096506de22a07f7071961"
 }

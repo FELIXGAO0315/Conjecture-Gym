@@ -96,20 +96,26 @@ def gate_witness_recheck():
 
 
 def gate_oracle_persisted():
+    # schema = PolyForge.env.oracle_check output (persisted to analysis/v1.5/oracle.json)
     p = ROOT / "analysis" / "v1.5" / "oracle.json"
     if not p.exists():
         return False, "analysis/v1.5/oracle.json missing (run Phase F oracle_check)"
     o = json.loads(p.read_text())
-    ok = (o.get("oracle_pass") and o.get("anticheat_pass") and o.get("recompile_pass"))
-    return bool(ok), f"oracle={o.get('oracle')} anticheat={o.get('anticheat_pass')} recompile={o.get('recompile')}"
+    ok = bool(o.get("all_green"))
+    return ok, (f"oracle {o.get('oracle_reward1')}/{o.get('n_tasks')}, "
+                f"anti_cheat={'PASS' if o.get('anti_cheat_pass') else 'FAIL'}, "
+                f"recompile {o.get('recompile_ok')}/{o.get('recompile_total')}")
 
 
 def gate_baselines_persisted():
+    # schema = analysis/v1.5/baselines.json produced by Phase F (baseline_ladder + L4 status)
     p = ROOT / "analysis" / "v1.5" / "baselines.json"
     if not p.exists():
         return False, "analysis/v1.5/baselines.json missing (run Phase F baselines)"
     b = json.loads(p.read_text())
-    return bool(b.get("complete")), f"levels={b.get('levels')} none_remaining={b.get('none_remaining')}"
+    ok = bool(b.get("l0_l3_complete")) and bool(b.get("l4_complete"))
+    return ok, (f"L0-L3 counts={b.get('level_counts')} none={b.get('none_count')} "
+                f"l4_complete={b.get('l4_complete')}")
 
 
 FAST_GATES = [("version_pins", gate_pins), ("pytest_all", gate_pytest),
