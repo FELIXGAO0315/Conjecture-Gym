@@ -1,0 +1,6 @@
+{
+  "total_false": 160,
+  "false_wrongly_proven_old_method": 59,
+  "maxErrors_cap_hit": true,
+  "method": "b843447 omega_decide_batch (no -D maxErrors, error-line parsing)"
+}
