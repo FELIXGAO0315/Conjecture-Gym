@@ -28,6 +28,7 @@ import json
 import os
 import signal
 import subprocess
+import threading
 import sys
 import time
 from dataclasses import dataclass, asdict
@@ -79,7 +80,8 @@ class Heartbeat:
         payload = {"t": _now(), "pid": os.getpid()}
         if progress is not None:
             payload["progress"] = progress
-        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        # Unique tmp per (pid, thread) so concurrent beaters never race on os.replace.
+        tmp = self.path.with_suffix(self.path.suffix + f".{os.getpid()}.{threading.get_ident()}.tmp")
         tmp.write_text(json.dumps(payload))
         os.replace(tmp, self.path)      # atomic; bumps mtime
 

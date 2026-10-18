@@ -111,15 +111,28 @@ def gate_oracle_persisted():
                 f"recompile {o.get('recompile_ok')}/{o.get('recompile_total')}")
 
 
-def gate_baselines_persisted():
-    # schema = analysis/v1.5/baselines.json produced by Phase F (baseline_ladder + L4 status)
+def _baselines():
     p = ROOT / "analysis" / "v1.5" / "baselines.json"
-    if not p.exists():
+    return json.loads(p.read_text()) if p.exists() else None
+
+
+def gate_baselines_l0_l3():
+    b = _baselines()
+    if b is None:
         return False, "analysis/v1.5/baselines.json missing (run Phase F baselines)"
-    b = json.loads(p.read_text())
-    ok = bool(b.get("l0_l3_complete")) and bool(b.get("l4_complete"))
-    return ok, (f"L0-L3 counts={b.get('level_counts')} none={b.get('none_count')} "
-                f"l4_complete={b.get('l4_complete')}")
+    return bool(b.get("l0_l3_complete")), (
+        f"L0-L3 counts={b.get('level_counts')} none={b.get('none_count')} "
+        f"diff_vs_v143={b.get('diff_vs_v143', {}).get('n_diff')}")
+
+
+def gate_baselines_l4():
+    b = _baselines()
+    if b is None:
+        return False, "baselines.json missing"
+    # HONEST: L4 deep-plan-search has no non-LLM driver in the tree (HARD CONSTRAINT
+    # forbids LLM plans). This gate is EXPECTED to fail until such a driver exists.
+    return bool(b.get("l4_complete")), ("L4 complete" if b.get("l4_complete")
+        else "OPEN: no non-LLM L4 driver exists (see baselines.json l4_status)")
 
 
 FAST_GATES = [("version_pins", gate_pins), ("pytest_all", gate_pytest),
@@ -128,7 +141,8 @@ FAST_GATES = [("version_pins", gate_pins), ("pytest_all", gate_pytest),
 FULL_EXTRA = [("matrix_cold_verified", gate_matrix_invariants),
               ("witness_recheck", gate_witness_recheck),
               ("oracle_anticheat_recompile", gate_oracle_persisted),
-              ("baselines", gate_baselines_persisted)]
+              ("baselines_l0_l3", gate_baselines_l0_l3),
+              ("baselines_l4", gate_baselines_l4)]
 
 
 def _matrix_fingerprint():

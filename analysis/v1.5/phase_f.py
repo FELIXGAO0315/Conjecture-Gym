@@ -15,6 +15,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -33,7 +34,19 @@ HB = Heartbeat(os.environ.get("PF_HEARTBEAT", str(ART / "phase_f.hb")))
 NPROCS = str(min(4, (os.cpu_count() or 4)))
 
 
+_stage = {"name": "init"}
+
+
+def _beat_forever():
+    # The ladder/oracle run as blocking subprocesses; beat on a background thread so the
+    # supervisor sees liveness throughout (fix: whole-ladder heartbeat gap stall-killed it).
+    while True:
+        HB.beat({"stage": _stage["name"]})
+        time.sleep(30)
+
+
 def _run(argv):
+    _stage["name"] = argv[argv.index("-m") + 1] if "-m" in argv else argv[:3]
     HB.beat({"cmd": argv[:4]})
     print("+", " ".join(argv), flush=True)
     return subprocess.run(argv, cwd=str(ROOT)).returncode
@@ -41,6 +54,7 @@ def _run(argv):
 
 def main():
     ART.mkdir(parents=True, exist_ok=True)
+    threading.Thread(target=_beat_forever, daemon=True).start()   # liveness during subprocs
     HB.beat({"stage": "oracle"})
     # 1. oracle / anti-cheat / recompile (skip if already green, so restarts resume fast)
     ojson = OUT / "oracle.json"

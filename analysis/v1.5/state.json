@@ -36,8 +36,8 @@
       "notes": "ms/target 95/60/43/35/35 at 50/100/200/400/800; plateau at 400; max_batch=400 confirmed (800 <0.5% better); supersedes 11.8ms"
     },
     "F": {
-      "status": "in_progress",
-      "notes": "phase_f.py built (oracle+L0-L3 via supervisor); L4 has no non-LLM driver in tree -> recorded, not faked"
+      "status": "partial",
+      "notes": "oracle/anti-cheat/recompile GREEN; L0=0 U=0 L1=61 measured; L2/L3 interrupted by user decision; L4 no driver (open)"
     },
     "G": {
       "status": "in_progress",
@@ -74,5 +74,5 @@
     "per_judgment_compared_vs_v145": 550,
     "per_judgment_disagree_vs_v145": 0
   },
-  "head_commit": "fd0e9ebac781f56fba94f41e59ffcc3dd4412a3e"
+  "head_commit": "f7a059e7e226129679ca08ed3526c8bdaca47553"
 }

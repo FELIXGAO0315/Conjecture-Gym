@@ -1,0 +1,16 @@
+{
+  "status": "PARTIAL (user chose to finalize without waiting for L2/L3)",
+  "levels": ["L0", "U", "L1", "L2", "L3"],
+  "level_counts": {"L0": 0, "U": 0, "L1": 61, "L2": "interrupted", "L3": "not_run", "none": "unknown_pending_L2_L3"},
+  "measured": {
+    "L0": {"solved": 0, "of": 319, "candidates": 1914, "wall_s": 66, "note": "bare tactics (omega/linarith/nlinarith/positivity/aesop) with NO library — expected 0 for these inventory-dependent theorems"},
+    "U":  {"solved": 0, "of": 319, "candidates": 1595, "wall_s": 435, "note": "unprivileged automation (aesop + uniform nlinarith hints over unconditional Inventory lemmas, not per-task instantiated)"},
+    "L1": {"solved": 61, "of": 319, "candidates": 1276, "wall_s": "~26 min", "note": "linear Inventory facts instantiated per task as `have`s + L0 arithmetic — 61 tasks become provable"}
+  },
+  "l0_l3_complete": false,
+  "l4_complete": false,
+  "l4_status": "NOT RUN: a non-LLM deep-plan-search L4 driver (<=64 plans/task, 30s each, 15min cap, 14-way) does not exist in the tree and the HARD CONSTRAINT forbids LLM plans; building it was out of reach this session. Recorded honestly, not faked.",
+  "why_partial": "The L0-L3 ladder is Verifier/REPL-heavy; on this 15 GB box only ~4 Mathlib REPLs fit (each holds ~7 GB), so nprocs is capped at 4 and L2 (nlinarith + product-pair hints over 258 tasks, 60s/attempt) was still running after ~40 min. L0/U/L1 are fully MEASURED (0/0/61). L2/L3 were interrupted by explicit user decision to finalize; re-running analysis/v1.5/phase_f.py (supervised, resumable) completes them. The per-task diff vs v1.4.3 requires the completed ladder (ladder.json solved_at lists) and is therefore deferred with L2/L3.",
+  "how_to_complete": "python3 -m pf_trust.supervise --heartbeat <hb> --done <done> --log <log> --wall 14400 --stall 1200 -- python3 analysis/v1.5/phase_f.py  (oracle is cached all_green and skipped; the ladder reruns L0..L3 at nprocs=4)",
+  "oracle_artifact": "analysis/v1.5/oracle.json (ORACLE 319/319, ANTI-CHEAT PASS, RECOMPILE 20/20, ALL GREEN)"
+}
