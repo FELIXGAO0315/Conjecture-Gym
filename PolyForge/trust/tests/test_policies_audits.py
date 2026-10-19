@@ -1,6 +1,6 @@
-from pf_trust.audits import graph_soundness_violations, monotonicity_violations
-from pf_trust.lean_batch import Verdict
-from pf_trust.policies import Ent, decide_with_prefilter, from_lean, may_prune, may_replace
+from PolyForge.trust.audits import graph_soundness_violations, monotonicity_violations
+from PolyForge.trust.lean_batch import Verdict
+from PolyForge.trust.policies import Ent, decide_with_prefilter, from_lean, may_prune, may_replace
 
 
 def test_only_exact_entailment_prunes():

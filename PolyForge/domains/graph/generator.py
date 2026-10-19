@@ -130,9 +130,9 @@ def props_dischargeable(required_props, available_props):
     ``available_props`` also have all ``required_props``?  Non-parametric premises go
     through our ``property_closure`` lattice; parametric ones (is_regular(d),
     is_k_edge_connected(k)) must match the parameter (a 2-regular graph is NOT
-    3-regular).  Delegates to ``pf_trust.props.dischargeable`` so there is ONE decision
+    3-regular).  Delegates to ``PolyForge.trust.props.dischargeable`` so there is ONE decision
     rule, replacing the old unsound name-only ``issubset`` prefilter."""
-    from pf_trust.props import dischargeable as _pf_dischargeable
+    from PolyForge.trust.props import dischargeable as _pf_dischargeable
     return _pf_dischargeable(_prop_strs(required_props), _prop_strs(available_props),
                              closure=property_closure)
 

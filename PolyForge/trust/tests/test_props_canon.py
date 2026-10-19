@@ -4,8 +4,8 @@ import random
 import networkx as nx
 import pytest
 
-from pf_trust.canon import FALSE, TRUE, Lin, canon, content_key
-from pf_trust.props import dischargeable, parse_prop
+from PolyForge.trust.canon import FALSE, TRUE, Lin, canon, content_key
+from PolyForge.trust.props import dischargeable, parse_prop
 
 ATLAS = [g for g in nx.graph_atlas_g() if g.number_of_nodes() >= 1]
 
@@ -108,7 +108,7 @@ def test_key_invariances():
 def test_is_k_edge_connected_rejects_malformed_arity():
     # v1.5 audit hardening: a malformed 2-arg form must NOT discharge a 1-arg need by
     # inspecting only the first argument.
-    from pf_trust.props import dischargeable
+    from PolyForge.trust.props import dischargeable
     def closure(s):
         return set(s)
     # well-formed monotone case still works

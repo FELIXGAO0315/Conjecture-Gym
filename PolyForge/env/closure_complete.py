@@ -113,14 +113,14 @@ def _goal_statement(facts, goal, variables):
 def omega_decide_batch(cases):
     """cases: list of (name, facts, goal, vars).  Returns ``({name: entailed_bool}, "", "")``.
 
-    v1.4.6: routed through ``pf_trust.lean_batch.verify`` — a goal counts as entailed ONLY
+    v1.4.6: routed through ``PolyForge.trust.lean_batch.verify`` — a goal counts as entailed ONLY
     when the fail-closed summary positively confirms its declaration is present with axioms
     ⊆ ALLOWED_AXIOMS (no `sorryAx`); NOT_PROVEN and UNKNOWN both map to ``False`` (a wrong
     "entailed" would be unsound; "not entailed" is only incomplete).  Decision never comes
     from the absence of error messages.  ``-D maxErrors`` is passed as defense-in-depth so a
     mostly-failing batch does not abort and force splitting (speed only; correctness does
     not depend on it)."""
-    from pf_trust import lean_batch as LB
+    from PolyForge.trust import lean_batch as LB
     global _lean_runner
     if _lean_runner is None:
         _lean_runner = LB.lake_runner(str(_LEAN_DIR), extra_args=["-D", "maxErrors=100000000"])
@@ -204,12 +204,12 @@ def _vars_of(facts, goal):
 
 def props_dischargeable(R_props, T_props, pset=None):
     """Can T's premises discharge R's property premises?  v1.4.6 §3: delegates to
-    ``pf_trust.props.dischargeable`` (the single decision rule) with our
+    ``PolyForge.trust.props.dischargeable`` (the single decision rule) with our
     ``property_closure`` as the non-parametric lattice; parametric properties
-    (is_regular(d) exact, is_k_edge_connected(k) monotone) are matched by pf_trust,
+    (is_regular(d) exact, is_k_edge_connected(k) monotone) are matched by PolyForge.trust,
     never stripped by the lattice.  ``pset`` is accepted for signature compatibility
     but ignored (the closure is recomputed from T's non-parametric names)."""
-    from pf_trust.props import dischargeable as _pf_dischargeable
+    from PolyForge.trust.props import dischargeable as _pf_dischargeable
     return _pf_dischargeable(G._prop_strs(R_props), G._prop_strs(T_props),
                              closure=G.property_closure)
 
@@ -284,4 +284,3 @@ if __name__ == "__main__":
         print("module: use complete_entails (restricted usability) / complete_entails_v2 (complete usability)")
 
 
-PF_DECISION_MODULE = True  # v1.5: hashed into the omega verdict cache key (pf_trust/cachekey.py)

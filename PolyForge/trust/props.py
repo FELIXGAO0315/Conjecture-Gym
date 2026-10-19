@@ -66,4 +66,3 @@ def dischargeable(required: Iterable[str], available: Iterable[str],
     return True
 
 
-PF_DECISION_MODULE = True  # v1.5: hashed into the omega verdict cache key (pf_trust/cachekey.py)

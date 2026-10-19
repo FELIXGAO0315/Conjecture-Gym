@@ -5,16 +5,3 @@ __pycache__/
 PolyForge/env/vendor/
 # exported RL environment artifacts (written outside the repo via --out; ignore if placed inside)
 PolyForge/env/export_out/
-
-# v1.5 heavy cold-matrix artifacts (persisted on disk; summaries live in analysis/v1.5/*.json)
-analysis/v1.5/artifacts/omega_cold_cache.jsonl
-analysis/v1.5/artifacts/matrix_certs.jsonl
-analysis/v1.5/artifacts/*.hb
-analysis/v1.5/artifacts/*.ckpt
-analysis/v1.5/artifacts/*.superlog
-analysis/v1.5/artifacts/*.driver.log
-analysis/v1.5/artifacts/*.superresult
-
-# v1.5 runtime markers
-analysis/v1.5/artifacts/*.done
-analysis/v1.5/artifacts/*.tmp

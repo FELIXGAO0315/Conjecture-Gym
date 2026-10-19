@@ -12,8 +12,8 @@ from PolyForge.domains.graph.domain import GraphDomain
 from PolyForge.anvil import deducer as D
 from PolyForge.domains.graph import generator as G
 from PolyForge.env import closure_complete as CC
-from pf_trust import lean_batch as LB
-from pf_trust import audits as AUD
+from PolyForge.trust import lean_batch as LB
+from PolyForge.trust import audits as AUD
 dom = GraphDomain(); D.configure(dom)
 
 CACHE = Path("/home/felix_gao/pf_production/v147_omega_cache.jsonl")
@@ -163,7 +163,7 @@ c3d=entail_many(c3q,"c3")
 c3_fail=[archive[i]["standard_form"] for i in arch_by if not c3d[f"C3|{i}"]]
 c3_ent=sum(1 for i in arch_by if c3d[f"C3|{i}"])
 
-# ── 5. graph-soundness (pf_trust.audits, Python, atlas) on M usable pairs ──
+# ── 5. graph-soundness (PolyForge.trust.audits, Python, atlas) on M usable pairs ──
 print("[stage] graph soundness", flush=True)
 import json as _j
 pool=_j.load(open(G.DATA))["graphs"]; graphs=[(g,__import__("PolyForge.domains.graph.inventory",fromlist=["properties_of"]).properties_of(g)) for g in pool if g["n"]>=1]

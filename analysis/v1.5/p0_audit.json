@@ -1,9 +1,0 @@
-{
-  "phase": "P0 read-only audit (per reviewer's priority 0)",
-  "a_witness_reconciliation": {"finding":"BUG: realizability_counts iterated dirty _cache (74,501) not _live (37,582), reporting checked=65,636. CORRECT (live) = checked=33,106, realizable=0. Code fixed; realizability_live.json has the corrected value.","status":"fixed"},
-  "b_cold_really_cold": {"finding":"NOT truly cold: the 'cold' run loaded 74,495 pre-existing cached verdicts and reused them. A true cold run (empty cache) recomputes ~37,582 via Lean (~1-1.5h). Addressed by Priority 3 (one-commit cold run after A').","status":"acknowledged"},
-  "c_legacy_allow": {"finding":"GraphDomain HAS may_replace; discardlog default OFF -> legacy-allow (no_may_replace) triggered 0 times during the matrix. Only the hex domain (no may_replace, out of scope) would hit it.","status":"reported=0"},
-  "d_six_counterfactual": {"finding":"MAJOR CORRECTION. The 6 are FINAL judgments (5 RECORD_CONCLUSION/M1, 1 ARCHIVE_CONCLUSION/C3 = one of the 3 'param-gap' failures), all INTEGER-specific (z3-Int entailed, z3-Real refuted). z3 verified correct by brute force. Lean omega is incomplete here (4/6 fail even on minimal core; 2/6 certifiable via core reduction). Reported M1=20/C3=228 are omega-CONSERVATIVE; complete answer up to M1=25/C3=229. disagreements.json + errata.json corrected.","status":"corrected"},
-  "e_domain": {"finding":"General finite simple graphs (NOT 3-polytopes). No planar/Euler/2m=3n in inventory; pool = graph atlas (1253, n<=7, atlas_index). => correct test population for C' is the atlas/geng bucketed by property, NOT plantri polytopes.","status":"settles C' design"},
-  "f_319_axioms": {"finding":"oracle axiom-checks ALL 319 reference_proofs (collectAxioms; bad_axioms->reward 0; STANDARD_AXIOMS={propext,Quot.sound,Classical.choice}); only the standalone RECOMPILE is 20/319. Full-319 standalone #print axioms is the cheap addition (Priority 3).","status":"clarified"}
-}

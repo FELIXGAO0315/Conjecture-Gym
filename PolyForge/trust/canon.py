@@ -71,4 +71,3 @@ def content_key(properties: Iterable[str], premises: Iterable[Lin], conclusion: 
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
-PF_DECISION_MODULE = True  # v1.5: hashed into the omega verdict cache key (pf_trust/cachekey.py)

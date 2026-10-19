@@ -3,7 +3,7 @@ from PolyForge.domains.graph.domain import GraphDomain
 from PolyForge.anvil import deducer as D
 from PolyForge.domains.graph import generator as G
 from PolyForge.env import closure_complete as CC
-from pf_trust import lean_batch as LB
+from PolyForge.trust import lean_batch as LB
 dom=GraphDomain(); D.configure(dom)
 LEAN="PolyForge/domains/graph/lean"; HDR=CC._OMEGA_HEADER
 runner=LB.lake_runner(LEAN, extra_args=["-D","maxErrors=100000000"])

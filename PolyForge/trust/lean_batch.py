@@ -293,7 +293,7 @@ def _timed_group_run(argv: Sequence[str], cwd: str, timeout: float,
                 out, err = proc.communicate(timeout=grace)
             except subprocess.TimeoutExpired:
                 out, err = "", ""
-        return 124, "pf_trust: lake/lean exceeded timeout; process group killed (fail-closed)\n" + (err or "")
+        return 124, "PolyForge.trust: lake/lean exceeded timeout; process group killed (fail-closed)\n" + (err or "")
     finally:
         if proc.poll() is None:
             try:
@@ -348,4 +348,3 @@ def selftest(header: str, runner: Runner, n_false: int = 150) -> dict:
     return {"ok": not wrong, "misclassified": wrong, "n_goals": len(goals)}
 
 
-PF_DECISION_MODULE = True  # v1.5: hashed into the omega verdict cache key (pf_trust/cachekey.py)
