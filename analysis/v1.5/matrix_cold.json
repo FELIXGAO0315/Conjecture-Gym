@@ -9,13 +9,16 @@
     "mathlib_rev": "5ed2965256430c3649e86755f9576b54eca72435"
   },
   "encoding_version": "v1.5",
-  "pf_commit": "3c509ab",
+  "pf_commit": "4253243",
   "toolchain": "leanprover/lean4:v4.34.0+mathlib:5ed296525643",
   "totals": {
     "distinct_queries_issued_this_run": 37582,
-    "distinct_queries_in_cache": 74501,
+    "distinct_queries_in_cache": 37582,
     "unknown": 0,
-    "disagreements_lean_vs_z3_fresh": 6
+    "disagreements_lean_vs_z3_fresh": 6,
+    "verdict_fingerprint": "84081f12066b55d995dd5498c73454588f5915c9df6587e3aca113ce0fc67eec",
+    "cache_hit_proven_reverified": 82,
+    "cache_hit_proven_reverify_failures": 0
   },
   "two_sided": {
     "proven": 4470,
@@ -115,9 +118,9 @@
     "count": 0
   },
   "realizability": {
-    "checked": 65636,
+    "checked": 32530,
     "realizable": 0,
-    "arithmetic_only": 65636,
+    "arithmetic_only": 32530,
     "error": null
   },
   "loss_attribution": {
