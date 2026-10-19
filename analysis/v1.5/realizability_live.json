@@ -1,0 +1,7 @@
+{
+  "source": "analysis/v1.5/artifacts/matrix_certs.jsonl (LIVE certs, 37,582)",
+  "checked": 33106,
+  "realizable": 0,
+  "arithmetic_only": 33106,
+  "note": "CORRECTED C5: supersedes matrix_cold.json.realizability which was computed over the dirty _cache (74,501, orphan-contaminated -> reported 65,636). This is over live keys only."
+}

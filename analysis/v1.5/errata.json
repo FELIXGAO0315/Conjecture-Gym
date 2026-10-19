@@ -47,14 +47,14 @@
     {
       "id": "omega_tactic_conservative_incompleteness",
       "where": "Lean `omega` tactic (v1.5 C6 finding)",
-      "what": "On 6 of 37,582 cold linear-integer queries (29-70 hypotheses, 11 vars) omega returns NOT_PROVEN while z3 proves entailment.",
+      "what": "On 6 of 37,582 cold linear-integer queries (INTEGER-specific: z3-Int entailed, z3-Real refuted) omega returns NOT_PROVEN while z3 proves entailment. These are FINAL judgments: 5 RECORD_CONCLUSIONs (M1) and 1 ARCHIVE_CONCLUSION that is one of the 3 reported 'C3 failures'. Independently confirmed z3 is right (brute force [-30,30]^4 on a 4-fact core finds no counterexample).",
       "affected_published_production": false,
-      "measured_impact_on_published_numbers": "NONE. SOUND direction (omega conservative -> at worst keeps a redundant record, never a false PROVEN, never deletes a true theorem; 0 dangerous false-positive candidates). All reported judgments (M1=20, M2=299/299, C3=228/231) match v1.4.7 exactly (per-judgment disagree over the 550 M1+C3 judgments = 0); v1.4.7 used the same omega. Documented in disagreements.json."
+      "measured_impact_on_published_numbers": "SOUND direction (omega conservative -> never a false PROVEN, never deletes a true theorem; 0 dangerous false-positive candidates). BUT the reported counts are omega-CONSERVATIVE, not complete: the Lean-certified M1=20, C3=228 match v1.4.7 (same omega), while the COMPLETE (z3) answer is up to M1=25 and C3=229 — the extra 6 entailments lack a Lean certificate (omega cannot produce one). 2 of the 6 become omega-certifiable via z3-unsat-core reduction; 4 do not. See disagreements.json."
     }
   ],
   "net_statement_for_the_paper": {
-    "published_319": "sound and unchanged (byte-identical to 1ba72d0). 20 of the 319 are redundant under the complete param-aware criterion (a minimal basis is 299, both prune orders).",
-    "archive_231": "228/231 re-derivable from the final 319 under the correct param-aware COMPLETE criterion; the 3 non-re-derivable ones are the name_only_param_blind_pruning residue listed above.",
+    "published_319": "sound and unchanged (byte-identical to 1ba72d0). At LEAST 20 of the 319 are redundant under the Lean-certified param-aware criterion (a minimal basis is 299). CORRECTION: these are omega-CONSERVATIVE counts; a complete integer solver (z3) finds up to 5 more redundancies omega could not certify (complete M1 up to 25), so 299 is an UPPER bound on the independent basis.",
+    "archive_231": "228/231 re-derivable under the Lean-certified criterion. CORRECTION: of the 3 non-re-derivable, >=1 (`4*alpha>=3*n-3*chi-1`) is actually z3-ENTAILED and is an OMEGA-INCOMPLETENESS artifact, NOT a param gap (complete C3 = 229). So the 'C3 shortfall = param gaps' attribution is only partly correct; see disagreements.json.",
     "no_false_theorems": "every one of the 4,470 PROVEN omega judgments carries a Lean certificate (axioms ⊆ {propext,Classical.choice,Quot.sound}) AND an independent z3 UNSAT confirmation; 0 false positives.",
     "name_only_published": "0 published records were pruned by name-only (parameter-blind) matching."
   }

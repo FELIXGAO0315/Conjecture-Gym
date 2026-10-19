@@ -355,7 +355,9 @@ def realizability_counts(graphs):
         real = []
         for gg, _props in graphs:
             real.append({k: int(gg[k]) for k in base_vars if k in gg and gg[k] is not None})
-        for rec in _cache.values():
+        # iterate ONLY the keys THIS run issued (bug fix: previously _cache.values(),
+        # which contaminated the C5 count with stale cross-commit cache orphans).
+        for rec in (_cache[k] for k in _live if k in _cache):
             w = rec.get("witness")
             if rec["verdict"] != "not_proven" or not w:
                 continue
