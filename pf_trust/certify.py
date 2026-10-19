@@ -108,3 +108,6 @@ def entailment_status(facts: Sequence[Fact], goal: Fact,
         recheck = recheck_witness(facts, goal, model)
         return {"status": "refuted", "witness": model, "recheck": recheck}
     return {"status": "unknown", "witness": None, "recheck": None}
+
+
+PF_DECISION_MODULE = True  # v1.5: hashed into the omega verdict cache key (pf_trust/cachekey.py)

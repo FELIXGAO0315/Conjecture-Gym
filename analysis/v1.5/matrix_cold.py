@@ -49,6 +49,14 @@ ENCODING_VERSION = "v1.5"
 PF_COMMIT = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"],
                                     cwd=ROOT, text=True).strip()
 TOOLCHAIN = PINS["lean_toolchain"] + "+mathlib:" + PINS["mathlib_rev"][:12]
+# A' (v1.5 review): key on a CONTENT fingerprint of the decision-code import closure +
+# toolchain/solver pins, NOT on git HEAD. Coverage-tested (test_cachekey.py). An unrelated
+# commit no longer invalidates the cache; a decision-code/toolchain change does.
+from pf_trust import cachekey as _ck
+_coverage_missing = _ck.check_coverage()
+assert not _coverage_missing, f"decision modules outside cache-key closure: {_coverage_missing}"
+VERDICT_FP = _ck.verdict_fingerprint()
+print(f"[init] verdict fingerprint {VERDICT_FP[:16]} (coverage ok)", flush=True)
 
 _cache = {}                                     # ckey -> record dict (3-valued + cert)
 if COLD_CACHE.exists():
@@ -60,14 +68,16 @@ print(f"[init] loaded {len(_cache)} cold cached certs; commit={PF_COMMIT} "
 
 _runner = LB.lake_runner(str(CC._LEAN_DIR), extra_args=["-D", "maxErrors=100000000"])
 _cf = open(COLD_CACHE, "a")
-STATE = {"batches": 0, "queries": 0, "unknown": 0, "disagree": 0, "t0": time.time()}
+STATE = {"batches": 0, "queries": 0, "unknown": 0, "disagree": 0,
+         "reverified": 0, "reverify_fail": 0, "t0": time.time()}
 _live = set()   # keys actually ISSUED by THIS run (excludes stale cross-commit orphans)
 
 
 def _ckey(base, goal):
+    # key = (canonical base+goal, verdict-code+toolchain fingerprint). See cachekey.py.
     payload = json.dumps([sorted((sorted(c.items()), r, h) for (c, r, h) in base),
                           [sorted(goal[0].items()), goal[1], goal[2]],
-                          ENCODING_VERSION, PF_COMMIT, TOOLCHAIN], sort_keys=True)
+                          VERDICT_FP], sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -88,7 +98,16 @@ def entail_many(queries, label=""):
         ck = _ckey(base, goal)
         _live.add(ck)                       # this run issued this key
         if ck in _cache:
-            out[qk] = (_cache[ck]["verdict"] == "proven")
+            proven = (_cache[ck]["verdict"] == "proven")
+            out[qk] = proven
+            # A' cache-hit re-verification: ~1/64 of cached PROVENs are re-decided by z3
+            # from the CURRENT query's facts; a cached PROVEN that z3 now refutes is a
+            # stale/corrupt-cache alarm (the dangerous direction) and is recorded.
+            if proven and int(ck[:4], 16) % 64 == 0:
+                STATE["reverified"] += 1
+                if certify.entailment_status(base, goal, vs)["status"] != "entailed":
+                    STATE["reverify_fail"] += 1
+                    _cf.write(json.dumps({"ALARM": "cache_hit_proven_not_entailed", "k": ck}) + "\n")
         else:
             todo.append((qk, ck, base, goal, vs))
     for i in range(0, len(todo), 400):
@@ -309,7 +328,10 @@ def run():
         "totals": {"distinct_queries_issued_this_run": len(_live),
                    "distinct_queries_in_cache": len(_cache),
                    "unknown": STATE["unknown"],
-                   "disagreements_lean_vs_z3_fresh": STATE["disagree"]},
+                   "disagreements_lean_vs_z3_fresh": STATE["disagree"],
+                   "verdict_fingerprint": VERDICT_FP,
+                   "cache_hit_proven_reverified": STATE["reverified"],
+                   "cache_hit_proven_reverify_failures": STATE["reverify_fail"]},
         "two_sided": two_sided_summary(),
         "M1": {"count": len(redundant), "ids": sorted(new_m1, key=lambda x: int(x[1:])), "inv_entailed": len(inv_ent)},
         "M2": {"asc_basis": len(basis_asc), "asc_removed": rem_asc, "desc_basis": len(basis_desc), "desc_removed": rem_desc},

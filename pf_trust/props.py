@@ -64,3 +64,6 @@ def dischargeable(required: Iterable[str], available: Iterable[str],
         if not any(n == name and rule(args, a) for n, a in param_av):
             return False
     return True
+
+
+PF_DECISION_MODULE = True  # v1.5: hashed into the omega verdict cache key (pf_trust/cachekey.py)

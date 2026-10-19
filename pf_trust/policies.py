@@ -47,3 +47,6 @@ def may_replace(old, new, usable: Callable[[object, object], bool],
     if not usable(old, new):
         return False
     return may_prune(entails_by(old, [new]))
+
+
+PF_DECISION_MODULE = True  # v1.5: hashed into the omega verdict cache key (pf_trust/cachekey.py)

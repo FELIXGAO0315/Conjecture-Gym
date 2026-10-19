@@ -346,3 +346,6 @@ def selftest(header: str, runner: Runner, n_false: int = 150) -> dict:
         return {"ok": False, "reason": f"single batch not trusted: {why}"}
     wrong = [n for n, v in expected.items() if got[n].verdict is not v]
     return {"ok": not wrong, "misclassified": wrong, "n_goals": len(goals)}
+
+
+PF_DECISION_MODULE = True  # v1.5: hashed into the omega verdict cache key (pf_trust/cachekey.py)

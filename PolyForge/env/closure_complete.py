@@ -282,3 +282,6 @@ if __name__ == "__main__":
         _selftest()
     else:
         print("module: use complete_entails (restricted usability) / complete_entails_v2 (complete usability)")
+
+
+PF_DECISION_MODULE = True  # v1.5: hashed into the omega verdict cache key (pf_trust/cachekey.py)
