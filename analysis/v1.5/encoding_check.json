@@ -1,0 +1,179 @@
+{
+  "population": "NONEMPTY graph atlas (general finite simple graphs, 1<=n<=7)",
+  "n_graphs": 1252,
+  "differential_invariants": {
+    "checked_graphs": 1252,
+    "mismatches": [],
+    "n_mismatch": 0
+  },
+  "per_fact_validation": {
+    "fact_checks": 42449,
+    "violations": [],
+    "n_violations": 0
+  },
+  "mutation_testing": {
+    "n_mutants": 131,
+    "killed_total": 78,
+    "breaking_mutants": 97,
+    "breaking_killed": 75,
+    "breaking_kill_rate": 0.7732,
+    "breaking_survivors": [
+      {
+        "fact": "omega_le_chi",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "chi_le_n",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "min_le_max",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "max_lt_card",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "max_le_edges",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "tau_le_card_sub_one",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "radius_le_diam",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "diam_le_two_radius",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "alpha_le_n",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "omega_le_n",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "tau_le_m",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "omega_le_maxdeg",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "diam_le_card_sub_one",
+        "mutation": "negate_coeff",
+        "rel": "<=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "nonneg_n",
+        "mutation": "rhs+1",
+        "rel": ">=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "nonneg_chi",
+        "mutation": "rhs+1",
+        "rel": ">=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "nonneg_omega",
+        "mutation": "rhs+1",
+        "rel": ">=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "nonneg_alpha",
+        "mutation": "rhs+1",
+        "rel": ">=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "nonneg_diam",
+        "mutation": "rhs+1",
+        "rel": ">=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "nonneg_radius",
+        "mutation": "rhs+1",
+        "rel": ">=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "nonneg_girth",
+        "mutation": "rhs+1",
+        "rel": ">=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "nonneg_girth",
+        "mutation": "flip_rel",
+        "rel": ">=",
+        "breaking": true,
+        "killed": false
+      },
+      {
+        "fact": "nonneg_girth",
+        "mutation": "negate_coeff",
+        "rel": ">=",
+        "breaking": true,
+        "killed": false
+      }
+    ],
+    "note": "loosening mutations (rhs-1) legitimately survive. A breaking survivor means the atlas (n<=7) is too small to witness that mutation; extend with `geng` n=8,9 to catch more."
+  },
+  "verdict": "ENCODING SOUND ON NONEMPTY ATLAS"
+}
