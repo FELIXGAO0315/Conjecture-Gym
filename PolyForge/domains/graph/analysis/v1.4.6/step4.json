@@ -1,8 +1,0 @@
-{
-  "n_items": 550,
-  "distinct_ours": 480,
-  "distinct_pf": 480,
-  "ours_splits_under_pf": 0,
-  "pf_splits_under_ours": 0,
-  "same_classes": true
-}
