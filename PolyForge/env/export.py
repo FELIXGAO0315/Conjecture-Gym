@@ -3,10 +3,11 @@
 ``python -m PolyForge.env.export graph --out <dir>`` reads the current ``graph``
 records and writes a self-contained RL-environment dataset:
 
-  tasks.jsonl        every task (all fields, see tasks.py)
-  train.jsonl        the training split
-  test.jsonl         the test split
-  sft_train.jsonl    SFT pairs for the training split (prompt / completion)
+  tasks.jsonl        every task, PUBLIC fields only (statement + split; no answer)
+  train.jsonl        the training split (public fields)
+  test.jsonl         the test split (public fields)
+  sft_train.jsonl    SFT pairs for the training split (prompt / completion) — server-side
+  task_record_map.server.jsonl  task_id -> record (C{n}) linkage — server-side only
   metadata.json      versions, difficulty thresholds, counts, split rule & seed
   README.md          English description of the environment and its usage
 
@@ -89,6 +90,18 @@ def export(domain: str, out_dir: Path, split_seed: int = _DEFAULT_SPLIT_SEED) ->
         for t in train:
             f.write(json.dumps(_sft_record(t.to_dict()), ensure_ascii=False, sort_keys=True) + "\n")
 
+    # v1.5.1 §D3: SERVER-SIDE ONLY task_id -> record (C{n}) + generator version
+    # mapping.  Never ship this to a model: it links the neutralised task_id back
+    # to the record, which is where the answer lives.  Consumers that need the
+    # answer (oracle_check, SFT) read it from record/ via build_tasks; this file
+    # just persists the linkage that the removed public `source` field used to
+    # carry.  (sft_train.jsonl likewise is server-side: it contains proofs.)
+    with open(out_dir / "task_record_map.server.jsonl", "w") as f:
+        for t in tasks:
+            f.write(json.dumps({"task_id": t.task_id, "record": t.source["record"],
+                                "generator_version": t.source["generator_version"]},
+                               ensure_ascii=False, sort_keys=True) + "\n")
+
     # split statistics
     tier_split = defaultdict(lambda: Counter())
     for t in tasks:
@@ -147,25 +160,28 @@ proof that the kernel accepts using only the standard axioms.
 
 ## What a task is
 
-Each line of `tasks.jsonl` is one task:
+Each line of `tasks.jsonl` is one task. The task rows carry ONLY the problem
+statement and split — no answer and no proof-strategy metadata (§D3):
 
 - `task_id` — `{domain}-<12 hex>`, the hash of the (name-neutralised, whitespace-
   normalised) Lean statement. Stable across exports; the same statement always
   gets the same id.
-- `domain`, `source` (originating record id and generator version — informational).
+- `domain`.
 - `formula`, `canonical_form`, `natural_language` — the conjecture in PolyForge's
   notation, its identity-canonical form, and an English statement.
 - `lean_header` — the `import`/`open` block.
 - `lean_statement` — the theorem signature ending in `:= by` (no proof). The
-  theorem is named `thm_<12 hex>`.
-- `theorem_name`.
-- `reference_proof` — PolyForge's own proof (the tactic block after `by`).
-- `natural_language_proof` — the proof rendered as reasoning steps.
-- `difficulty` (easy/medium/hard), `hardness`, `depth_type`, `proof_stats`,
-  `inventory_used`.
-- `skeleton` — the split key (property premises + constant-free premise shapes +
-  canonical-conclusion variable set and direction).
+  theorem is named `thm_<12 hex>` (never the record id).
+- `hardness`, `iris` — scalar difficulty/interest scores (no proof structure).
 - `split` — `train` or `test`.
+
+The reference proof, natural-language proof, inventory used, depth_type,
+proof_stats, the skeleton split key, the difficulty tier, the originating record
+id and the theorem's record name are **not** in the task rows. They live
+server-side only (in `record/`, reconstructable via `build_tasks`). SFT pairs
+(with proofs) are in the separate server-side `sft_train.jsonl`; the task_id→record
+linkage is in the separate server-side `task_record_map.server.jsonl`. Neither is
+meant to be shown to a model.
 
 ## Submission & proof-extraction
 

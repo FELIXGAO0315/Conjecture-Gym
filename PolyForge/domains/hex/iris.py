@@ -12,7 +12,7 @@ call convention.
 
 from __future__ import annotations
 
-from ...scoring import iris as _IRIS
+from ...engine.scoring import iris as _IRIS
 from .inventory import M_MAX, TAIL_VAR
 
 FEATURES = (["p_3", "p_4", "p_5", "p_6"] + [f"p_{k}" for k in range(7, M_MAX + 1)]

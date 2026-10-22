@@ -1,0 +1,190 @@
+{
+  "id": "C208",
+  "key": "a209df1ebb12e872a19879057356a02db535add663103fa9e48f97b111802f6b",
+  "provenance_keys": {
+    "self": "a209df1ebb12e872a19879057356a02db535add663103fa9e48f97b111802f6b",
+    "instance_of": null,
+    "promoted_from": null
+  },
+  "created_at": "2026-10-15T05:59:33.907446+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 2026008117
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((is_connected) and (max_deg >= 3)), then (n >= 2*diam - 3*radius + 3)",
+    "properties_premises": [
+      {
+        "name": "is_connected"
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "max_deg >= 3",
+        "coeffs": {
+          "max_deg": 1
+        },
+        "rel": ">=",
+        "rhs": 3
+      }
+    ],
+    "conclusion": {
+      "text": "n >= 2*diam - 3*radius + 3",
+      "coeffs": {
+        "diam": -2,
+        "n": 1,
+        "radius": 3
+      },
+      "rel": ">=",
+      "rhs": 3
+    },
+    "canonical_form": {
+      "text": "n >= 2*diam - 3*radius + 3",
+      "coeffs": {
+        "n": 1,
+        "diam": -2,
+        "radius": 3
+      },
+      "rel": ">=",
+      "rhs": 3
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_connected, max_deg >= 3. Then n >= 2*diam - 3*radius + 3."
+  },
+  "primary_var": "n",
+  "dalmatian": "significant",
+  "properties": [
+    "is_connected"
+  ],
+  "conclusion_property": null,
+  "instance_of": null,
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "diam_le_card_sub_one",
+      "diam_le_two_radius",
+      "max_lt_card"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*n + -1*max_deg + -1 >= 0",
+        "coeffs": {
+          "max_deg": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "max_lt_card"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "-1*diam + 2*radius >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "radius": "2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "diam_le_two_radius"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "1*n + -1*diam + -1 >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "diam_le_card_sub_one"
+      },
+      {
+        "fid": 4,
+        "rule": "premise",
+        "text": "1*max_deg + -3 >= 0",
+        "coeffs": {
+          "max_deg": "1"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "note": "max_deg >= 3"
+      },
+      {
+        "fid": 5,
+        "rule": "combination",
+        "text": "1*n + -2*diam + 3*radius + -5/2 >= 0",
+        "coeffs": {
+          "n": "1",
+          "diam": "-2",
+          "radius": "3"
+        },
+        "const": "-5/2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "mults": [
+          "1/2",
+          "3/2",
+          "1/2",
+          "1/2"
+        ]
+      },
+      {
+        "fid": 6,
+        "rule": "rounding",
+        "text": "1*n + -2*diam + 3*radius + -3 >= 0",
+        "coeffs": {
+          "n": "1",
+          "diam": "-2",
+          "radius": "3"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          5
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.003048780487804878,
+    "R": 0.3333333333333333,
+    "L": 0.0,
+    "score": 0.3363821138211382
+  },
+  "attained": "yes",
+  "touch": 3,
+  "arith_sharp": "exact",
+  "depth_type": "rounding_only",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 3,
+    "product_steps": 0
+  },
+  "proof_cost_initial": 9.0,
+  "proof_cost": 9.0,
+  "proof_cost_expanded": 9.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.8,
+  "lean": {
+    "theorem_name": "C208",
+    "status": "compiled"
+  }
+}

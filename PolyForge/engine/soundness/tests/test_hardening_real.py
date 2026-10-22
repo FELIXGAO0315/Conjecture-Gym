@@ -2,16 +2,16 @@
 
 Slow (each batch compiles against Mathlib). Skipped automatically if `lake` or the
 Lean project is unavailable. verify_all FULL runs these; FAST does not.
-Run directly:  python -m pytest PolyForge.trust/tests/test_hardening_real.py -v
+Run directly:  python -m pytest PolyForge.engine.soundness/tests/test_hardening_real.py -v
 """
 import shutil
 from pathlib import Path
 
 import pytest
 
-from PolyForge.trust.lean_batch import Goal, Verdict, lake_runner, selftest, verify
+from PolyForge.engine.soundness.lean_batch import Goal, Verdict, lake_runner, selftest, verify
 
-LEAN_DIR = Path("/home/felix_gao/Conjecture-Gym/PolyForge/domains/graph/lean")
+LEAN_DIR = Path("/home/felix_gao/Conjecture-Gym/PolyForge/lean")
 HEADER = "import Mathlib"
 
 pytestmark = pytest.mark.skipif(

@@ -7,7 +7,7 @@ exactly re-check, regression-test on the real graph dataset, gate with an intege
 counter-model over the active inventory, find the shortest proof, score, tag and
 write.  Conclusions range over any invariant (both bounds); graph *properties*
 appear only as premises.  The domain-agnostic flow (cache, renumber, record IO,
-worker entry) is reused from ``PolyForge.generator.generator``.
+worker entry) is reused from ``PolyForge.engine.generator``.
 """
 
 from __future__ import annotations
@@ -27,15 +27,16 @@ import itertools as _it
 import numpy as np
 from scipy.optimize import linprog, milp, LinearConstraint, Bounds
 
-from ...anvil import deducer as D
-from ...anvil.deducer import Context, traceback, recheck
+from ...engine import deducer as D
+from ...engine.deducer import Context, traceback, recheck
 from . import inventory as INV
 from . import deduction as DED
 from . import formalizer as F
-from ...scoring import iris as IRIS
-from ...scoring import hardness as HARD
-from ...generator import generator as CG
-from ...generator.generator import (
+from ...engine.scoring import iris as IRIS
+from ...engine.scoring import interestingness as INTEREST
+from ...engine.scoring import hardness as HARD
+from ...engine import generator as CG
+from ...engine.generator import (
     cached_context, _ctx_cache_clear, renumber_steps,
     _count_derivation_steps, _used_inventory, _primitive_int,
 )
@@ -130,9 +131,9 @@ def props_dischargeable(required_props, available_props):
     ``available_props`` also have all ``required_props``?  Non-parametric premises go
     through our ``property_closure`` lattice; parametric ones (is_regular(d),
     is_k_edge_connected(k)) must match the parameter (a 2-regular graph is NOT
-    3-regular).  Delegates to ``PolyForge.trust.props.dischargeable`` so there is ONE decision
+    3-regular).  Delegates to ``PolyForge.engine.soundness.props.dischargeable`` so there is ONE decision
     rule, replacing the old unsound name-only ``issubset`` prefilter."""
-    from PolyForge.trust.props import dischargeable as _pf_dischargeable
+    from PolyForge.engine.soundness.props import dischargeable as _pf_dischargeable
     return _pf_dischargeable(_prop_strs(required_props), _prop_strs(available_props),
                              closure=property_closure)
 
@@ -2338,13 +2339,14 @@ def set_snapshot_records(recs):
     _W_SNAPSHOT_RECORDS = recs or []
 
 
-def process_premise_set(rng, pool, existing_hashes, stats, seed, accept="split_needed"):
+def process_premise_set(rng, pool, existing_hashes, stats, seed, accept="split_needed",
+                        harvest=False):
     D.work_reset(GROUP_WORK_BUDGET)
     try:
-        return _impl(rng, pool, existing_hashes, stats, seed, accept)
+        return _impl(rng, pool, existing_hashes, stats, seed, accept, harvest)
     except D.WorkBudgetExceeded:
         stats["too_slow"] += 1
-        return None
+        return [] if harvest else None
 
 
 def _main_var(coeffs):
@@ -2371,7 +2373,8 @@ def _coeff1_var(coeffs):
     return _main_var(coeffs)
 
 
-def _impl(rng, pool, existing_hashes, stats, seed, accept):
+def _impl(rng, pool, existing_hashes, stats, seed, accept, harvest=False):
+    _none = [] if harvest else None             # harvest mode returns a LIST of all valid
     _ctx_cache_clear()
     props, numeric = sample_premises(rng)
     props = dedup_properties(props)                 # §IV.1: drop implied property premises
@@ -2389,20 +2392,20 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
     if _deg is not None:
         stats["degenerate_premises"] += 1
         stats[f"degenerate_{_deg}"] += 1
-        return None
+        return _none
 
     covered = pool_covered(props, numeric)
     if covered and not dataset_subset(pool, props, numeric):
         stats["empty_premises"] += 1
-        return None
+        return _none
 
     primary = choose_primary(seed, usable)                      # §III rotation
     if primary is None:
-        return None
+        return _none
     candidates = enumerate_candidates(numeric, usable, primary, stats, rng, accept)
     if not candidates:
         stats["no_candidate"] += 1
-        return None
+        return _none
     # §IV: candidates arrive sorted by (v_int − v_lin) desc, enumeration order; the
     # cap keeps the strongest; no shuffle (deterministic).
     if len(candidates) > MAX_CANDIDATES_PER_SET:
@@ -2415,6 +2418,7 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
     # pipeline.  Each item is (candidate, promote_depth, promoted_from) — promoted
     # cores (depth ≥ 1) do not count against the candidate cap.
     queue = [(cand, 0, None) for cand in candidates]
+    harvested = []                                  # harvest mode: collect ALL valid candidates
     while queue:
         cand, _promote_depth, _promoted_from = queue.pop(0)
         # restore the FULL-premise active inventory for the linear-derivability gate
@@ -2457,59 +2461,65 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         if linearly_derivable(c_numeric, conclusion):
             stats["linear_only"] += 1
             continue
-        # §IV decomposability filter (full deduction power) — on the canonical form
-        if is_decomposable(c_numeric, canon):
-            stats["decomposable"] += 1
-            continue
-        # v1.3.1 §III + v1.3.2 §I: coefficient-split decomposability and weakened-form
-        # detection share one split tree / bound cache under one time budget.
-        _canon_L = {v: int(x) for v, x in canon["coeffs"].items() if int(x) != 0}
-        _c = int(canon["rhs"])
-        _lp_lo, _full_lo = _bound_helpers(c_numeric)
-        _deadline = perf_counter() + DECOMP_SPLIT_TIME_BUDGET
-        dec2, dec_timed = _coeff_split_decomposable(_canon_L, _c, _lp_lo, _full_lo, _deadline)
-        if dec2:
-            stats["decomposable_split"] += 1
-            continue
-        weak, _wcore, _b_A, _winfo, weak_timed = _weakened(_canon_L, _c, _lp_lo, _full_lo, _deadline)
-        if dec_timed or weak_timed:
-            stats["decomposition_timeout"] += 1
-        if weak:
-            # v1.3.2 §I.2: promote the cleaner core ``A ≥ b_A`` back into the pipeline.
-            if _promote_depth >= 2:
-                stats["weakened_depth_limit"] += 1
+        # §IV decomposability / weakened-form / redundancy filters are PRUNING-ONLY and
+        # expensive — in harvest mode we keep every valid theorem, so skip them entirely.
+        if not harvest:
+            if is_decomposable(c_numeric, canon):
+                stats["decomposable"] += 1
                 continue
-            stats["weakened_promoted"] += 1
-            canon_disp, canon_prim = display_conclusion(canon, None)
-            parent = {"text": _render_isolated(canon_disp, canon_prim),
-                      "coeffs": {k: int(v) for k, v in canon_disp["coeffs"].items()},
-                      "rel": canon_disp["rel"], "rhs": int(canon_disp["rhs"])}
-            core = {"coeffs": dict(_wcore), "rel": ">=", "rhs": int(_b_A)}
-            queue.insert(0, (core, _promote_depth + 1, parent))
-            continue
+            # v1.3.1 §III + v1.3.2 §I: coefficient-split decomposability and weakened-form
+            # detection share one split tree / bound cache under one time budget.
+            _canon_L = {v: int(x) for v, x in canon["coeffs"].items() if int(x) != 0}
+            _c = int(canon["rhs"])
+            _lp_lo, _full_lo = _bound_helpers(c_numeric)
+            _deadline = perf_counter() + DECOMP_SPLIT_TIME_BUDGET
+            dec2, dec_timed = _coeff_split_decomposable(_canon_L, _c, _lp_lo, _full_lo, _deadline)
+            if dec2:
+                stats["decomposable_split"] += 1
+                continue
+            weak, _wcore, _b_A, _winfo, weak_timed = _weakened(_canon_L, _c, _lp_lo, _full_lo, _deadline)
+            if dec_timed or weak_timed:
+                stats["decomposition_timeout"] += 1
+            if weak:
+                # v1.3.2 §I.2: promote the cleaner core ``A ≥ b_A`` back into the pipeline.
+                if _promote_depth >= 2:
+                    stats["weakened_depth_limit"] += 1
+                    continue
+                stats["weakened_promoted"] += 1
+                canon_disp, canon_prim = display_conclusion(canon, None)
+                parent = {"text": _render_isolated(canon_disp, canon_prim),
+                          "coeffs": {k: int(v) for k, v in canon_disp["coeffs"].items()},
+                          "rel": canon_disp["rel"], "rhs": int(canon_disp["rhs"])}
+                core = {"coeffs": dict(_wcore), "rel": ">=", "rhs": int(_b_A)}
+                queue.insert(0, (core, _promote_depth + 1, parent))
+                continue
+            # §V logical-redundancy pre-check against the run-start snapshot (canonical)
+            if is_redundant_vs_records(c_props, c_numeric, canon, _W_SNAPSHOT_RECORDS):
+                stats["redundant_vs_record"] += 1
+                continue
         skel = conjecture_skeleton(c_props, c_numeric, canon)
-        # §V logical-redundancy pre-check against the run-start snapshot (canonical)
-        if is_redundant_vs_records(c_props, c_numeric, canon, _W_SNAPSHOT_RECORDS):
-            stats["redundant_vs_record"] += 1
-            continue
         tb = traceback(ctx_m, fact)
         if _count_derivation_steps(tb) < 1:
             stats["too_shallow"] += 1
             continue
-        ok, _msg = recheck(ctx_m, fact, c_numeric)
-        if not ok:
-            stats["recheck_failed"] += 1
-            continue
-        soundness_check(c_props, c_numeric, conclusion, pool)
-        cm = counter_model(c_numeric, conclusion)
-        if cm is not None:
-            model, is_real = cm
-            if is_real:
-                raise AssertionError(
-                    f"COUNTER-MODEL: not inventory-derivable.\n props={c_props}\n "
-                    f"numeric={c_numeric}\n conclusion={conclusion}\n model={model}")
-            # §VI.1: a relaxed-only model (some P ≠ x·y) is a statistic, not fatal.
-            stats["relaxed_counter_model"] += 1
+        # recheck / soundness / counter-model are expensive per-candidate correctness
+        # PRE-checks — in harvest mode the batch Lean compile is the final arbiter, so
+        # skip them (a non-derivable / false candidate simply fails to compile and is dropped).
+        if not harvest:
+            ok, _msg = recheck(ctx_m, fact, c_numeric)
+            if not ok:
+                stats["recheck_failed"] += 1
+                continue
+            soundness_check(c_props, c_numeric, conclusion, pool)
+            cm = counter_model(c_numeric, conclusion)
+            if cm is not None:
+                model, is_real = cm
+                if is_real:
+                    raise AssertionError(
+                        f"COUNTER-MODEL: not inventory-derivable.\n props={c_props}\n "
+                        f"numeric={c_numeric}\n conclusion={conclusion}\n model={model}")
+                # §VI.1: a relaxed-only model (some P ≠ x·y) is a statistic, not fatal.
+                stats["relaxed_counter_model"] += 1
         # v1.4.2 §A1: the LP-NECESSITY class (what extra power is *required* beyond
         # linear) still drives phase acceptance — the hard tier is "needs a product or a
         # split", the easy tier is "rounding suffices".  The RECORDED depth_type is set
@@ -2517,11 +2527,15 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
         accept_class = classify_depth(c_numeric, ccoeffs)
         if not _accepts(accept, accept_class):
             stats["depth_mismatch"] += 1
-            continue
+            if not harvest:
+                continue
         # shortest proof
         proof_cost_initial = _pdiff(tb)
-        tb, ctx_m, fact, proof_cost, shorten_rounds = shorten_proof(
-            c_numeric, conclusion, tb, ctx_m, fact, proof_cost_initial)
+        if harvest:                              # training: any valid proof is fine
+            proof_cost, shorten_rounds = proof_cost_initial, 0
+        else:
+            tb, ctx_m, fact, proof_cost, shorten_rounds = shorten_proof(
+                c_numeric, conclusion, tb, ctx_m, fact, proof_cost_initial)
         # lemma usage
         lemma_cnums = sorted(F._lemma_cnums_in(tb))
         if lemma_cnums:
@@ -2548,10 +2562,18 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             n_set = len(feats)
             dataset_size = n_set
             iris = _iris_from_feats(feats, feat_vars, ccoeffs, int(conclusion["rhs"]))
+            _inv_vars = set(ccoeffs)
+            for _pr in c_numeric:
+                _inv_vars |= set(_pr["coeffs"])
+            interest = INTEREST.interestingness(
+                {"coeffs": ccoeffs, "rel": conclusion.get("rel", ">="), "rhs": int(conclusion["rhs"])},
+                feats, feat_vars, len(_inv_vars))
             touch_val = touch
         else:
             attained = "unknown"
             iris = {"T": 0.0, "R": 0.0, "L": 0.0, "score": 0.0}
+            interest = {"score": 0.0, "sharpness": 0.0, "tightness": 0.0,
+                        "breadth": 0.0, "dataset_size": 0}
             touch_val = None
             stats["skipped_pool_checks"] += 1
 
@@ -2586,9 +2608,10 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             fam = family_key(instance_of, c_props, c_numeric, canon)
             if family_duplicate_vs(_W_SNAPSHOT_RECORDS, fam, new_metrics):
                 stats["instance_family_duplicate"] += 1
-                continue
+                if not harvest:
+                    continue
             skel = fam
-        return {
+        prop = {
             "seed": seed, "props": c_props, "numeric": c_numeric, "conclusion": conclusion,
             "instance_of": instance_of,
             "promoted_from": _promoted_from,
@@ -2599,6 +2622,7 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             "gen_conclusion": conclusion, "canonical": canon,
             "main_var": prim, "tb": tb, "inv_used": inv_used,
             "iris": {k: iris[k] for k in ("T", "R", "L", "score")},
+            "interestingness": interest,
             "attained": attained, "touch": touch_val, "hardness": hard,
             "arith_sharp": arith_sharp,
             "depth_type": depth_type, "proof_stats": proof_stats,
@@ -2610,7 +2634,11 @@ def _impl(rng, pool, existing_hashes, stats, seed, accept):
             "conclusion_property": conclusion_property(c_props, disp_oriented),
             "dalmatian": "unknown",   # finalised in the main process at commit (§VI.4)
         }
-    return None
+        if harvest:
+            harvested.append(prop)
+            continue
+        return prop
+    return harvested if harvest else None
 
 
 def _provable_under(props, numeric, conclusion):
@@ -2908,6 +2936,8 @@ def assemble_data(proposal, target, supersedes):
         "proof": {"inventory_used": proposal["inv_used"], "lemmas_used": proposal["lemma_refs"],
                   "steps": steps},
         "iris": proposal["iris"],
+        "interestingness": proposal.get("interestingness",
+            {"score": 0.0, "sharpness": 0.0, "tightness": 0.0, "breadth": 0.0, "dataset_size": 0}),
         "attained": proposal["attained"], "touch": proposal["touch"],
         "arith_sharp": proposal.get("arith_sharp", "exact"),
         "depth_type": proposal["depth_type"], "proof_stats": proposal["proof_stats"],

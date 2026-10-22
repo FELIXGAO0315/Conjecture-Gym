@@ -1,0 +1,286 @@
+{
+  "id": "C97",
+  "key": "87992d09466cbec58ea252f3d1e1b08481a3a1a6264525cfe6548d400aca24fc",
+  "provenance_keys": {
+    "self": "87992d09466cbec58ea252f3d1e1b08481a3a1a6264525cfe6548d400aca24fc",
+    "instance_of": null,
+    "promoted_from": null
+  },
+  "created_at": "2026-10-15T01:46:25.537200+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 2025006547
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((is_acyclic) and (max_deg >= chi)), then (2*chi >= n - 3*alpha + 6)",
+    "properties_premises": [
+      {
+        "name": "is_acyclic"
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "max_deg >= chi",
+        "coeffs": {
+          "max_deg": 1,
+          "chi": -1
+        },
+        "rel": ">=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "2*chi >= n - 3*alpha + 6",
+      "coeffs": {
+        "alpha": 3,
+        "chi": 2,
+        "n": -1
+      },
+      "rel": ">=",
+      "rhs": 6
+    },
+    "canonical_form": {
+      "text": "3*alpha >= n - 2*chi + 6",
+      "coeffs": {
+        "chi": 2,
+        "alpha": 3,
+        "n": -1
+      },
+      "rel": ">=",
+      "rhs": 6
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_acyclic, max_deg >= chi. Then 2*chi >= n - 3*alpha + 6."
+  },
+  "primary_var": "chi",
+  "dalmatian": "significant",
+  "properties": [
+    "is_acyclic"
+  ],
+  "conclusion_property": null,
+  "instance_of": null,
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "acyclic_chi",
+      "alpha_ge_one",
+      "card_le_alpha_chi",
+      "max_lt_card"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*n + -1*max_deg + -1 >= 0",
+        "coeffs": {
+          "max_deg": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "max_lt_card"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "-1*n + 1*P_alpha_chi >= 0",
+        "coeffs": {
+          "n": "-1",
+          "P_alpha_chi": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "card_le_alpha_chi"
+      },
+      {
+        "fid": 3,
+        "rule": "premise",
+        "text": "1*max_deg + -1*chi >= 0",
+        "coeffs": {
+          "max_deg": "1",
+          "chi": "-1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "max_deg >= chi"
+      },
+      {
+        "fid": 4,
+        "rule": "inventory",
+        "text": "1*alpha + -1 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "alpha_ge_one"
+      },
+      {
+        "fid": 5,
+        "rule": "inventory",
+        "text": "-1*chi + 2 >= 0",
+        "coeffs": {
+          "chi": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "inventory": "acyclic_chi"
+      },
+      {
+        "fid": 6,
+        "rule": "product",
+        "text": "1*chi + 2*alpha + -1*P_alpha_chi + -2 >= 0",
+        "coeffs": {
+          "P_alpha_chi": "-1",
+          "alpha": "2",
+          "chi": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          4,
+          5
+        ],
+        "prod_var": "P_alpha_chi",
+        "prod_factors": [
+          [
+            "alpha",
+            "lower",
+            1,
+            4
+          ],
+          [
+            "chi",
+            "upper",
+            2,
+            5
+          ]
+        ]
+      },
+      {
+        "fid": 7,
+        "rule": "combination",
+        "text": "1*alpha + -3/2 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-3/2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          6
+        ],
+        "mults": [
+          "1/2",
+          "1/2",
+          "1/2",
+          "1/2"
+        ]
+      },
+      {
+        "fid": 8,
+        "rule": "rounding",
+        "text": "1*alpha + -2 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          7
+        ]
+      },
+      {
+        "fid": 9,
+        "rule": "product",
+        "text": "2*chi + 2*alpha + -1*P_alpha_chi + -4 >= 0",
+        "coeffs": {
+          "P_alpha_chi": "-1",
+          "alpha": "2",
+          "chi": "2"
+        },
+        "const": "-4",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          5,
+          8
+        ],
+        "prod_var": "P_alpha_chi",
+        "prod_factors": [
+          [
+            "alpha",
+            "lower",
+            2,
+            8
+          ],
+          [
+            "chi",
+            "upper",
+            2,
+            5
+          ]
+        ]
+      },
+      {
+        "fid": 10,
+        "rule": "combination",
+        "text": "-1*n + 2*chi + 3*alpha + -6 >= 0",
+        "coeffs": {
+          "chi": "2",
+          "alpha": "3",
+          "n": "-1"
+        },
+        "const": "-6",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          8,
+          2,
+          9
+        ],
+        "mults": [
+          "1",
+          "1",
+          "1"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.016666666666666666,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0166666666666666
+  },
+  "attained": "yes",
+  "touch": 1,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 3,
+    "product_steps": 2
+  },
+  "proof_cost_initial": 14.0,
+  "proof_cost": 14.0,
+  "proof_cost_expanded": 14.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 2.3333333333333335,
+  "lean": {
+    "theorem_name": "C97",
+    "status": "compiled"
+  }
+}

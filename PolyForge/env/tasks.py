@@ -35,7 +35,7 @@ import re
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 
-from ..generator.generator import _steps_md
+from ..engine.generator import _steps_md
 
 _ROOT = Path(__file__).resolve().parents[1]           # .../PolyForge
 
@@ -54,7 +54,7 @@ DOMAINS = {
     "graph": DomainConfig(
         name="graph",
         record_dir=_ROOT / "domains" / "graph" / "record",
-        lean_dir=_ROOT / "domains" / "graph" / "lean",
+        lean_dir=_ROOT / "lean",                          # shared v4.34 workspace
         repl_preamble="import Mathlib\nimport GraphLemmas\nopen SimpleGraph\nopen PolyForge.Graph",
     ),
 }
@@ -144,10 +144,6 @@ def skeleton(record: dict) -> str:
     return json.dumps(sk, sort_keys=True, separators=(",", ":"))
 
 
-def skeleton_hash(sk: str) -> str:
-    return hashlib.sha256(sk.encode()).hexdigest()
-
-
 # ── difficulty tiers (v1.3 §II, hardness tertiles) ────────────────────────────
 def difficulty_thresholds(hardness: list[float]) -> tuple[float, float]:
     """Return (t1, t2), the 1/3 and 2/3 quantiles of the hardness values, so that
@@ -197,6 +193,7 @@ class Task:
     natural_language_proof: str
     difficulty: str
     hardness: float
+    iris: dict
     depth_type: str
     proof_stats: dict
     inventory_used: list
@@ -261,6 +258,7 @@ def build_tasks(domain: str, split_seed: int = 1337) -> list[Task]:
             natural_language_proof=_render_nl_proof(record),
             difficulty=difficulty_of(float(record["hardness"]), thr),
             hardness=float(record["hardness"]),
+            iris=record.get("iris") or {},
             depth_type=record.get("depth_type", ""),
             proof_stats=record.get("proof_stats", {}),
             inventory_used=record.get("proof", {}).get("inventory_used", []),
@@ -291,20 +289,38 @@ def assign_splits(tasks: list[Task], seed: int) -> None:
 
 
 # ── jsonl IO ───────────────────────────────────────────────────────────────────
+# v1.5.1 §D3: the PUBLIC task-row schema.  Only these keys may appear in the
+# shipped task files (tasks/train/test.jsonl).  Everything else — the record id
+# (C{n}), the reference proof and all proof-strategy metadata (reference_proof,
+# natural_language_proof, inventory_used, depth_type, proof_stats), the skeleton
+# split key, the difficulty tier and theorem_name — stays server-side only (it is
+# still carried on the in-memory Task and reconstructable from record/ via
+# build_tasks).  lean_statement already uses the neutral name thm_<hash>.
+PUBLIC_FIELDS = ("task_id", "domain", "lean_header", "lean_statement",
+                 "natural_language", "formula", "canonical_form",
+                 "hardness", "iris", "split")
+
+
+def public_dict(t) -> dict:
+    """The model-visible projection of a task onto ``PUBLIC_FIELDS``."""
+    d = t.to_dict() if isinstance(t, Task) else t
+    return {k: d[k] for k in PUBLIC_FIELDS if k in d}
+
+
+def full_task_dicts(domain: str, split_seed: int = 1337) -> list[dict]:
+    """Server-side full task dicts (all fields), sourced from record/ via
+    build_tasks — for internal tools (oracle_check / baseline / stratified_split)
+    that need the answer or proof-strategy fields no longer present in the public
+    task rows."""
+    return [t.to_dict() for t in build_tasks(domain, split_seed=split_seed)]
+
+
 def dump_jsonl(tasks: list[Task], path: Path) -> None:
+    """Write the PUBLIC (whitelisted) task rows — used only for the shipped
+    tasks/train/test.jsonl files (§D3)."""
     with open(path, "w") as f:
         for t in tasks:
-            f.write(json.dumps(t.to_dict(), ensure_ascii=False, sort_keys=True) + "\n")
-
-
-def load_task_dicts(path: Path) -> list[dict]:
-    out = []
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                out.append(json.loads(line))
-    return out
+            f.write(json.dumps(public_dict(t), ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def tasks_by_id(tasks) -> dict:

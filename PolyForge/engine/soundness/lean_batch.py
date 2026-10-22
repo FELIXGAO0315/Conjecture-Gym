@@ -293,7 +293,7 @@ def _timed_group_run(argv: Sequence[str], cwd: str, timeout: float,
                 out, err = proc.communicate(timeout=grace)
             except subprocess.TimeoutExpired:
                 out, err = "", ""
-        return 124, "PolyForge.trust: lake/lean exceeded timeout; process group killed (fail-closed)\n" + (err or "")
+        return 124, "PolyForge.engine.soundness: lake/lean exceeded timeout; process group killed (fail-closed)\n" + (err or "")
     finally:
         if proc.poll() is None:
             try:

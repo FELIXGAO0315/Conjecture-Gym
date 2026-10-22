@@ -4,7 +4,7 @@ orphaned grandchild holding stdout cannot block communicate() forever (the v1.4.
 import subprocess
 import time
 
-from PolyForge.trust.lean_batch import Goal, Verdict, _timed_group_run, verify
+from PolyForge.engine.soundness.lean_batch import Goal, Verdict, _timed_group_run, verify
 
 _MARK = "pf_grandchild_313371"
 
@@ -44,7 +44,7 @@ def test_timeout_maps_to_unknown(tmp_path):
 def test_parse_summary_empty_axioms_is_proven():
     # v1.4.7 regression: a PROVEN declaration with an EMPTY axiom set prints a trailing
     # tab ("name\tPRESENT\t"); parse_summary must read it as PROVEN, not drop the batch.
-    from PolyForge.trust.lean_batch import parse_summary, Verdict
+    from PolyForge.engine.soundness.lean_batch import parse_summary, Verdict
     nonce = "deadbeefdeadbeefdeadbeef"
     def nm(x):
         return f"pf{nonce}_{x}"

@@ -15,7 +15,10 @@ from sklearn.model_selection import StratifiedGroupKFold
 
 def main(argv):
     export_dir = Path(argv[0])
-    tasks = [json.loads(l) for l in (export_dir / "tasks.jsonl").read_text().splitlines() if l.strip()]
+    # v1.5.1 §D3: difficulty / skeleton are no longer in the public task rows;
+    # source full tasks server-side from record/ via build_tasks.
+    from PolyForge.env import tasks as T
+    tasks = T.full_task_dicts("graph")
     y = [t["difficulty"] for t in tasks]
     groups = [t["skeleton"] for t in tasks]
     X = list(range(len(tasks)))

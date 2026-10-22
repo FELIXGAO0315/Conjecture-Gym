@@ -1,4 +1,4 @@
-"""v1.5 PHASE B — adversarial hardening of PolyForge.trust (Python-logic tests).
+"""v1.5 PHASE B — adversarial hardening of PolyForge.engine.soundness (Python-logic tests).
 
 Covers B1 (name collision / nonce namespacing), B2 (summary spoofing),
 B3 (parser fuzz), B4 (mandatory canaries), B5 (split/bisection termination +
@@ -11,11 +11,11 @@ import random
 
 import pytest
 
-from PolyForge.trust.lean_batch import (
+from PolyForge.engine.soundness.lean_batch import (
     ALLOWED_AXIOMS, Goal, Rendered, Verdict, canary_name, parse_summary,
     render_batch, verify,
 )
-from PolyForge.trust.tests.fake_lean import make_runner
+from PolyForge.engine.soundness.tests.fake_lean import make_runner
 
 HEADER = "import Mathlib"
 NONCE = "0123456789abcdef0123456789abcdef"

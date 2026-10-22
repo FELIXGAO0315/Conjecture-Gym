@@ -1,0 +1,219 @@
+{
+  "id": "C286",
+  "key": "4dd2d08e961027ade1fab056b4f5e913bfb5826644672b850c7cc416769b7521",
+  "provenance_keys": {
+    "self": "4dd2d08e961027ade1fab056b4f5e913bfb5826644672b850c7cc416769b7521",
+    "instance_of": "handshake_max",
+    "promoted_from": null
+  },
+  "created_at": "2026-10-15T12:51:35.054906+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 2028007733
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((max_deg <= 2) and (max_deg <= min_deg)), then (2*min_deg >= -3*n + 3*m + 3)",
+    "properties_premises": [],
+    "numeric_premises": [
+      {
+        "text": "max_deg <= 2",
+        "coeffs": {
+          "max_deg": 1
+        },
+        "rel": "<=",
+        "rhs": 2
+      },
+      {
+        "text": "max_deg <= min_deg",
+        "coeffs": {
+          "max_deg": 1,
+          "min_deg": -1
+        },
+        "rel": "<=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "2*min_deg >= -3*n + 3*m + 3",
+      "coeffs": {
+        "m": -3,
+        "min_deg": 2,
+        "n": 3
+      },
+      "rel": ">=",
+      "rhs": 3
+    },
+    "canonical_form": {
+      "text": "3*n >= 3*m - 2*min_deg + 3",
+      "coeffs": {
+        "min_deg": 2,
+        "m": -3,
+        "n": 3
+      },
+      "rel": ">=",
+      "rhs": 3
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose max_deg <= 2, max_deg <= min_deg. Then 2*min_deg >= -3*n + 3*m + 3."
+  },
+  "primary_var": "min_deg",
+  "dalmatian": "unknown",
+  "properties": [],
+  "conclusion_property": null,
+  "instance_of": "handshake_max",
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "handshake_max",
+      "n_ge_one",
+      "nonneg_max_deg"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*max_deg >= 0",
+        "coeffs": {
+          "max_deg": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_max_deg"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "-2*m + 1*P_n_maxdeg >= 0",
+        "coeffs": {
+          "m": "-2",
+          "P_n_maxdeg": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "handshake_max"
+      },
+      {
+        "fid": 3,
+        "rule": "premise",
+        "text": "-1*max_deg + 1*min_deg >= 0",
+        "coeffs": {
+          "max_deg": "-1",
+          "min_deg": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "max_deg <= min_deg"
+      },
+      {
+        "fid": 4,
+        "rule": "inventory",
+        "text": "1*n + -1 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "n_ge_one"
+      },
+      {
+        "fid": 5,
+        "rule": "premise",
+        "text": "-1*max_deg + 2 >= 0",
+        "coeffs": {
+          "max_deg": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "note": "max_deg <= 2"
+      },
+      {
+        "fid": 6,
+        "rule": "product",
+        "text": "2*n + 1*max_deg + -1*P_n_maxdeg + -2 >= 0",
+        "coeffs": {
+          "P_n_maxdeg": "-1",
+          "n": "2",
+          "max_deg": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          4,
+          5
+        ],
+        "prod_var": "P_n_maxdeg",
+        "prod_factors": [
+          [
+            "n",
+            "lower",
+            1,
+            4
+          ],
+          [
+            "max_deg",
+            "upper",
+            2,
+            5
+          ]
+        ]
+      },
+      {
+        "fid": 7,
+        "rule": "combination",
+        "text": "3*n + -3*m + 2*min_deg + -3 >= 0",
+        "coeffs": {
+          "min_deg": "2",
+          "m": "-3",
+          "n": "3"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          6
+        ],
+        "mults": [
+          "1/2",
+          "3/2",
+          "2",
+          "3/2"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.058823529411764705,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0588235294117647
+  },
+  "attained": "yes",
+  "touch": 1,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 0,
+    "inventory_theorems": 1,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 6.5,
+  "proof_cost": 6.5,
+  "proof_cost_expanded": 6.5,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 0.8125,
+  "lean": {
+    "theorem_name": "C286",
+    "status": "compiled"
+  }
+}

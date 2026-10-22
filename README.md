@@ -1,7 +1,7 @@
 # Conjecture-Gym
 Infinite Verifiable Conjectures for Training Mathematical Reasoning in Small LLMs
 
-## PolyForge (v1.4.3)
+## PolyForge (v1.5.1)
 
 PolyForge is the upstream data factory of Conjecture-Gym. Following the AlphaGeometry recipe, it samples random premises about a mathematical subject, runs a symbolic deduction engine forward, and turns the derived facts into new conjectures — each one **true, proved, and formally verified in Lean 4** before it enters the record.
 
@@ -11,13 +11,14 @@ No LLM is used anywhere in the pipeline: deduction is symbolic, truth is decided
 
 PolyForge separates a **domain-agnostic engine** from the **domains** that plug into it:
 
-- The engine (`anvil`, `generator`, `formalizer`, `scoring`) knows how to saturate a closed linear axiom base, enumerate and filter candidate conclusions, translate a proof to Lean and compile it, and score the result — without naming any subject-specific object.
+- The engine (`PolyForge/engine/`: `deducer`, `generator`, `formalizer`, `scoring`, and the `soundness` verification kernel) knows how to saturate a closed linear axiom base, enumerate and filter candidate conclusions, translate a proof to Lean and compile it, score the result, and verify it fail-closed — without naming any subject-specific object.
 - A **domain** supplies everything subject-specific through a single interface (`domains/base.py`): its variable set and Inventory (proved axiom base), its premise sampling and proposition format, its filters, its Lean statement/proof templates, its IRIS features, and its dataset.
 
-This version ships two domains:
+This version ships three domains:
 
 - **hex** — the original HexForge subject: p₆ of simple 3-connected planar maps (simple 3-polytopes). Fully wired and unchanged from v0.7; the 212-conjecture record is preserved and reproduced byte-for-byte.
-- **graph** — graph theory on top of Mathlib's proved graph theorems. It has its own Lean project (Mathlib v4.34.0), a graph dataset (all 1253 graphs with ≤ 7 vertices), an Inventory (Mathlib theorems plus self-proved `GraphLemmas` — the Gallai identity α+τ=n, max degree ≤ edges, ℕ∞→ℕ finiteness/conversions, …), and generates conjectures that are linear (in)equalities among graph invariants under property premises. **Stage 2a (v1.2)** adds *product facts* whose proofs pass through a product of two invariants — the handshake degree bounds (n·min_deg ≤ 2m ≤ n·max_deg), the edge-count bounds (2m ≤ n²−n, and 4m ≤ n² for bipartite graphs) — while the conclusions stay linear.
+- **graph** — graph theory on top of Mathlib's proved graph theorems. It uses the shared Lean/Mathlib v4.34.0 workspace (`PolyForge/lean`, hosting the self-proved `GraphLemmas`), a graph dataset (all 1253 graphs with ≤ 7 vertices), an Inventory (Mathlib theorems plus self-proved `GraphLemmas` — the Gallai identity α+τ=n, max degree ≤ edges, ℕ∞→ℕ finiteness/conversions, …), and generates conjectures that are linear (in)equalities among graph invariants under property premises. **Stage 2a (v1.2)** adds *product facts* whose proofs pass through a product of two invariants — the handshake degree bounds (n·min_deg ≤ 2m ≤ n·max_deg), the edge-count bounds (2m ≤ n²−n, and 4m ≤ n² for bipartite graphs) — while the conclusions stay linear.
+- **magma** — equational-theories (ETP) domain on a free magma; a FORWARD REWRITING engine derives equational consequences of an axiom set, each Lean-verified (all provable). Genuinely infinite and non-collapsing; difficulty = derivation length.
 
 ### Products and McCormick envelopes (graph, v1.2)
 
@@ -37,40 +38,51 @@ premises → anvil (deduction) → generator (selection) → formalizer (Lean) �
 
 ### Structure
 
+The one main line: **axioms → forward deduction → Lean-verified conjecture → scores → dataset / RL env.**
+
 ```
 Conjecture-Gym/
 ├── run.py                      # entry point (python -m run polyforge <domain> …)
+├── README.md                   # this file (includes the architecture map)
+├── requirements-dev.txt
 └── PolyForge/
-    ├── anvil/deducer.py        # generic engine: facts, saturation, LP, traceback, recheck
-    ├── generator/generator.py  # generic driver: cache, renumber, soundness, record IO, worker
-    ├── formalizer/formalizer.py# generic Lean compilation (single / batch, bisection)
-    ├── scoring/
-    │   ├── iris.py             # IRIS core: T + R + L over domain feature vectors
-    │   └── hardness.py         # proof difficulty / statement length
-    ├── env/                    # core training environment (v1.3, domain-agnostic)
+    ├── engine/                 # domain-agnostic BACKEND
+    │   ├── deducer.py          #   the "anvil": deduction engine — facts, LP saturation, rounding, splits, products
+    │   ├── generator.py        #   generic driver: cache, renumber, soundness, record IO, workers
+    │   ├── formalizer.py       #   generic Lean compilation (single / batch, bisection)
+    │   ├── scoring/            #   iris.py (interestingness T+R+L) · hardness.py (proof cost / stmt len)
+    │   └── soundness/          #   fail-closed decision KERNEL: Lean verification, canon, policies, lean_batch
+    ├── domains/                # SUBJECTS (each plugs into the engine via domains/base.py)
+    │   ├── base.py             #   the Domain interface
+    │   ├── graph/              #   graph-invariant domain — WIRED: Inventory (Mathlib + GraphLemmas),
+    │   │                       #   generator, formalizer, record/ (319 verified)
+    │   ├── hex/                #   original p₆ (HexForge) domain — FROZEN (212 records, own lean/ @ Mathlib v4.30.0)
+    │   └── magma/              #   equational-theories domain — FORWARD REWRITING engine
+    │       ├── axioms.py       #     oriented rewrite-rule axiom library
+    │       ├── generator.py    #     enumerate → normalize → derivation-path proof → Lean-verify → record
+    │       └── record/         #     verified consequences (all provable; difficulty = derivation length)
+    ├── lean/                   # SHARED v4.34 Lean+Mathlib workspace (GraphLemmas; git-ignored .lake build)
+    │                           #   used by both graph and magma — not owned by any single domain
+    ├── env/                    # RL ENVIRONMENT + DATASET
     │   ├── tasks.py            #   task format, task_id, skeleton, difficulty, split
-    │   ├── verifier.py         #   resident-REPL verifier + layered anti-cheat checks
+    │   ├── verifier.py         #   resident-Lean-REPL verifier → reward; layered anti-cheat
     │   ├── reward.py           #   RL reward_fn + proof extraction
     │   ├── evaluate.py         #   pass@1 / pass@k evaluation
-    │   ├── export.py           #   tasks/train/test/sft/metadata/README export
-    │   └── setup_repl.sh       #   build the pinned Lean REPL (git-ignored vendor/)
-    └── domains/
-        ├── base.py            # the Domain interface
-        ├── hex/               # the p₆ domain (original HexForge content)
-        │   ├── inventory.py   #   Python counterpart of Inventory.lean + HexLemmas.lean
-        │   ├── deduction.py   #   base directions, split specs, B&B vars, vars_from_pvec
-        │   ├── generator.py   #   premise sampling, candidate search, filters, formula, pipeline
-        │   ├── formalizer.py  #   proof steps → Lean (SimplyCon3ConnectedMap), compile wrappers
-        │   ├── iris.py        #   hex IRIS features
-        │   ├── domain.py      #   HexDomain: wires the above to the engine
-        │   ├── lean/          #   Inventory.lean (read-only), HexLemmas.lean  (Mathlib v4.30.0)
-        │   ├── data/          #   plantri_pool.json (real simple 3-polytopes)
-        │   └── record/        #   C{n}/C{n}.json, C{n}.md, C{n}.lean
-        └── graph/             # the graph domain (skeleton)
-            ├── domain.py      #   GraphDomain (not yet wired to an Inventory)
-            ├── lean/          #   independent Lean project, GraphLemmas.lean  (Mathlib v4.34.0)
-            └── data/          #   graph_pool.json (all graphs with ≤ 7 vertices)
+    │   ├── export.py           #   tasks/train/test/sft/metadata/README export (public rows: statement + split only)
+    │   ├── closure_complete.py · replace_gate.py · discardlog.py   # live generation helpers
+    │   ├── setup_repl.sh       #   build the pinned Lean REPL (git-ignored vendor/)
+    │   └── analysis/           #   one-off / audit tools (baseline, stratified_split, oracle_check, …)
+    ├── scripts/run_production.py   # cross-segment production driver (large-batch runs)
+    └── tests/                  # correctness guard rail (pytest); engine/soundness/tests/ for the kernel
 ```
+
+**Trust boundary.** Nothing counts unless the Lean kernel accepts it. Every record's `.lean`
+compiles with only the standard axioms (graph: `propext`, `Quot.sound`, `Classical.choice`;
+hex additionally `sorryAx` via Inventory; magma: `propext`). The search/generator is untrusted.
+
+**Status.** graph — complete & running (319 records, full pipeline + dataset + RL env). hex —
+frozen (212). magma — integrated forward-rewriting domain (genuinely infinite, all-provable;
+scale by richer axiom sets / larger term depth, e.g. `python -m PolyForge.domains.magma.generator assoc,idem 4`).
 
 ### Usage
 
@@ -81,7 +93,7 @@ python -m run polyforge hex                 # run until Ctrl+C
 python -m run polyforge hex 50              # 50 split_needed, then up to floor(50/4)=12 rounding_only
 python -m run polyforge hex --minutes 30    # run for 30 minutes
 python -m run polyforge hex 50 --minutes 30 # stop at whichever comes first
-python -m run polyforge graph               # prints a notice (graph Inventory not yet wired up)
+python -m run polyforge graph 80            # 80 graph split_needed conjectures (graph is fully wired)
 ```
 
 Generation runs in two phases: a main phase that produces `N` harder
@@ -127,7 +139,7 @@ its parent dies (`PR_SET_PDEATHSIG` on Linux). Record writes are atomic (temp di
 `os.replace`), so a crash leaves only complete records and a restart needs zero manual
 steps.
 
-**Production driver (v1.4.2, `scripts/run_production.py`).** The cross-segment driver lives
+**Production driver (v1.4.2, `PolyForge/scripts/run_production.py`).** The cross-segment driver lives
 in the repo. Before each segment it backs up the whole record (C-dirs + `pruned.jsonl` +
 `.production_state.jsonl`); after each completed segment it appends one line to
 `record/.production_state.jsonl` with the stats, the `gen/forward/reverse/compile/other`
@@ -328,6 +340,11 @@ Each major version has eight minor versions, x.0 through x.7, after which the ma
 
 ### Changelog
 
+- **v1.5.1** — Dataset de-answering + engineering hygiene (no new records, no generator/Inventory/Lean change). Public task rows (`tasks/train/test.jsonl`) now carry **only** the problem statement and split — `task_id`, `domain`, `lean_header`, `lean_statement` (neutral `thm_<hash>` name), `natural_language`, `formula`, `canonical_form`, `hardness`, `iris`, `split`. The reference proof, natural-language proof, `inventory_used`, `depth_type`, `proof_stats`, the `skeleton` split key, the difficulty tier, the originating record id and `theorem_name` are no longer in the task rows; they stay server-side (carried on the in-memory `Task`, reconstructable from `record/` via `build_tasks`). SFT pairs (with proofs) remain in the separate server-side `sft_train.jsonl`; the `task_id → record` linkage is written to a separate server-side `task_record_map.server.jsonl`. Server-side consumers (`oracle_check`, `baseline`, `stratified_split`) now source full tasks from `record/` via `build_tasks` rather than the public rows. Hygiene: `record/` runtime state (`.lock`, `.run_token`, `.production_state.jsonl`) git-ignored and untracked; stale `run.py` docstrings corrected (graph is fully wired, not a skeleton).
+- **v1.5** — Trust/release hardening on the existing 319-record (no new records). Freeze + dependency pins + run-state + superseded handling (Phase A); hardened `pf_trust` kernel + supervisor (B); two-sided derivation certificates + generation-path fixtures, cold 319×319 + 231-archive matrix re-certified (C); `verify_all.sh` FAST/FULL gate runner + pre-push hook (G); batch-verification performance driver (E); independent audit with no confirmed findings + latent hardening (H). Review fixes: content-addressed verdict cache key (not git HEAD), encoding soundness checked on the right population + mutation + differential, clean orphan-free cold rerun on HEAD. Trust kernel folded into `PolyForge`; one-off audit artifact dropped.
+- **v1.4.7** — Measurement + trust-stack fixes: fixed a `lake_runner` process-group timeout hang, pinned pytest (dev); full 319×319 redundancy matrix re-run through the fixed, `pf_trust`-routed stack (measured); loss attribution recomputed; old-method misclassification (59/160) measured.
+- **v1.4.6** — Added `pf_trust`; routed closure/usability `omega` through a fail-closed `lean_batch`; parameter-aware usability in generation + policy-gated record replacement.
+- **v1.4.5** — Validated the complete-usability checker (two bugs fixed) + M/C analysis tools; closed code gaps G1–G3 behind a neutrality gate (G5 passed); corrected complete-sense closure. (No `v1.4.4` was released — versions jump from v1.4.3 to v1.4.5.)
 - **v1.4.3** — What the benchmark measures, made explicit, plus traceable certificates and complete-sense closure (all on the existing v1.4.2 319-record; no new records). **Task setting (S1):** the verifier loads `GraphLemmas` (the graph Inventory) into the environment every task is checked against, so a solver may cite Inventory lemmas; the submission static-check forbids `import`, so the setting cannot be changed by a submission. **Cumulative baseline ladder** (`PolyForge.env.baseline_ladder`): monotone levels `L0 ⊂ U ⊂ L1 ⊂ L2 ⊂ L3`, each a superset of attempts; a task's `auto_level` is the lowest level that proves it. `L0` is generic tactics only; `U` is *unprivileged* automation (Inventory lemmas in scope but not instantiated per task — `aesop` with them as forward rules and a uniform `nlinarith`/`omega` hint list; hammer/duper are not in the pinned v4.34.0 toolchain and are not added); `L1`–`L3` instantiate Inventory facts per task. **Content-keyed traceability** (§B): every record, pruned-archive entry and provenance reference carries a stable `key = sha256(canonical standard form incl. premises)`; display ids stay contiguous labels; `make_prune_entry` resolves each certificate reference to a key at prune time; `PolyForge.env.trace_keys` resolves the historical archive by certificate matching (keeping originals under `orig`) and replays every certificate by checking its recorded linear-combination + rounding steps. **Complete-sense closure** (`PolyForge.env.closure_complete`): the bounded LP+rounding redundancy engine is unchanged for generation and pruning, but the *audit* can additionally decide entailment completely — Lean `omega` (a complete decision procedure for linear integer arithmetic) over the usable record conclusions + restricted Inventory + premises (products as opaque atoms) — distinguishing bounded-rounds artifacts from true information loss. **Ladder export** (`PolyForge.env.export_ladder`): every task carries `auto_level`, `depth_type`, `hardness`, `key`; StratifiedGroupKFold split stratified by `auto_level`, grouped by skeleton. **Timing** (§F1): `run.py` now emits `t_gen_wall` (main-thread idle-wait on parallel generation) and `t_other_resid` alongside `t_gen_cpu`.
 - **v1.4.2** — `depth_type` now reflects the proof's actual structure (any case split ⇒ `split_needed`; else any product step ⇒ `product_needed`; else `rounding_only`) rather than the LP-necessity class used for phase acceptance; the main-phase counter is the hard tier (`split_needed` + `product_needed`), named accordingly. Deterministic work-budget stop rule (`--max-groups`; main phase returns `TARGET_REACHED` / `BUDGET_EXHAUSTED` / `CANDIDATES_EXHAUSTED`; `--minutes` is a safety cap only). Reverse pruning skips targets `N` cannot affect (premise-implication guard, cached) and prunes targets sequentially in id order so two mutually-derivable records are never both removed. Every forward rejection and reverse prune is archived to `record/pruned.jsonl` with a derivation certificate; a `closure_audit` checks every archived proposition is still derivable from the final record. Run safety: exclusive record-dir `flock` + per-run write token, workers killed with the parent (`PDEATHSIG`), atomic writes.
 

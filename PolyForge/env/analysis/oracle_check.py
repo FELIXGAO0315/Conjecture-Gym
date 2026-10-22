@@ -28,7 +28,7 @@ ATTACKS = {
 def main(argv):
     export = Path(argv[0])
     rec = Path("/home/felix_gao/Conjecture-Gym/PolyForge/domains/graph/record")
-    lean = Path("/home/felix_gao/Conjecture-Gym/PolyForge/domains/graph/lean")
+    lean = Path("/home/felix_gao/Conjecture-Gym/PolyForge/lean")
     nprocs, jout = 4, None
     if "--record" in argv:
         rec = Path(argv[argv.index("--record") + 1])
@@ -36,7 +36,10 @@ def main(argv):
         nprocs = int(argv[argv.index("--nprocs") + 1])
     if "--json" in argv:
         jout = Path(argv[argv.index("--json") + 1])
-    tasks = [json.loads(l) for l in (export / "tasks.jsonl").read_text().splitlines() if l.strip()]
+    # v1.5.1 §D3: the reference proof is no longer in the public task rows; source
+    # the full tasks server-side from record/ via build_tasks.
+    from PolyForge.env import tasks as T
+    tasks = T.full_task_dicts("graph")
     ver = V.Verifier("graph", nprocs=nprocs)
     t0 = time.time()
     ores = ver.verify_batch([(t["task_id"], t["reference_proof"]) for t in tasks])

@@ -4,7 +4,7 @@
 # We pin leanprover-community/repl at the tag v4.34.0 (commit
 # 193cf4bb9a22bb3fc6d25774f0fe6a70db1fd6ee), which ships the Lean toolchain
 # `leanprover/lean4:v4.34.0` — byte-for-byte the toolchain used by the graph
-# domain's Lean project (PolyForge/domains/graph/lean).  The build output lives
+# domain's Lean project (PolyForge/lean).  The build output lives
 # under PolyForge/env/vendor/ and is git-ignored; re-run this script on a fresh
 # checkout before using the verifier.
 set -euo pipefail

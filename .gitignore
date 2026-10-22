@@ -5,3 +5,6 @@ __pycache__/
 PolyForge/env/vendor/
 # exported RL environment artifacts (written outside the repo via --out; ignore if placed inside)
 PolyForge/env/export_out/
+# domain records are local/generated artifacts — not tracked in git.
+# (the graph deliverable is mirrored to the repo-root output/ via run.py sync_mirror)
+PolyForge/domains/*/record/

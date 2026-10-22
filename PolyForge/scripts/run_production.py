@@ -22,7 +22,7 @@ POLYFORGE_SKIP_AUDITS (1 to skip V1-V4), POLYFORGE_AUDIT_NPROCS.
 import ctypes, hashlib, json, os, re, shutil, signal, subprocess, sys, time
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 REC = Path(os.environ.get("POLYFORGE_GRAPH_RECORD", str(REPO / "PolyForge/domains/graph/record")))
 RUN_DIR = Path(os.environ.get("POLYFORGE_RUN_DIR", str(Path.home() / "pf_production/v142_prod")))
 STATE = REC / ".production_state.jsonl"
@@ -190,7 +190,7 @@ def should_stop(state):
 def run_audits(stop_reason):
     sys.path.insert(0, str(REPO))
     from PolyForge.domains.graph.domain import GraphDomain
-    from PolyForge.anvil import deducer as D
+    from PolyForge.engine import deducer as D
     from PolyForge.domains.graph import generator as G
     dom = GraphDomain(); D.configure(dom)
     # v1.4.5 §G2: full backup (record C-dirs + pruned.jsonl + .production_state.jsonl)
@@ -252,16 +252,16 @@ def run_audits(stop_reason):
             print(f"  V2 reproducibility of seg1: {v2ok}", flush=True)
             # V3 oracle + anti-cheat + recompile; stratified split
             ocj = RUN_DIR / "oracle.json"
-            subprocess.run([sys.executable, "-m", "PolyForge.env.oracle_check", str(exp),
+            subprocess.run([sys.executable, "-m", "PolyForge.env.analysis.oracle_check", str(exp),
                             "--nprocs", str(AUDIT_NPROCS), "--json", str(ocj)],
                            cwd=str(REPO), env=SUBENV, capture_output=True, text=True)
             summary["V3_oracle"] = json.loads(ocj.read_text()) if ocj.exists() else None
-            ss = subprocess.run([sys.executable, "-m", "PolyForge.env.stratified_split", str(exp)],
+            ss = subprocess.run([sys.executable, "-m", "PolyForge.env.analysis.stratified_split", str(exp)],
                                 cwd=str(REPO), env=SUBENV, capture_output=True, text=True)
             summary["V3_split_stdout"] = ss.stdout
             # V4 baselines L0-L3 on the new record
             blj = RUN_DIR / "baseline_new.json"
-            bl = subprocess.run([sys.executable, "-m", "PolyForge.env.baseline", str(exp),
+            bl = subprocess.run([sys.executable, "-m", "PolyForge.env.analysis.baseline", str(exp),
                                  "--nprocs", str(AUDIT_NPROCS), "--json", str(blj)],
                                 cwd=str(REPO), env=SUBENV, capture_output=True, text=True)
             summary["V4_baseline"] = json.loads(blj.read_text()) if blj.exists() else None

@@ -1,0 +1,190 @@
+{
+  "id": "T299",
+  "key": "4780a55e22cf42e5341c9c95cb0e6131d96265aa901b07a8365dca3a317d3ed8",
+  "provenance_keys": {
+    "self": "4780a55e22cf42e5341c9c95cb0e6131d96265aa901b07a8365dca3a317d3ed8",
+    "instance_of": "handshake_min",
+    "promoted_from": null
+  },
+  "created_at": "2026-10-22T21:55:37.342461+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 50
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((n >= 3)), then (2*m >= -2*n + 3*min_deg + 6)",
+    "properties_premises": [],
+    "numeric_premises": [
+      {
+        "text": "n >= 3",
+        "coeffs": {
+          "n": 1
+        },
+        "rel": ">=",
+        "rhs": 3
+      }
+    ],
+    "conclusion": {
+      "text": "2*m >= -2*n + 3*min_deg + 6",
+      "coeffs": {
+        "m": 2,
+        "min_deg": -3,
+        "n": 2
+      },
+      "rel": ">=",
+      "rhs": 6
+    },
+    "canonical_form": {
+      "text": "3*min_deg <= 2*n + 2*m - 6",
+      "coeffs": {
+        "m": -2,
+        "min_deg": 3,
+        "n": -2
+      },
+      "rel": "<=",
+      "rhs": -6
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose n >= 3. Then 2*m >= -2*n + 3*min_deg + 6."
+  },
+  "primary_var": "m",
+  "dalmatian": "unknown",
+  "properties": [],
+  "conclusion_property": null,
+  "instance_of": "handshake_min",
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "handshake_min",
+      "nonneg_min_deg"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "premise",
+        "text": "1*n + -3 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-3",
+        "rel": ">=",
+        "note": "n >= 3"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "2*m + -1*P_n_mindeg >= 0",
+        "coeffs": {
+          "P_n_mindeg": "-1",
+          "m": "2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "handshake_min"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "1*min_deg >= 0",
+        "coeffs": {
+          "min_deg": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "nonneg_min_deg"
+      },
+      {
+        "fid": 4,
+        "rule": "product",
+        "text": "-3*min_deg + 1*P_n_mindeg >= 0",
+        "coeffs": {
+          "P_n_mindeg": "1",
+          "min_deg": "-3"
+        },
+        "const": "0",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          3,
+          1
+        ],
+        "prod_var": "P_n_mindeg",
+        "prod_factors": [
+          [
+            "n",
+            "lower",
+            3,
+            1
+          ],
+          [
+            "min_deg",
+            "lower",
+            0,
+            3
+          ]
+        ]
+      },
+      {
+        "fid": 5,
+        "rule": "combination",
+        "text": "2*n + 2*m + -3*min_deg + -6 >= 0",
+        "coeffs": {
+          "m": "2",
+          "min_deg": "-3",
+          "n": "2"
+        },
+        "const": "-6",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          4
+        ],
+        "mults": [
+          "2",
+          "1",
+          "1"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.0016012810248198558,
+    "R": 1.0,
+    "L": 0.16238586255274184,
+    "score": 1.1639871435775617
+  },
+  "interestingness": {
+    "score": 0.32317668432372154,
+    "sharpness": 0.047354343599082825,
+    "tightness": 0.8646647167633873,
+    "breadth": 0.3333333333333333,
+    "dataset_size": 1249
+  },
+  "attained": "yes",
+  "touch": 2,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 0,
+    "inventory_theorems": 0,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 4.0,
+  "proof_cost": 4.0,
+  "proof_cost_expanded": 4.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 0.8,
+  "lean": {
+    "theorem_name": "T299",
+    "status": "compiled"
+  }
+}

@@ -1,0 +1,278 @@
+{
+  "id": "T219",
+  "key": "788274889b84dd4dff067edd4c83b272ad75419563915f13bb81fbf56e30abf8",
+  "provenance_keys": {
+    "self": "788274889b84dd4dff067edd4c83b272ad75419563915f13bb81fbf56e30abf8",
+    "instance_of": null,
+    "promoted_from": null
+  },
+  "created_at": "2026-10-22T21:55:23.481113+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 56
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((is_tree) and (chi <= omega) and (tau >= 1)), then (2*max_deg >= -3*alpha + diam + 4)",
+    "properties_premises": [
+      {
+        "name": "is_tree"
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "chi <= omega",
+        "coeffs": {
+          "chi": 1,
+          "omega": -1
+        },
+        "rel": "<=",
+        "rhs": 0
+      },
+      {
+        "text": "tau >= 1",
+        "coeffs": {
+          "tau": 1
+        },
+        "rel": ">=",
+        "rhs": 1
+      }
+    ],
+    "conclusion": {
+      "text": "2*max_deg >= -3*alpha + diam + 4",
+      "coeffs": {
+        "alpha": 3,
+        "diam": -1,
+        "max_deg": 2
+      },
+      "rel": ">=",
+      "rhs": 4
+    },
+    "canonical_form": {
+      "text": "3*alpha >= -2*max_deg + diam + 4",
+      "coeffs": {
+        "max_deg": 2,
+        "alpha": 3,
+        "diam": -1
+      },
+      "rel": ">=",
+      "rhs": 4
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, chi <= omega, tau >= 1. Then 2*max_deg >= -3*alpha + diam + 4."
+  },
+  "primary_var": "max_deg",
+  "dalmatian": "unknown",
+  "properties": [
+    "is_tree"
+  ],
+  "conclusion_property": null,
+  "instance_of": null,
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "acyclic_chi",
+      "alpha_ge_one",
+      "card_le_alpha_chi",
+      "diam_le_card_sub_one",
+      "gallai",
+      "omega_le_maxdeg"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*max_deg + -1*omega + 1 >= 0",
+        "coeffs": {
+          "omega": "-1",
+          "max_deg": "1"
+        },
+        "const": "1",
+        "rel": ">=",
+        "inventory": "omega_le_maxdeg"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "1*n + -1*diam + -1 >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "diam_le_card_sub_one"
+      },
+      {
+        "fid": 3,
+        "rule": "premise",
+        "text": "1*tau + -1 >= 0",
+        "coeffs": {
+          "tau": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "note": "tau >= 1"
+      },
+      {
+        "fid": 4,
+        "rule": "inventory",
+        "text": "-1*n + 1*P_alpha_chi >= 0",
+        "coeffs": {
+          "n": "-1",
+          "P_alpha_chi": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "card_le_alpha_chi"
+      },
+      {
+        "fid": 5,
+        "rule": "premise",
+        "text": "-1*chi + 1*omega >= 0",
+        "coeffs": {
+          "chi": "-1",
+          "omega": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "chi <= omega"
+      },
+      {
+        "fid": 6,
+        "rule": "inventory",
+        "text": "1*alpha + -1 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "alpha_ge_one"
+      },
+      {
+        "fid": 7,
+        "rule": "inventory",
+        "text": "-1*chi + 2 >= 0",
+        "coeffs": {
+          "chi": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "inventory": "acyclic_chi"
+      },
+      {
+        "fid": 8,
+        "rule": "product",
+        "text": "1*chi + 2*alpha + -1*P_alpha_chi + -2 >= 0",
+        "coeffs": {
+          "P_alpha_chi": "-1",
+          "alpha": "2",
+          "chi": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          6,
+          7
+        ],
+        "prod_var": "P_alpha_chi",
+        "prod_factors": [
+          [
+            "alpha",
+            "lower",
+            1,
+            6
+          ],
+          [
+            "chi",
+            "upper",
+            2,
+            7
+          ]
+        ]
+      },
+      {
+        "fid": 9,
+        "rule": "inventory",
+        "text": "-1*n + 1*alpha + 1*tau == 0",
+        "coeffs": {
+          "alpha": "1",
+          "tau": "1",
+          "n": "-1"
+        },
+        "const": "0",
+        "rel": "==",
+        "inventory": "gallai"
+      },
+      {
+        "fid": 10,
+        "rule": "combination",
+        "text": "2*max_deg + 3*alpha + -1*diam + -4 >= 0",
+        "coeffs": {
+          "max_deg": "2",
+          "alpha": "3",
+          "diam": "-1"
+        },
+        "const": "-4",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          8,
+          9
+        ],
+        "mults": [
+          "2",
+          "1",
+          "1",
+          "2",
+          "2",
+          "2",
+          "-1"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.041666666666666664,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0416666666666667
+  },
+  "interestingness": {
+    "score": 0.4789071714050883,
+    "sharpness": 0.14175406339589777,
+    "tightness": 0.6321205588285577,
+    "breadth": 1.0,
+    "dataset_size": 24
+  },
+  "attained": "yes",
+  "touch": 1,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 0,
+    "inventory_theorems": 5,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 14.0,
+  "proof_cost": 14.0,
+  "proof_cost_expanded": 14.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.75,
+  "lean": {
+    "theorem_name": "T219",
+    "status": "compiled"
+  }
+}

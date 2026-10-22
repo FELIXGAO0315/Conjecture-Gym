@@ -9,10 +9,10 @@ self-exclusion.  Run: python tests/test_closure_validate.py
 import sys
 sys.path.insert(0, "/home/felix_gao/Conjecture-Gym")
 from PolyForge.domains.graph.domain import GraphDomain
-from PolyForge.anvil import deducer as D
+from PolyForge.engine import deducer as D
 from PolyForge.domains.graph import generator as G
 from PolyForge.env import closure_complete as CC
-from PolyForge.env import closure_validate as CV
+from PolyForge.env.analysis import closure_validate as CV
 dom = GraphDomain(); D.configure(dom)
 
 

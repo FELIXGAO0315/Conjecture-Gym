@@ -12,10 +12,10 @@ from fractions import Fraction
 from math import gcd
 from pathlib import Path
 
-from ...formalizer import formalizer as _CF
+from ...engine import formalizer as _CF
 from . import deduction as DED
 
-LEAN_DIR = Path(__file__).resolve().parent / "lean"
+LEAN_DIR = Path(__file__).resolve().parents[2] / "lean"   # shared v4.34 workspace (PolyForge/lean)
 LEAN_HEADER = ("import Mathlib\n"
                "import GraphLemmas\n\n"
                "open SimpleGraph\n"

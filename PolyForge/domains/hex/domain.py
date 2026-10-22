@@ -5,8 +5,8 @@ unchanged; this class just wires the hex submodules to the generic engine.
 
 from __future__ import annotations
 
-from ...anvil import deducer as D
-from ...generator import generator as CG
+from ...engine import deducer as D
+from ...engine import generator as CG
 from ..base import Domain
 from . import inventory as INV
 from . import deduction as DED

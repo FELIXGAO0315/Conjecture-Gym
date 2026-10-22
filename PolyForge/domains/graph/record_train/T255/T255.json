@@ -1,0 +1,198 @@
+{
+  "id": "T255",
+  "key": "3c5d40b52312b99021ef14ded43dd48669bdf33b6ef08f879d202152e3c74137",
+  "provenance_keys": {
+    "self": "3c5d40b52312b99021ef14ded43dd48669bdf33b6ef08f879d202152e3c74137",
+    "instance_of": null,
+    "promoted_from": null
+  },
+  "created_at": "2026-10-22T21:55:29.806890+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 63
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((is_tree) and (max_deg >= 2*min_deg)), then (2*n >= 3*min_deg + chi + 1)",
+    "properties_premises": [
+      {
+        "name": "is_tree"
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "max_deg >= 2*min_deg",
+        "coeffs": {
+          "max_deg": 1,
+          "min_deg": -2
+        },
+        "rel": ">=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "2*n >= 3*min_deg + chi + 1",
+      "coeffs": {
+        "chi": -1,
+        "min_deg": -3,
+        "n": 2
+      },
+      "rel": ">=",
+      "rhs": 1
+    },
+    "canonical_form": {
+      "text": "3*min_deg <= 2*n - chi - 1",
+      "coeffs": {
+        "n": -2,
+        "chi": 1,
+        "min_deg": 3
+      },
+      "rel": "<=",
+      "rhs": -1
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, max_deg >= 2*min_deg. Then 2*n >= 3*min_deg + chi + 1."
+  },
+  "primary_var": "n",
+  "dalmatian": "unknown",
+  "properties": [
+    "is_tree"
+  ],
+  "conclusion_property": null,
+  "instance_of": null,
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "acyclic_chi",
+      "chi_le_n",
+      "max_lt_card"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*n + -1*chi >= 0",
+        "coeffs": {
+          "chi": "-1",
+          "n": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "chi_le_n"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "1*n + -1*max_deg + -1 >= 0",
+        "coeffs": {
+          "max_deg": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "max_lt_card"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "-1*chi + 2 >= 0",
+        "coeffs": {
+          "chi": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "inventory": "acyclic_chi"
+      },
+      {
+        "fid": 4,
+        "rule": "premise",
+        "text": "1*max_deg + -2*min_deg >= 0",
+        "coeffs": {
+          "max_deg": "1",
+          "min_deg": "-2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "max_deg >= 2*min_deg"
+      },
+      {
+        "fid": 5,
+        "rule": "combination",
+        "text": "2*n + -3*min_deg + -1*chi + -1/2 >= 0",
+        "coeffs": {
+          "n": "2",
+          "chi": "-1",
+          "min_deg": "-3"
+        },
+        "const": "-1/2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "mults": [
+          "1/2",
+          "3/2",
+          "1/2",
+          "3/2"
+        ]
+      },
+      {
+        "fid": 6,
+        "rule": "rounding",
+        "text": "2*n + -3*min_deg + -1*chi + -1 >= 0",
+        "coeffs": {
+          "n": "2",
+          "chi": "-1",
+          "min_deg": "-3"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          5
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.08333333333333333,
+    "R": 1.0,
+    "L": 0.3676073110469039,
+    "score": 1.4509406443802373
+  },
+  "interestingness": {
+    "score": 0.4942085072331749,
+    "sharpness": 0.22275132275132273,
+    "tightness": 0.8646647167633873,
+    "breadth": 0.6666666666666666,
+    "dataset_size": 24
+  },
+  "attained": "yes",
+  "touch": 2,
+  "arith_sharp": "exact",
+  "depth_type": "rounding_only",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 3,
+    "product_steps": 0
+  },
+  "proof_cost_initial": 9.0,
+  "proof_cost": 9.0,
+  "proof_cost_expanded": 9.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.5,
+  "lean": {
+    "theorem_name": "T255",
+    "status": "compiled"
+  }
+}

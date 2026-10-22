@@ -1,0 +1,184 @@
+{
+  "id": "C2",
+  "key": "96ffdb33c24034a00ecfb005efbd3db211fba0d5ede84de3628e1d80b130c385",
+  "provenance_keys": {
+    "self": "96ffdb33c24034a00ecfb005efbd3db211fba0d5ede84de3628e1d80b130c385",
+    "instance_of": "handshake_max",
+    "promoted_from": null
+  },
+  "created_at": "2026-10-15T00:05:30.893157+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 2024006091
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((max_deg <= 2)), then (max_deg >= -3*n + 3*m + 2)",
+    "properties_premises": [],
+    "numeric_premises": [
+      {
+        "text": "max_deg <= 2",
+        "coeffs": {
+          "max_deg": 1
+        },
+        "rel": "<=",
+        "rhs": 2
+      }
+    ],
+    "conclusion": {
+      "text": "max_deg >= -3*n + 3*m + 2",
+      "coeffs": {
+        "m": -3,
+        "max_deg": 1,
+        "n": 3
+      },
+      "rel": ">=",
+      "rhs": 2
+    },
+    "canonical_form": {
+      "text": "max_deg >= -3*n + 3*m + 2",
+      "coeffs": {
+        "max_deg": 1,
+        "m": -3,
+        "n": 3
+      },
+      "rel": ">=",
+      "rhs": 2
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose max_deg <= 2. Then max_deg >= -3*n + 3*m + 2."
+  },
+  "primary_var": "max_deg",
+  "dalmatian": "significant",
+  "properties": [],
+  "conclusion_property": null,
+  "instance_of": "handshake_max",
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "handshake_max",
+      "n_ge_one"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "-2*m + 1*P_n_maxdeg >= 0",
+        "coeffs": {
+          "m": "-2",
+          "P_n_maxdeg": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "handshake_max"
+      },
+      {
+        "fid": 2,
+        "rule": "premise",
+        "text": "-1*max_deg + 2 >= 0",
+        "coeffs": {
+          "max_deg": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "note": "max_deg <= 2"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "1*n + -1 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "n_ge_one"
+      },
+      {
+        "fid": 4,
+        "rule": "product",
+        "text": "2*n + 1*max_deg + -1*P_n_maxdeg + -2 >= 0",
+        "coeffs": {
+          "P_n_maxdeg": "-1",
+          "n": "2",
+          "max_deg": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          3,
+          2
+        ],
+        "prod_var": "P_n_maxdeg",
+        "prod_factors": [
+          [
+            "n",
+            "lower",
+            1,
+            3
+          ],
+          [
+            "max_deg",
+            "upper",
+            2,
+            2
+          ]
+        ]
+      },
+      {
+        "fid": 5,
+        "rule": "combination",
+        "text": "3*n + -3*m + 1*max_deg + -2 >= 0",
+        "coeffs": {
+          "max_deg": "1",
+          "m": "-3",
+          "n": "3"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          4
+        ],
+        "mults": [
+          "3/2",
+          "1/2",
+          "3/2"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.0958904109589041,
+    "R": 0.2857142857142857,
+    "L": 0.5996253511966892,
+    "score": 0.981230047869879
+  },
+  "attained": "yes",
+  "touch": 7,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 0,
+    "inventory_theorems": 1,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 5.5,
+  "proof_cost": 5.5,
+  "proof_cost_expanded": 5.5,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.1,
+  "lean": {
+    "theorem_name": "C2",
+    "status": "compiled"
+  }
+}

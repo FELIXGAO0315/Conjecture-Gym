@@ -19,7 +19,7 @@ def test_single_archive_path():
     # archive_removal itself (and the definitions/aliases).
     files = [ROOT / "PolyForge/domains/graph/generator.py",
              ROOT / "PolyForge/domains/graph/domain.py",
-             ROOT / "PolyForge/env/record_audit.py",
+             ROOT / "PolyForge/env/analysis/record_audit.py",
              ROOT / "run.py"]
     offenders = []
     for f in files:
@@ -50,7 +50,7 @@ def test_single_archive_path():
     assert hasattr(G, "archive_removal"), "archive_removal missing"
     for f, needs in [(ROOT / "PolyForge/domains/graph/generator.py", "archive_removal("),
                      (ROOT / "PolyForge/domains/graph/domain.py", "archive_removal("),
-                     (ROOT / "PolyForge/env/record_audit.py", "archive_removal(")]:
+                     (ROOT / "PolyForge/env/analysis/record_audit.py", "archive_removal(")]:
         assert needs in f.read_text(), f"{f.name} does not route through archive_removal"
     assert "archive_replacement" in (ROOT / "run.py").read_text(), "run.py replacement not archived"
     from PolyForge.domains.graph.domain import GraphDomain
@@ -59,7 +59,7 @@ def test_single_archive_path():
 
 
 def test_driver_backup_before_postrun():
-    drv = (ROOT / "scripts/run_production.py").read_text()
+    drv = (ROOT / "PolyForge/scripts/run_production.py").read_text()
     # a post-run mutation (restore / cleanup / audit) must be preceded by a full backup
     # that includes record + archive (pruned.jsonl) + state.
     assert "backup" in drv.lower(), "driver has no backup step"

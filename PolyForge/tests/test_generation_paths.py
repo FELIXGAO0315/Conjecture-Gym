@@ -11,12 +11,12 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 import sys
 sys.path.insert(0, str(ROOT))
 
 from PolyForge.domains.graph.domain import GraphDomain
-from PolyForge.anvil import deducer as D
+from PolyForge.engine import deducer as D
 from PolyForge.domains.graph import generator as G
 from PolyForge.env import closure_complete as CC
 from PolyForge.env import discardlog

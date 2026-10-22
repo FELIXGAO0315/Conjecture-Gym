@@ -21,12 +21,12 @@ from pathlib import Path
 
 sys.path.insert(0, "/home/felix_gao/Conjecture-Gym")
 from PolyForge.domains.graph.domain import GraphDomain
-from PolyForge.anvil import deducer as D
-from PolyForge.anvil.deducer import Context
+from PolyForge.engine import deducer as D
+from PolyForge.engine.deducer import Context
 from PolyForge.domains.graph import generator as G
 
 dom = GraphDomain(); D.configure(dom)
-_LEAN_DIR = Path("/home/felix_gao/Conjecture-Gym/PolyForge/domains/graph/lean")
+_LEAN_DIR = Path("/home/felix_gao/Conjecture-Gym/PolyForge/lean")
 _INPUT_RULES = {"premise", "inventory", "conditional", "assumption", "lemma", "product"}
 
 
@@ -90,12 +90,6 @@ def _render(coeffs, rel, rhs):
     return f"{terms} {op} {rhs}"
 
 
-def lean_theorem(name, facts, goal, variables):
-    decls = " ".join(f"({_lean_var(v)} : Int)" for v in variables)
-    hyps = " ".join(f"(h{i} : {_render(*f)})" for i, f in enumerate(facts))
-    return f"theorem {name} {decls} {hyps} : {_render(*goal)} := by omega"
-
-
 _OMEGA_HEADER = "import Mathlib"
 _lean_runner = None
 _UNKNOWN_LOG = []   # v1.4.7: names whose lean_batch verdict was UNKNOWN (measurement only)
@@ -113,14 +107,14 @@ def _goal_statement(facts, goal, variables):
 def omega_decide_batch(cases):
     """cases: list of (name, facts, goal, vars).  Returns ``({name: entailed_bool}, "", "")``.
 
-    v1.4.6: routed through ``PolyForge.trust.lean_batch.verify`` — a goal counts as entailed ONLY
+    v1.4.6: routed through ``PolyForge.engine.soundness.lean_batch.verify`` — a goal counts as entailed ONLY
     when the fail-closed summary positively confirms its declaration is present with axioms
     ⊆ ALLOWED_AXIOMS (no `sorryAx`); NOT_PROVEN and UNKNOWN both map to ``False`` (a wrong
     "entailed" would be unsound; "not entailed" is only incomplete).  Decision never comes
     from the absence of error messages.  ``-D maxErrors`` is passed as defense-in-depth so a
     mostly-failing batch does not abort and force splitting (speed only; correctness does
     not depend on it)."""
-    from PolyForge.trust import lean_batch as LB
+    from PolyForge.engine.soundness import lean_batch as LB
     global _lean_runner
     if _lean_runner is None:
         _lean_runner = LB.lake_runner(str(_LEAN_DIR), extra_args=["-D", "maxErrors=100000000"])
@@ -204,12 +198,12 @@ def _vars_of(facts, goal):
 
 def props_dischargeable(R_props, T_props, pset=None):
     """Can T's premises discharge R's property premises?  v1.4.6 §3: delegates to
-    ``PolyForge.trust.props.dischargeable`` (the single decision rule) with our
+    ``PolyForge.engine.soundness.props.dischargeable`` (the single decision rule) with our
     ``property_closure`` as the non-parametric lattice; parametric properties
-    (is_regular(d) exact, is_k_edge_connected(k) monotone) are matched by PolyForge.trust,
+    (is_regular(d) exact, is_k_edge_connected(k) monotone) are matched by PolyForge.engine.soundness,
     never stripped by the lattice.  ``pset`` is accepted for signature compatibility
     but ignored (the closure is recomputed from T's non-parametric names)."""
-    from PolyForge.trust.props import dischargeable as _pf_dischargeable
+    from PolyForge.engine.soundness.props import dischargeable as _pf_dischargeable
     return _pf_dischargeable(G._prop_strs(R_props), G._prop_strs(T_props),
                              closure=G.property_closure)
 

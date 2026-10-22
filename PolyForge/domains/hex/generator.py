@@ -9,7 +9,7 @@ p-vector, formalised in Lean, scored, and written to ``record/C{n}/``.
 
 The domain-agnostic parts of the flow (the deduction cache, proof renumbering,
 the soundness regression, markdown rendering, record writing, and the worker
-entry point) live in :mod:`PolyForge.generator.generator` and are imported here.
+entry point) live in :mod:`PolyForge.engine.generator` and are imported here.
 """
 
 from __future__ import annotations
@@ -25,16 +25,16 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import linprog, milp, LinearConstraint, Bounds
 
-from ...anvil import deducer as D
-from ...anvil.deducer import Context, traceback, recheck, fact_text
+from ...engine import deducer as D
+from ...engine.deducer import Context, traceback, recheck, fact_text
 from . import inventory as INV
 from .inventory import PROP_VARS, ALL_VARS
 from . import formalizer as F
 from . import iris as IRIS
 from .deduction import vars_from_pvec
-from ...scoring import hardness as HARD
-from ...generator import generator as CG
-from ...generator.generator import (
+from ...engine.scoring import hardness as HARD
+from ...engine import generator as CG
+from ...engine.generator import (
     cached_context, _ctx_cache_clear, renumber_steps, soundness_check,
     _pvec_satisfies, _count_derivation_steps, _used_inventory,
     _used_premise_texts, _primitive_int,
@@ -269,7 +269,7 @@ def pool_covered(premises: list) -> bool:
 # (The deduction cache, deterministic fid renumbering, and the small generic
 # proof-walk helpers — _primitive_int / _count_derivation_steps / _used_inventory
 # / _used_premise_texts — are domain-agnostic and imported from
-# PolyForge.generator.generator at the top of this module.)
+# PolyForge.engine.generator at the top of this module.)
 
 
 # ── canonical form (§2): eliminate f_2 via face_split ────────────────────────
@@ -1963,7 +1963,7 @@ def assemble_data(proposal: dict, target: str, supersedes: list) -> dict:
 # The lemma library's per-lemma metadata (generation, expanded proof cost) is set
 # in the parent before the Pool is forked, so each worker inherits it copy-on-write.
 # The pool, snapshot and base seed now live on the domain object; the worker entry
-# point and record writing are domain-agnostic (see PolyForge.generator.generator).
+# point and record writing are domain-agnostic (see PolyForge.engine.generator).
 _W_LEMMA_META = {}        # cnum -> {"generation", "proof_cost_expanded"} (v0.7)
 
 

@@ -24,8 +24,8 @@ import shutil
 from collections import defaultdict
 from fractions import Fraction
 
-from ..anvil import deducer as D
-from ..anvil.deducer import Context
+from . import deducer as D
+from .deducer import Context
 
 # The generator version stamped into every newly-written record (shared across
 # domains).  Existing records keep whatever version they were written with.
@@ -290,6 +290,34 @@ def write_record(data: dict, lean_src: str, record_dir, lean_working_dir=None):
         lean_working = lean_working_dir / f"{name}.lean"
         if lean_working.exists():
             lean_working.unlink()
+
+
+# ── output mirror (deliverable copy outside the domain) ───────────────────────
+def sync_mirror(record_dir, mirror_dir):
+    """Make ``mirror_dir`` a faithful copy of ``record_dir``'s ``C*/`` records — the
+    deliverable conjectures only, not the generator's internal state files
+    (``.lock``/``.run_token``/``.production_state.jsonl``/``pruned.jsonl``).  Records that
+    disappeared from the source are dropped from the mirror; ``production_summary.json`` is
+    carried over.  Best-effort: logs and returns ``None`` on failure, never raises into the
+    caller — the record dir stays the source of truth."""
+    try:
+        mirror_dir.mkdir(parents=True, exist_ok=True)
+        live = {d.name for d in record_dir.iterdir() if d.is_dir() and d.name.startswith("C")}
+        for d in mirror_dir.iterdir():
+            if d.is_dir() and d.name.startswith("C") and d.name not in live:
+                shutil.rmtree(d)
+        for name in live:
+            dst = mirror_dir / name
+            if dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(record_dir / name, dst)
+        summ = record_dir / "production_summary.json"
+        if summ.exists():
+            shutil.copy2(summ, mirror_dir / "production_summary.json")
+        return len(live)
+    except Exception as e:
+        print(f"  [mirror] warning: sync to {mirror_dir} failed: {e}")
+        return None
 
 
 # ── multiprocessing worker plumbing (v0.6.4 §II) ──────────────────────────────

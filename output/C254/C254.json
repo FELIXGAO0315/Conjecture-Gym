@@ -1,0 +1,255 @@
+{
+  "id": "C254",
+  "key": "d7a6e02e9f5713b30607a69a329750ad6eea0ae46ce41de3e1f45afb7e07e5b9",
+  "provenance_keys": {
+    "self": "d7a6e02e9f5713b30607a69a329750ad6eea0ae46ce41de3e1f45afb7e07e5b9",
+    "instance_of": null,
+    "promoted_from": "451e252a5731ff1fb21c81e0a0517895c05bc40b8a78956d68461ed2005a5997"
+  },
+  "created_at": "2026-10-15T08:56:51.260954+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 2027007973
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((is_bipartite) and (alpha >= 2*omega) and (chi <= omega)), then (2*omega >= 2*n - 5*alpha + 8)",
+    "properties_premises": [
+      {
+        "name": "is_bipartite"
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "alpha >= 2*omega",
+        "coeffs": {
+          "alpha": 1,
+          "omega": -2
+        },
+        "rel": ">=",
+        "rhs": 0
+      },
+      {
+        "text": "chi <= omega",
+        "coeffs": {
+          "chi": 1,
+          "omega": -1
+        },
+        "rel": "<=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "2*omega >= 2*n - 5*alpha + 8",
+      "coeffs": {
+        "alpha": 5,
+        "n": -2,
+        "omega": 2
+      },
+      "rel": ">=",
+      "rhs": 8
+    },
+    "canonical_form": {
+      "text": "5*alpha >= 2*n - 2*omega + 8",
+      "coeffs": {
+        "omega": 2,
+        "alpha": 5,
+        "n": -2
+      },
+      "rel": ">=",
+      "rhs": 8
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_bipartite, alpha >= 2*omega, chi <= omega. Then 2*omega >= 2*n - 5*alpha + 8."
+  },
+  "primary_var": "omega",
+  "dalmatian": "significant",
+  "properties": [
+    "is_bipartite"
+  ],
+  "conclusion_property": null,
+  "instance_of": null,
+  "promoted_from": {
+    "text": "omega >= 2*n - 5*alpha + 6",
+    "coeffs": {
+      "omega": 1,
+      "alpha": 5,
+      "n": -2
+    },
+    "rel": ">=",
+    "rhs": 6
+  },
+  "proof": {
+    "inventory_used": [
+      "bipartite_chi",
+      "card_le_alpha_chi",
+      "omega_ge_one"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "-1*n + 1*P_alpha_chi >= 0",
+        "coeffs": {
+          "n": "-1",
+          "P_alpha_chi": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "card_le_alpha_chi"
+      },
+      {
+        "fid": 2,
+        "rule": "premise",
+        "text": "-2*omega + 1*alpha >= 0",
+        "coeffs": {
+          "alpha": "1",
+          "omega": "-2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "alpha >= 2*omega"
+      },
+      {
+        "fid": 3,
+        "rule": "premise",
+        "text": "-1*chi + 1*omega >= 0",
+        "coeffs": {
+          "chi": "-1",
+          "omega": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "chi <= omega"
+      },
+      {
+        "fid": 4,
+        "rule": "inventory",
+        "text": "-1*chi + 2 >= 0",
+        "coeffs": {
+          "chi": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "inventory": "bipartite_chi"
+      },
+      {
+        "fid": 5,
+        "rule": "inventory",
+        "text": "1*omega + -1 >= 0",
+        "coeffs": {
+          "omega": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "omega_ge_one"
+      },
+      {
+        "fid": 6,
+        "rule": "combination",
+        "text": "1*alpha + -2 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          5,
+          2
+        ],
+        "mults": [
+          "2",
+          "1"
+        ]
+      },
+      {
+        "fid": 7,
+        "rule": "product",
+        "text": "2*chi + 2*alpha + -1*P_alpha_chi + -4 >= 0",
+        "coeffs": {
+          "P_alpha_chi": "-1",
+          "alpha": "2",
+          "chi": "2"
+        },
+        "const": "-4",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          4,
+          6
+        ],
+        "prod_var": "P_alpha_chi",
+        "prod_factors": [
+          [
+            "alpha",
+            "lower",
+            2,
+            6
+          ],
+          [
+            "chi",
+            "upper",
+            2,
+            4
+          ]
+        ]
+      },
+      {
+        "fid": 8,
+        "rule": "combination",
+        "text": "-2*n + 2*omega + 5*alpha + -8 >= 0",
+        "coeffs": {
+          "omega": "2",
+          "alpha": "5",
+          "n": "-2"
+        },
+        "const": "-8",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          7
+        ],
+        "mults": [
+          "2",
+          "1",
+          "4",
+          "2"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.008403361344537815,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0084033613445378
+  },
+  "attained": "yes",
+  "touch": 1,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 0,
+    "inventory_theorems": 1,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 7.0,
+  "proof_cost": 7.0,
+  "proof_cost_expanded": 7.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 0.7777777777777778,
+  "lean": {
+    "theorem_name": "C254",
+    "status": "compiled"
+  }
+}

@@ -1,0 +1,287 @@
+{
+  "id": "C142",
+  "key": "bdcb92afbd298a1001b9afb9f3a4a165326091451e4e7a3aa99064ac75e50f62",
+  "provenance_keys": {
+    "self": "bdcb92afbd298a1001b9afb9f3a4a165326091451e4e7a3aa99064ac75e50f62",
+    "instance_of": null,
+    "promoted_from": null
+  },
+  "created_at": "2026-10-15T03:14:51.756504+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 2026006216
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((n >= 2*chi) and (n <= 5)), then (n >= m - 1)",
+    "properties_premises": [],
+    "numeric_premises": [
+      {
+        "text": "n >= 2*chi",
+        "coeffs": {
+          "n": 1,
+          "chi": -2
+        },
+        "rel": ">=",
+        "rhs": 0
+      },
+      {
+        "text": "n <= 5",
+        "coeffs": {
+          "n": 1
+        },
+        "rel": "<=",
+        "rhs": 5
+      }
+    ],
+    "conclusion": {
+      "text": "n >= m - 1",
+      "coeffs": {
+        "m": -1,
+        "n": 1
+      },
+      "rel": ">=",
+      "rhs": -1
+    },
+    "canonical_form": {
+      "text": "n >= m - 1",
+      "coeffs": {
+        "n": 1,
+        "m": -1
+      },
+      "rel": ">=",
+      "rhs": -1
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose n >= 2*chi, n <= 5. Then n >= m - 1."
+  },
+  "primary_var": "n",
+  "dalmatian": "significant",
+  "properties": [],
+  "conclusion_property": null,
+  "instance_of": null,
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "chi_ge_one",
+      "omega_le_chi",
+      "turan_r2"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "premise",
+        "text": "-1*n + 5 >= 0",
+        "coeffs": {
+          "n": "-1"
+        },
+        "const": "5",
+        "rel": ">=",
+        "note": "n <= 5"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "1*chi + -1*omega >= 0",
+        "coeffs": {
+          "omega": "-1",
+          "chi": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "omega_le_chi"
+      },
+      {
+        "fid": 3,
+        "rule": "premise",
+        "text": "1*n + -2*chi >= 0",
+        "coeffs": {
+          "n": "1",
+          "chi": "-2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "n >= 2*chi"
+      },
+      {
+        "fid": 4,
+        "rule": "combination",
+        "text": "-1*omega + 5/2 >= 0",
+        "coeffs": {
+          "omega": "-1"
+        },
+        "const": "5/2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          2,
+          3,
+          1
+        ],
+        "mults": [
+          "1",
+          "1/2",
+          "1/2"
+        ]
+      },
+      {
+        "fid": 5,
+        "rule": "rounding",
+        "text": "-1*omega + 2 >= 0",
+        "coeffs": {
+          "omega": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          4
+        ]
+      },
+      {
+        "fid": 6,
+        "rule": "conditional",
+        "text": "-4*m + 1*N2 >= 0",
+        "coeffs": {
+          "m": "-4",
+          "N2": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "turan_r2",
+        "tactic": "linarith",
+        "deps": [
+          5
+        ]
+      },
+      {
+        "fid": 7,
+        "rule": "inventory",
+        "text": "1*chi + -1 >= 0",
+        "coeffs": {
+          "chi": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "chi_ge_one"
+      },
+      {
+        "fid": 8,
+        "rule": "combination",
+        "text": "1*n + -2 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          7,
+          3
+        ],
+        "mults": [
+          "2",
+          "1"
+        ]
+      },
+      {
+        "fid": 9,
+        "rule": "product",
+        "text": "7*n + -1*N2 + -10 >= 0",
+        "coeffs": {
+          "N2": "-1",
+          "n": "7"
+        },
+        "const": "-10",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          1,
+          8
+        ],
+        "prod_var": "N2",
+        "prod_factors": [
+          [
+            "n",
+            "lower",
+            2,
+            8
+          ],
+          [
+            "n",
+            "upper",
+            5,
+            1
+          ]
+        ]
+      },
+      {
+        "fid": 10,
+        "rule": "combination",
+        "text": "1*n + -1*m + 5/4 >= 0",
+        "coeffs": {
+          "n": "1",
+          "m": "-1"
+        },
+        "const": "5/4",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          6,
+          9
+        ],
+        "mults": [
+          "3/4",
+          "1/4",
+          "1/4"
+        ]
+      },
+      {
+        "fid": 11,
+        "rule": "rounding",
+        "text": "1*n + -1*m + 1 >= 0",
+        "coeffs": {
+          "n": "1",
+          "m": "-1"
+        },
+        "const": "1",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          10
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.045454545454545456,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0454545454545454
+  },
+  "attained": "yes",
+  "touch": 1,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 2,
+    "inventory_theorems": 2,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 13.0,
+  "proof_cost": 13.0,
+  "proof_cost_expanded": 13.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.8571428571428572,
+  "lean": {
+    "theorem_name": "C142",
+    "status": "compiled"
+  }
+}

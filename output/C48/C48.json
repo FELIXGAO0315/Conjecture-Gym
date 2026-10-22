@@ -1,0 +1,227 @@
+{
+  "id": "C48",
+  "key": "0828eca91b2e2186e05010da2b7b705d2ba79a01df6acb40e47720e8142f23b6",
+  "provenance_keys": {
+    "self": "0828eca91b2e2186e05010da2b7b705d2ba79a01df6acb40e47720e8142f23b6",
+    "instance_of": null,
+    "promoted_from": null
+  },
+  "created_at": "2026-10-15T00:54:32.747807+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 2024006786
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((is_tree) and (omega >= 2)), then (radius >= -3*n + 3*diam + 4)",
+    "properties_premises": [
+      {
+        "name": "is_tree"
+      }
+    ],
+    "numeric_premises": [
+      {
+        "text": "omega >= 2",
+        "coeffs": {
+          "omega": 1
+        },
+        "rel": ">=",
+        "rhs": 2
+      }
+    ],
+    "conclusion": {
+      "text": "radius >= -3*n + 3*diam + 4",
+      "coeffs": {
+        "diam": -3,
+        "n": 3,
+        "radius": 1
+      },
+      "rel": ">=",
+      "rhs": 4
+    },
+    "canonical_form": {
+      "text": "radius >= -3*n + 3*diam + 4",
+      "coeffs": {
+        "radius": 1,
+        "diam": -3,
+        "n": 3
+      },
+      "rel": ">=",
+      "rhs": 4
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree, omega >= 2. Then radius >= -3*n + 3*diam + 4."
+  },
+  "primary_var": "radius",
+  "dalmatian": "significant",
+  "properties": [
+    "is_tree"
+  ],
+  "conclusion_property": null,
+  "instance_of": null,
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "diam_le_card_sub_one",
+      "diam_le_two_radius",
+      "omega_le_n",
+      "tree_edges"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "premise",
+        "text": "1*omega + -2 >= 0",
+        "coeffs": {
+          "omega": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "note": "omega >= 2"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "-1*diam + 2*radius >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "radius": "2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "diam_le_two_radius"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "1*n + -1*omega >= 0",
+        "coeffs": {
+          "omega": "-1",
+          "n": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "omega_le_n"
+      },
+      {
+        "fid": 4,
+        "rule": "inventory",
+        "text": "1*n + -1*diam + -1 >= 0",
+        "coeffs": {
+          "diam": "-1",
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "diam_le_card_sub_one"
+      },
+      {
+        "fid": 5,
+        "rule": "inventory",
+        "text": "-1*n + 1*m + 1 == 0",
+        "coeffs": {
+          "m": "1",
+          "n": "-1"
+        },
+        "const": "1",
+        "rel": "==",
+        "inventory": "tree_edges"
+      },
+      {
+        "fid": 6,
+        "rule": "combination",
+        "text": "3*m + -3*diam + 1*radius + -1/2 >= 0",
+        "coeffs": {
+          "radius": "1",
+          "diam": "-3",
+          "m": "3"
+        },
+        "const": "-1/2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "mults": [
+          "1/2",
+          "1/2",
+          "1/2",
+          "5/2",
+          "3"
+        ]
+      },
+      {
+        "fid": 7,
+        "rule": "rounding",
+        "text": "3*m + -3*diam + 1*radius + -1 >= 0",
+        "coeffs": {
+          "radius": "1",
+          "diam": "-3",
+          "m": "3"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          6
+        ]
+      },
+      {
+        "fid": 8,
+        "rule": "identity_rewrite",
+        "text": "radius >= -3*n + 3*diam + 4",
+        "coeffs": {
+          "diam": -3,
+          "n": 3,
+          "radius": 1
+        },
+        "rel": ">=",
+        "rhs": 4,
+        "tactic": "linarith",
+        "deps": [
+          7
+        ],
+        "identities": [
+          "gallai",
+          "tree"
+        ],
+        "identities_human": "the Gallai identity `alpha + tau = n`; the tree identity `m = n - 1`",
+        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`; the tree identity `m = n - 1`."
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.08333333333333333,
+    "R": 1.0,
+    "L": 0.19245008972987526,
+    "score": 1.2757834230632086
+  },
+  "attained": "yes",
+  "touch": 2,
+  "arith_sharp": "exact",
+  "depth_type": "rounding_only",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 4,
+    "product_steps": 0
+  },
+  "proof_cost_initial": 11.0,
+  "proof_cost": 11.0,
+  "proof_cost_expanded": 11.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 2.2,
+  "lean": {
+    "theorem_name": "C48",
+    "status": "compiled"
+  }
+}

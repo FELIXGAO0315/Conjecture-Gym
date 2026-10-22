@@ -6,7 +6,7 @@ Run: python -m tests.test_content_key   (or python tests/test_content_key.py)
 import sys
 sys.path.insert(0, "/home/felix_gao/Conjecture-Gym")
 from PolyForge.domains.graph.domain import GraphDomain
-from PolyForge.anvil import deducer as D
+from PolyForge.engine import deducer as D
 from PolyForge.domains.graph import generator as G
 dom = GraphDomain(); D.configure(dom)
 

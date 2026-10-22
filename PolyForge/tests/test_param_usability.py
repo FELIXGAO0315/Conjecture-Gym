@@ -2,14 +2,14 @@
 """v1.4.6 §3.2: regression tests for parameter-aware property usability in OUR code,
 from the v1.4.5 counterexamples (is_regular(2) vs is_regular(3); k-edge-connectivity).
 These exercise generator.props_dischargeable and the generator's _premises_imply /
-_avail_for (which now route through PolyForge.trust.props.dischargeable).
+_avail_for (which now route through PolyForge.engine.soundness.props.dischargeable).
 
 Run: python tests/test_param_usability.py
 """
 import sys
 sys.path.insert(0, "/home/felix_gao/Conjecture-Gym")
 from PolyForge.domains.graph.domain import GraphDomain
-from PolyForge.anvil import deducer as D
+from PolyForge.engine import deducer as D
 from PolyForge.domains.graph import generator as G
 dom = GraphDomain(); D.configure(dom)
 

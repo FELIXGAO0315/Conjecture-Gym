@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, "/home/felix_gao/Conjecture-Gym")
 from PolyForge.domains.graph.domain import GraphDomain
-from PolyForge.anvil import deducer as D
+from PolyForge.engine import deducer as D
 from PolyForge.domains.graph import generator as G
 from PolyForge.domains.graph import formalizer as F
 from PolyForge.env import verifier as V
@@ -142,7 +142,10 @@ def main(argv):
         nprocs = int(argv[argv.index("--nprocs") + 1])
     if "--json" in argv:
         jout = Path(argv[argv.index("--json") + 1])
-    tasks = [json.loads(l) for l in (export_dir / "tasks.jsonl").read_text().splitlines() if l.strip()]
+    # v1.5.1 §D3: proof_stats / difficulty are no longer in the public task rows;
+    # source full tasks server-side from record/ via build_tasks.
+    from PolyForge.env import tasks as T
+    tasks = T.full_task_dicts("graph")
     recs = {}
     for d in rec_dir.iterdir():
         j = d / f"{d.name}.json"

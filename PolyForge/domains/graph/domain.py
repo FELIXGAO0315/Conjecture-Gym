@@ -9,8 +9,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from ...anvil import deducer as D
-from ...generator import generator as CG
+from ...engine import deducer as D
+from ...engine import generator as CG
 from ..base import Domain
 from . import deduction as DED
 from . import formalizer as F
@@ -95,15 +95,15 @@ class GraphDomain(Domain):
 
     def may_replace(self, old_id, new_data):
         """v1.4.6 §5.2: a new record may REPLACE an old one (same skeleton) only when the
-        new record alone entails the old — via PolyForge.trust.policies.may_replace:
+        new record alone entails the old — via PolyForge.engine.soundness.policies.may_replace:
         (a) the new record is usable for the old (old's premises imply new's premises,
         PARAMETER-AWARE: G._premises_imply), and (b) the old's conclusion follows, by the
         COMPLETE check (omega via lean_batch), from old's premises + restricted inventory +
         the new's conclusion.  Otherwise both are kept.  A wrong True would delete a true
         theorem, so UNKNOWN maps to NOT_ENTAILED (keep both)."""
         import json as _json
-        from PolyForge.trust import policies as POL
-        from PolyForge.trust.lean_batch import Verdict
+        from PolyForge.engine.soundness import policies as POL
+        from PolyForge.engine.soundness.lean_batch import Verdict
         from PolyForge.env import closure_complete as CC
         p = self.record_dir / old_id / f"{old_id}.json"
         if not p.exists():

@@ -1,0 +1,242 @@
+{
+  "id": "T290",
+  "key": "8e5384a99678f6287994e37448b8043126f6c17c59bbba1d8411d735f6750871",
+  "provenance_keys": {
+    "self": "8e5384a99678f6287994e37448b8043126f6c17c59bbba1d8411d735f6750871",
+    "instance_of": null,
+    "promoted_from": null
+  },
+  "created_at": "2026-10-22T21:55:37.336052+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 63
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((is_tree)), then (n <= -3*omega + 2*alpha + 6)",
+    "properties_premises": [
+      {
+        "name": "is_tree"
+      }
+    ],
+    "numeric_premises": [],
+    "conclusion": {
+      "text": "n <= -3*omega + 2*alpha + 6",
+      "coeffs": {
+        "alpha": -2,
+        "n": 1,
+        "omega": 3
+      },
+      "rel": "<=",
+      "rhs": 6
+    },
+    "canonical_form": {
+      "text": "3*omega <= -n + 2*alpha + 6",
+      "coeffs": {
+        "n": 1,
+        "omega": 3,
+        "alpha": -2
+      },
+      "rel": "<=",
+      "rhs": 6
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose is_tree. Then n <= -3*omega + 2*alpha + 6."
+  },
+  "primary_var": "n",
+  "dalmatian": "unknown",
+  "properties": [
+    "is_tree"
+  ],
+  "conclusion_property": null,
+  "instance_of": null,
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "acyclic_chi",
+      "alpha_ge_one",
+      "card_le_alpha_chi",
+      "gallai",
+      "omega_le_chi"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*chi + -1*omega >= 0",
+        "coeffs": {
+          "omega": "-1",
+          "chi": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "omega_le_chi"
+      },
+      {
+        "fid": 2,
+        "rule": "inventory",
+        "text": "-1*chi + 2 >= 0",
+        "coeffs": {
+          "chi": "-1"
+        },
+        "const": "2",
+        "rel": ">=",
+        "inventory": "acyclic_chi"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "-1*n + 1*P_alpha_chi >= 0",
+        "coeffs": {
+          "n": "-1",
+          "P_alpha_chi": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "card_le_alpha_chi"
+      },
+      {
+        "fid": 4,
+        "rule": "inventory",
+        "text": "1*alpha + -1 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "alpha_ge_one"
+      },
+      {
+        "fid": 5,
+        "rule": "product",
+        "text": "1*chi + 2*alpha + -1*P_alpha_chi + -2 >= 0",
+        "coeffs": {
+          "P_alpha_chi": "-1",
+          "alpha": "2",
+          "chi": "1"
+        },
+        "const": "-2",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          4,
+          2
+        ],
+        "prod_var": "P_alpha_chi",
+        "prod_factors": [
+          [
+            "alpha",
+            "lower",
+            1,
+            4
+          ],
+          [
+            "chi",
+            "upper",
+            2,
+            2
+          ]
+        ]
+      },
+      {
+        "fid": 6,
+        "rule": "inventory",
+        "text": "-1*n + 1*alpha + 1*tau == 0",
+        "coeffs": {
+          "alpha": "1",
+          "tau": "1",
+          "n": "-1"
+        },
+        "const": "0",
+        "rel": "==",
+        "inventory": "gallai"
+      },
+      {
+        "fid": 7,
+        "rule": "combination",
+        "text": "1*n + -3*omega + -2*tau + 6 >= 0",
+        "coeffs": {
+          "n": "1",
+          "omega": "-3",
+          "tau": "-2"
+        },
+        "const": "6",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3,
+          5,
+          6
+        ],
+        "mults": [
+          "3",
+          "4",
+          "1",
+          "1",
+          "-2"
+        ]
+      },
+      {
+        "fid": 8,
+        "rule": "identity_rewrite",
+        "text": "n <= -3*omega + 2*alpha + 6",
+        "coeffs": {
+          "alpha": -2,
+          "n": 1,
+          "omega": 3
+        },
+        "rel": "<=",
+        "rhs": 6,
+        "tactic": "linarith",
+        "deps": [
+          7
+        ],
+        "identities": [
+          "gallai",
+          "tree"
+        ],
+        "identities_human": "the Gallai identity `alpha + tau = n`; the tree identity `m = n - 1`",
+        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`; the tree identity `m = n - 1`."
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.16,
+    "R": 0.5,
+    "L": 0.6593804733957871,
+    "score": 1.3193804733957872
+  },
+  "interestingness": {
+    "score": 0.5617544236111498,
+    "sharpness": 0.466,
+    "tightness": 0.9816843611112658,
+    "breadth": 0.3333333333333333,
+    "dataset_size": 25
+  },
+  "attained": "yes",
+  "touch": 4,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 0,
+    "inventory_theorems": 4,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 11.0,
+  "proof_cost": 11.0,
+  "proof_cost_expanded": 11.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 3.6666666666666665,
+  "lean": {
+    "theorem_name": "T290",
+    "status": "compiled"
+  }
+}

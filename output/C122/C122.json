@@ -1,0 +1,187 @@
+{
+  "id": "C122",
+  "key": "df22e1d2522ab9f1fda07bca93c237986bbfe7806e4b80921ada2910ea4837f9",
+  "provenance_keys": {
+    "self": "df22e1d2522ab9f1fda07bca93c237986bbfe7806e4b80921ada2910ea4837f9",
+    "instance_of": "gallai",
+    "promoted_from": null
+  },
+  "created_at": "2026-10-15T02:47:49.278227+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 2025007250
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((alpha >= 2*tau)), then (n <= 2*alpha - 1)",
+    "properties_premises": [],
+    "numeric_premises": [
+      {
+        "text": "alpha >= 2*tau",
+        "coeffs": {
+          "alpha": 1,
+          "tau": -2
+        },
+        "rel": ">=",
+        "rhs": 0
+      }
+    ],
+    "conclusion": {
+      "text": "n <= 2*alpha - 1",
+      "coeffs": {
+        "alpha": -2,
+        "n": 1
+      },
+      "rel": "<=",
+      "rhs": -1
+    },
+    "canonical_form": {
+      "text": "2*alpha >= n + 1",
+      "coeffs": {
+        "n": -1,
+        "alpha": 2
+      },
+      "rel": ">=",
+      "rhs": 1
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose alpha >= 2*tau. Then n <= 2*alpha - 1."
+  },
+  "primary_var": "n",
+  "dalmatian": "significant",
+  "properties": [],
+  "conclusion_property": null,
+  "instance_of": "gallai",
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "alpha_ge_one",
+      "gallai"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "1*alpha + -1 >= 0",
+        "coeffs": {
+          "alpha": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "alpha_ge_one"
+      },
+      {
+        "fid": 2,
+        "rule": "premise",
+        "text": "1*alpha + -2*tau >= 0",
+        "coeffs": {
+          "alpha": "1",
+          "tau": "-2"
+        },
+        "const": "0",
+        "rel": ">=",
+        "note": "alpha >= 2*tau"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "-1*n + 1*alpha + 1*tau == 0",
+        "coeffs": {
+          "alpha": "1",
+          "tau": "1",
+          "n": "-1"
+        },
+        "const": "0",
+        "rel": "==",
+        "inventory": "gallai"
+      },
+      {
+        "fid": 4,
+        "rule": "combination",
+        "text": "1*n + -2*tau + -1/2 >= 0",
+        "coeffs": {
+          "n": "1",
+          "tau": "-2"
+        },
+        "const": "-1/2",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          3
+        ],
+        "mults": [
+          "1/2",
+          "1/2",
+          "-1"
+        ]
+      },
+      {
+        "fid": 5,
+        "rule": "rounding",
+        "text": "1*n + -2*tau + -1 >= 0",
+        "coeffs": {
+          "n": "1",
+          "tau": "-2"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "tactic": "omega",
+        "deps": [
+          4
+        ]
+      },
+      {
+        "fid": 6,
+        "rule": "identity_rewrite",
+        "text": "n <= 2*alpha - 1",
+        "coeffs": {
+          "alpha": -2,
+          "n": 1
+        },
+        "rel": "<=",
+        "rhs": -1,
+        "tactic": "linarith",
+        "deps": [
+          5
+        ],
+        "identities": [
+          "gallai"
+        ],
+        "identities_human": "the Gallai identity `alpha + tau = n`",
+        "note": "Rewrite the proven form to the displayed conclusion using the Gallai identity `alpha + tau = n`."
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.027777777777777776,
+    "R": 0.6666666666666666,
+    "L": 0.28867513459481287,
+    "score": 0.9831195790392573
+  },
+  "attained": "yes",
+  "touch": 3,
+  "arith_sharp": "exact",
+  "depth_type": "rounding_only",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 1,
+    "inventory_theorems": 2,
+    "product_steps": 0
+  },
+  "proof_cost_initial": 7.0,
+  "proof_cost": 7.0,
+  "proof_cost_expanded": 7.0,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.4,
+  "lean": {
+    "theorem_name": "C122",
+    "status": "compiled"
+  }
+}

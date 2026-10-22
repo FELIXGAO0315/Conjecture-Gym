@@ -24,7 +24,7 @@ from fractions import Fraction
 from math import gcd
 from pathlib import Path
 
-from ...formalizer import formalizer as _CF
+from ...engine import formalizer as _CF
 from .inventory import M_MAX, TAIL_VAR, TAIL_COUNT_VARS
 
 LEAN_DIR = Path(__file__).resolve().parent / "lean"

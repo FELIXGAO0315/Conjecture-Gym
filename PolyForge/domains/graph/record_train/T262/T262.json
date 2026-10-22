@@ -1,0 +1,191 @@
+{
+  "id": "T262",
+  "key": "4676298acfb31047285f66a6146fcbf48e678118c36df30c62790727b6578da0",
+  "provenance_keys": {
+    "self": "4676298acfb31047285f66a6146fcbf48e678118c36df30c62790727b6578da0",
+    "instance_of": "handshake_max",
+    "promoted_from": null
+  },
+  "created_at": "2026-10-22T21:55:29.810543+00:00",
+  "generator": {
+    "version": "1.4.2",
+    "seed": 47
+  },
+  "rendered_with": "1.3",
+  "conjecture": {
+    "formula": "if ((max_deg <= 6)), then (max_deg <= 3*n - m + 6)",
+    "properties_premises": [],
+    "numeric_premises": [
+      {
+        "text": "max_deg <= 6",
+        "coeffs": {
+          "max_deg": 1
+        },
+        "rel": "<=",
+        "rhs": 6
+      }
+    ],
+    "conclusion": {
+      "text": "max_deg <= 3*n - m + 6",
+      "coeffs": {
+        "m": 1,
+        "max_deg": 1,
+        "n": -3
+      },
+      "rel": "<=",
+      "rhs": 6
+    },
+    "canonical_form": {
+      "text": "3*n >= m + max_deg - 6",
+      "coeffs": {
+        "max_deg": -1,
+        "m": -1,
+        "n": 3
+      },
+      "rel": ">=",
+      "rhs": -6
+    },
+    "natural_language": "Let G be a finite simple graph with the usual invariants (n, m, max_deg, min_deg, chi, omega, alpha, tau, diam, radius, girth). Suppose max_deg <= 6. Then max_deg <= 3*n - m + 6."
+  },
+  "primary_var": "max_deg",
+  "dalmatian": "unknown",
+  "properties": [],
+  "conclusion_property": null,
+  "instance_of": "handshake_max",
+  "promoted_from": null,
+  "proof": {
+    "inventory_used": [
+      "handshake_max",
+      "n_ge_one"
+    ],
+    "lemmas_used": [],
+    "steps": [
+      {
+        "fid": 1,
+        "rule": "inventory",
+        "text": "-2*m + 1*P_n_maxdeg >= 0",
+        "coeffs": {
+          "m": "-2",
+          "P_n_maxdeg": "1"
+        },
+        "const": "0",
+        "rel": ">=",
+        "inventory": "handshake_max"
+      },
+      {
+        "fid": 2,
+        "rule": "premise",
+        "text": "-1*max_deg + 6 >= 0",
+        "coeffs": {
+          "max_deg": "-1"
+        },
+        "const": "6",
+        "rel": ">=",
+        "note": "max_deg <= 6"
+      },
+      {
+        "fid": 3,
+        "rule": "inventory",
+        "text": "1*n + -1 >= 0",
+        "coeffs": {
+          "n": "1"
+        },
+        "const": "-1",
+        "rel": ">=",
+        "inventory": "n_ge_one"
+      },
+      {
+        "fid": 4,
+        "rule": "product",
+        "text": "6*n + 1*max_deg + -1*P_n_maxdeg + -6 >= 0",
+        "coeffs": {
+          "P_n_maxdeg": "-1",
+          "n": "6",
+          "max_deg": "1"
+        },
+        "const": "-6",
+        "rel": ">=",
+        "tactic": "mul_nonneg",
+        "deps": [
+          3,
+          2
+        ],
+        "prod_var": "P_n_maxdeg",
+        "prod_factors": [
+          [
+            "n",
+            "lower",
+            1,
+            3
+          ],
+          [
+            "max_deg",
+            "upper",
+            6,
+            2
+          ]
+        ]
+      },
+      {
+        "fid": 5,
+        "rule": "combination",
+        "text": "3*n + -1*m + -1*max_deg + 6 >= 0",
+        "coeffs": {
+          "max_deg": "-1",
+          "m": "-1",
+          "n": "3"
+        },
+        "const": "6",
+        "rel": ">=",
+        "tactic": "linarith",
+        "deps": [
+          1,
+          2,
+          4
+        ],
+        "mults": [
+          "1/2",
+          "3/2",
+          "1/2"
+        ]
+      }
+    ]
+  },
+  "iris": {
+    "T": 0.0007987220447284345,
+    "R": 1.0,
+    "L": 0.0,
+    "score": 1.0007987220447285
+  },
+  "interestingness": {
+    "score": 0.28336670361470434,
+    "sharpness": 0.0840064611484632,
+    "tightness": 0.6321205588285577,
+    "breadth": 0.3333333333333333,
+    "dataset_size": 1252
+  },
+  "attained": "yes",
+  "touch": 1,
+  "arith_sharp": "relaxed",
+  "depth_type": "product_needed",
+  "proof_stats": {
+    "case_splits": 0,
+    "case_splits_conditional": 0,
+    "case_splits_bnb": 0,
+    "max_nest_depth": 0,
+    "roundings": 0,
+    "inventory_theorems": 1,
+    "product_steps": 1
+  },
+  "proof_cost_initial": 5.5,
+  "proof_cost": 5.5,
+  "proof_cost_expanded": 5.5,
+  "shorten_rounds": 0,
+  "generation": 0,
+  "supersedes": [],
+  "hardness": 1.1,
+  "lean": {
+    "theorem_name": "T262",
+    "status": "compiled"
+  }
+}

@@ -7,9 +7,9 @@ Usage (run from the Conjecture-Gym root):
     python -m run polyforge <domain> --minutes M  # run for M minutes
     python -m run polyforge <domain> N --minutes M  # stop at whichever comes first
 
-``<domain>`` is ``hex`` (the original p₆ subject) or ``graph`` (a skeleton in this
-version — it prints a notice and exits, since the graph Inventory is not yet wired
-up).  ``N`` is the MAIN-phase target (``split_needed`` records); the SUPPLEMENT phase
+``<domain>`` is ``hex`` (the original p₆ subject) or ``graph`` (the graph-invariant
+domain, fully wired with its own Inventory and record).  ``N`` is the MAIN-phase
+target (``split_needed`` records); the SUPPLEMENT phase
 then adds AT MOST ``floor(N * RO_MAX_RATIO)`` = ``floor(N/4)`` ``rounding_only`` records.
 
 Options:
@@ -57,7 +57,7 @@ from collections import defaultdict
 import fcntl
 import uuid
 
-from PolyForge.generator import generator as CG
+from PolyForge.engine import generator as CG
 from PolyForge.env import discardlog
 from PolyForge.env.replace_gate import replace_decision
 
@@ -258,7 +258,8 @@ def main(argv):
 
     domain = load_domain(opts["domain"])
 
-    # §II.2: graph domain is a skeleton in this version — notice and exit.
+    # a domain may mark itself not-ready (ready=False) to print a notice and exit;
+    # both hex and graph are wired, so this guard is normally a no-op.
     if getattr(domain, "ready", True) is False:
         print(domain.notice)
         return 0
@@ -737,6 +738,14 @@ def main(argv):
                    batch_time_total, bisection_total, mem.peak, n_workers,
                    phase1, phase2)
     _recheck_sample(domain, base_seed)
+
+    # mirror graph's deliverable records to the repo-root output/ (sibling of PolyForge),
+    # so the final output lives both in the domain's record and in output/.
+    if domain.name == "graph":
+        mirror = domain.record_dir.parents[3] / "output"
+        n = CG.sync_mirror(domain.record_dir, mirror)
+        if n is not None:
+            print(f"  mirrored {n} records to {mirror}")
     return 0
 
 

@@ -2,8 +2,8 @@ import re
 
 import pytest
 
-from PolyForge.trust.lean_batch import Goal, Verdict, render_batch, selftest, verify
-from PolyForge.trust.tests.fake_lean import make_runner, old_method
+from PolyForge.engine.soundness.lean_batch import Goal, Verdict, render_batch, selftest, verify
+from PolyForge.engine.soundness.tests.fake_lean import make_runner, old_method
 
 HEADER = "import Mathlib"
 NONCE = "0123456789abcdef0123456789abcdef"
