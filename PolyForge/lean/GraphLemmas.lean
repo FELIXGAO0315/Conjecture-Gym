@@ -651,6 +651,19 @@ theorem complete_indep_le_one_int (h : (Fintype.card V : ℤ) ≤ (G.chromaticNu
   have hn : Fintype.card V ≤ G.chromaticNumber.toNat := by exact_mod_cast h
   have := complete_indep_le_one G hn; omega
 
+/-! ### Cauchy–Schwarz on degrees (B §P1): 4·m² ≤ n · Σ deg²  (new nlinarith action) -/
+
+theorem deg_cauchy_int :
+    4 * (G.edgeFinset.card : ℤ) ^ 2
+      ≤ (Fintype.card V : ℤ) * ∑ v, ((G.degree v : ℤ)) ^ 2 := by
+  have h : (2 * G.edgeFinset.card) ^ 2 ≤ Fintype.card V * ∑ v, (G.degree v) ^ 2 := by
+    have hsum := G.sum_degrees_eq_twice_card_edges
+    have hcs := sq_sum_le_card_mul_sum_sq (s := (univ : Finset V)) (f := fun v => G.degree v)
+    rw [← hsum]; simpa [Finset.card_univ] using hcs
+  have hz := (Nat.cast_le (α := ℤ)).2 h
+  push_cast at hz ⊢
+  nlinarith [hz]
+
 /-! ### property-implication discharge (§II.2, used by the formalizer) -/
 
 theorem isTree_connected (h : G.IsTree) : G.Connected := h.connected

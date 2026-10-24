@@ -3,8 +3,13 @@ __pycache__/
 *.pyc
 # vendored Lean REPL build (rebuilt via PolyForge/env/setup_repl.sh; commit pinned there)
 PolyForge/env/vendor/
-# exported RL environment artifacts (written outside the repo via --out; ignore if placed inside)
-PolyForge/env/export_out/
-# domain records are local/generated artifacts — not tracked in git.
-# (the graph deliverable is mirrored to the repo-root output/ via run.py sync_mirror)
+# generated record dirs (curated / harvest / parametric) — local artifacts, regenerated each run
 PolyForge/domains/*/record/
+PolyForge/domains/*/record_train/
+PolyForge/domains/*/record_parametric/
+# pre-write corpus backups + local run state — kept locally, not committed; the growing
+# corpus itself lives at output/train_corpus.jsonl
+output/backups/
+output/.corpus_state.json
+# derived SFT splits (regenerated on the training box by training/prepare_data.py)
+training/data/

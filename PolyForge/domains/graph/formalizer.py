@@ -37,6 +37,7 @@ _Z = {
     "diam": "(G.diam : ℤ)",
     "radius": "(G.radius.toNat : ℤ)",
     "girth": "(G.girth : ℤ)",
+    "s2": "(∑ v, (G.degree v : ℤ) ^ 2)",      # B §P1: Σ deg²  (matches deg_cauchy_int)
 }
 # v1.2 §III.1: product (auxiliary) variables render as the literal product of
 # their factor atoms, in the SAME factor order the GraphLemmas ℤ wrappers use
@@ -90,6 +91,7 @@ WRAPPER = {
     "regular_edges": ("regular_edges_int", ["is_regular"], None),
     # v1.2.1 §VI second batch
     "card_le_alpha_chi": ("card_le_alpha_chi_int", [], None),
+    "deg_cauchy": ("deg_cauchy_int", [], None),            # B §P1: 4m² ≤ n·Σdeg²
     "omega_le_maxdeg": ("omega_le_maxdeg_add_one_int", [], None),
     # v1.2.2 §IV diameter / cycle bounds
     "diam_le_card_sub_one": ("diam_le_card_sub_one_int", ["is_connected"], None),

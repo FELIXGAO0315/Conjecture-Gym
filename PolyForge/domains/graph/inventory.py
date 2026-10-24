@@ -43,7 +43,7 @@ from fractions import Fraction
 
 # ── variables ────────────────────────────────────────────────────────────────
 VARS = ["n", "m", "max_deg", "min_deg", "chi", "omega", "alpha", "tau",
-        "diam", "radius", "girth"]
+        "diam", "radius", "girth", "s2"]      # s2 = Σ deg²  (B §P1, Cauchy-Schwarz)
 
 # variables whose finiteness is conditional, and the property that grants it
 FINITENESS = {
@@ -255,6 +255,8 @@ PRODUCT_VARS = {
     "P_n_maxdeg": ("n", "max_deg"),
     "N2": ("n", "n"),
     "P_alpha_chi": ("alpha", "chi"),           # v1.2.1 §VI.1
+    "M2": ("m", "m"),                          # B §P1: m²  (for Cauchy-Schwarz)
+    "P_n_s2": ("n", "s2"),                     # B §P1: n·Σdeg²
 }
 
 PRODUCT_INVENTORY = [
@@ -278,6 +280,10 @@ PRODUCT_INVENTORY = [
     {"name": "card_le_alpha_chi", "lean_name": "PolyForge.Graph.card_le_alpha_chi_int",
      "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
      "conclusion": {"coeffs": _lin(n=1, P_alpha_chi=-1), "rel": "<=", "rhs": 0}},
+    # P7 — Cauchy-Schwarz on degrees (B §P1):  4·m² ≤ n·Σdeg²   (4·M2 − P_n_s2 ≤ 0)
+    {"name": "deg_cauchy", "lean_name": "PolyForge.Graph.deg_cauchy_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(M2=4, P_n_s2=-1), "rel": "<=", "rhs": 0}},
 ]
 PRODUCT_INVENTORY_BY_NAME = {e["name"]: e for e in PRODUCT_INVENTORY}
 
@@ -339,6 +345,7 @@ def _values_of(g: dict) -> dict:
         "chi": g["chromatic_number"], "omega": g["clique_number"],
         "alpha": g["independence_number"], "tau": g["vertex_cover_number"],
         "diam": g["diameter"], "radius": g["radius"], "girth": g["girth"],
+        "s2": g["sum_deg_sq"],                 # B §P1: Σ deg²
     }
     # v1.2: exact product-variable values (real products; §VI.3 regression)
     for pv, (a, b) in PRODUCT_VARS.items():

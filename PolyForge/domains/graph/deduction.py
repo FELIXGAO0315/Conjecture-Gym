@@ -161,6 +161,7 @@ def vars_from_graph(g: dict) -> dict:
         "chi": val(g["chromatic_number"]), "omega": val(g["clique_number"]),
         "alpha": val(g["independence_number"]), "tau": val(g["vertex_cover_number"]),
         "diam": val(g["diameter"]), "radius": val(g["radius"]), "girth": val(g["girth"]),
+        "s2": val(g["sum_deg_sq"]),             # B §P1: Σ deg²
     }
     # v1.2 §VI.3: exact product-variable values (real products)
     for pv, (a, b) in PRODUCT_VARS.items():

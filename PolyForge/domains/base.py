@@ -6,11 +6,11 @@ A *domain* supplies everything the generic engine (``anvil``), generation driver
 mathematical subject.  The common code accesses a domain ONLY through this
 interface, so it never names anything domain-specific.
 
-A domain provides the following (the hex domain, ``domains.hex``, implements all
-of them; the graph domain is so far a skeleton):
+A domain provides the following (the graph domain, ``domains.graph``, implements
+all of them):
 
 Identity & locations
-    name                 short domain name ("hex", "graph")
+    name                 short domain name (e.g. "graph")
     record_dir           Path to the record/ directory
     lean_dir             Path to the domain's Lean project
     data_path            Path to the domain's dataset

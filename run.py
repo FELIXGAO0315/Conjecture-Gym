@@ -2,13 +2,23 @@
 
 Usage (run from the Conjecture-Gym root):
 
+    python -m run graph                           # build the full graph training corpus
+    python -m run graph N                          #   N = harvest seeds (volume knob)
+    python -m run graph --no-curated               #   skip the curated engine, use existing C*
+
+The ``graph`` verb is the one graph conjecture generator: it drives the curated LP engine
+(quality + difficulty) + the harvest (volume) + the parametric families (proof diversity)
+into a single Lean-verified output/train_corpus.jsonl.  See PolyForge/domains/graph/build.py.
+
+The raw curated engine (used internally by the build, available directly) is:
+
     python -m run polyforge <domain>              # run until Ctrl+C
     python -m run polyforge <domain> N            # N split_needed, then floor(N/4) rounding_only
     python -m run polyforge <domain> --minutes M  # run for M minutes
     python -m run polyforge <domain> N --minutes M  # stop at whichever comes first
 
-``<domain>`` is ``hex`` (the original p₆ subject) or ``graph`` (the graph-invariant
-domain, fully wired with its own Inventory and record).  ``N`` is the MAIN-phase
+``<domain>`` is ``graph`` (the graph-invariant domain, fully wired with its own
+Inventory and record).  ``N`` is the MAIN-phase
 target (``split_needed`` records); the SUPPLEMENT phase
 then adds AT MOST ``floor(N * RO_MAX_RATIO)`` = ``floor(N/4)`` ``rounding_only`` records.
 
@@ -247,8 +257,39 @@ def parse_args(argv):
             "seed": seed, "workers": workers, "max_groups": max_groups}
 
 
+def _build_corpus(rest):
+    """`python -m run graph [N] [opts]` — the one graph conjecture generator: curated +
+    harvest + family → output/train_corpus.jsonl (see PolyForge/domains/graph/build.py).
+    Bare N sets harvest seeds (the volume knob)."""
+    from PolyForge.domains.graph.build import build
+    kw = {}
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        if a == "--no-curated":
+            kw["curated_groups"] = 0; i += 1
+        elif a == "--curated-groups":
+            kw["curated_groups"] = int(rest[i + 1]); i += 2
+        elif a == "--seeds":
+            kw["a_seeds"] = int(rest[i + 1]); i += 2
+        elif a == "--seed":
+            kw["curated_seed"] = int(rest[i + 1]); i += 2
+        elif a == "--workers":
+            kw["workers"] = int(rest[i + 1]); i += 2
+        elif a.isdigit():
+            kw["a_seeds"] = int(a); i += 1          # bare N → harvest seeds (volume)
+        else:
+            print(f"unrecognised argument: {a}"); return 1
+    build(**kw)
+    return 0
+
+
 def main(argv):
     import random
+    # `python -m run graph [...]` — build the full training corpus (curated+harvest+family).
+    # `python -m run polyforge <domain> [...]` — the raw curated engine (also called by build).
+    if len(argv) >= 2 and argv[1] == "graph":
+        return _build_corpus(argv[2:])
     opts = parse_args(argv)
     if opts is None:
         print("usage: python -m run polyforge <domain> [N] [--minutes M] "
@@ -738,14 +779,6 @@ def main(argv):
                    batch_time_total, bisection_total, mem.peak, n_workers,
                    phase1, phase2)
     _recheck_sample(domain, base_seed)
-
-    # mirror graph's deliverable records to the repo-root output/ (sibling of PolyForge),
-    # so the final output lives both in the domain's record and in output/.
-    if domain.name == "graph":
-        mirror = domain.record_dir.parents[3] / "output"
-        n = CG.sync_mirror(domain.record_dir, mirror)
-        if n is not None:
-            print(f"  mirrored {n} records to {mirror}")
     return 0
 
 

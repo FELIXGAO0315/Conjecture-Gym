@@ -1,0 +1,10 @@
+# nano-prover SFT stack. Install on the training box (Workbench JupyterLab / VS Code session).
+# If the session has an NVIDIA GPU, install a CUDA build of torch FIRST, e.g.:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+# then: pip install -r training/requirements.txt
+torch>=2.3
+transformers>=4.46
+trl>=0.12
+peft>=0.13
+datasets>=3.0
+accelerate>=1.0

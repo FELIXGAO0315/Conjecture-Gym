@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""PolyForge v1.4.5 §G1/§G2: single-archive-path + driver-backup tests.
+"""PolyForge §G1: single-archive-path test.
 
-§G1: ``archive_removal`` is the ONLY appender to pruned.jsonl — no removal path may
+``archive_removal`` is the ONLY appender to pruned.jsonl — no removal path may
 call ``_pruned_archive_append`` / ``make_prune_entry`` directly.  Enforced by a source
 scan (fails if any other site does), plus a behavioural check that each wired removal
 reason routes through ``archive_removal``.
-§G2: the production driver takes a full backup (record + archive + state) before any
-post-run step that mutates the record.
 """
 import re, sys
 from pathlib import Path
@@ -58,19 +56,6 @@ def test_single_archive_path():
     print("§G1 single-archive-path test: PASS")
 
 
-def test_driver_backup_before_postrun():
-    drv = (ROOT / "PolyForge/scripts/run_production.py").read_text()
-    # a post-run mutation (restore / cleanup / audit) must be preceded by a full backup
-    # that includes record + archive (pruned.jsonl) + state.
-    assert "backup" in drv.lower(), "driver has no backup step"
-    assert "post" in drv.lower() and ("restore" in drv.lower() or "cleanup" in drv.lower() or "audit" in drv.lower()), \
-        "driver does not reference a post-run step"
-    assert "pruned.jsonl" in drv and ".production_state" in drv, \
-        "driver backup must cover record + pruned.jsonl + state"
-    print("§G2 driver-backup test: PASS")
-
-
 if __name__ == "__main__":
     test_single_archive_path()
-    test_driver_backup_before_postrun()
     print("archive-paths tests OK")

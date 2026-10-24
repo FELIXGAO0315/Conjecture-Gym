@@ -1,19 +1,16 @@
 """PolyForge domains: pluggable mathematical subjects behind a common engine.
 
-``load_domain(name)`` returns the domain instance for ``"hex"`` or ``"graph"``.
-The hex domain is fully wired; the graph domain is a skeleton (see
-``graph.domain.GraphDomain``).
+``load_domain(name)`` returns the domain instance.  The project is graph-only
+(``graph.domain.GraphDomain``); the engine stays domain-agnostic so a new subject
+is a new module implementing ``domains/base.py``, not an engine rewrite.
 """
 
 from __future__ import annotations
 
-DOMAIN_NAMES = ("hex", "graph")
+DOMAIN_NAMES = ("graph",)
 
 
 def load_domain(name: str):
-    if name == "hex":
-        from .hex.domain import HexDomain
-        return HexDomain()
     if name == "graph":
         from .graph.domain import GraphDomain
         return GraphDomain()
