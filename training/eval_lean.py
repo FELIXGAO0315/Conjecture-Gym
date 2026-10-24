@@ -69,11 +69,13 @@ def main():
     def gen(statement):
         msgs = [{"role": "system", "content": SYS},
                 {"role": "user", "content": f"Prove this Lean 4 theorem:\n\n```lean\n{statement} :=\n```"}]
-        ids = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt").to(dev)
-        out = model.generate(ids, max_new_tokens=512, do_sample=(args.k > 1),
-                             temperature=0.7 if args.k > 1 else None, top_p=0.95 if args.k > 1 else None,
-                             pad_token_id=tok.eos_token_id)
-        return extract_proof(tok.decode(out[0][ids.shape[1]:], skip_special_tokens=True))
+        enc = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt",
+                                      return_dict=True).to(dev)
+        kw = dict(max_new_tokens=512, pad_token_id=tok.eos_token_id)
+        if args.k > 1:
+            kw.update(do_sample=True, temperature=0.7, top_p=0.95)
+        out = model.generate(**enc, **kw)
+        return extract_proof(tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True))
 
     solved = 0
     for i, t in enumerate(tests):
