@@ -28,13 +28,14 @@ from trl import SFTTrainer, SFTConfig
 
 # ───────────────── CONFIG (env-overridable, e.g. for a quick smoke test) ──────────────
 MODEL      = os.environ.get("SFT_MODEL", "Qwen/Qwen2.5-Coder-1.5B-Instruct")  # 0.5B: "...Coder-0.5B-Instruct"
-EPOCHS     = float(os.environ.get("SFT_EPOCHS", "3"))
+EPOCHS     = float(os.environ.get("SFT_EPOCHS", "1"))     # 1 epoch is plenty for LoRA on ~5k examples
 MAX_STEPS  = int(os.environ.get("SFT_MAX_STEPS", "-1"))   # >0 overrides EPOCHS (smoke test)
 LR         = float(os.environ.get("SFT_LR", "2e-4"))
-MAX_SEQ    = int(os.environ.get("SFT_MAX_SEQ", "2048"))
+MAX_SEQ    = int(os.environ.get("SFT_MAX_SEQ", "1024"))   # most proofs fit; big speed/memory win vs 2048
 BATCH      = int(os.environ.get("SFT_BATCH", "2"))        # per-device; lower to 1 if OOM
 GRAD_ACCUM = int(os.environ.get("SFT_GRAD_ACCUM", "8"))   # effective batch = BATCH * GRAD_ACCUM
 LORA_R     = int(os.environ.get("SFT_LORA_R", "16"))
+GRAD_CKPT  = os.environ.get("SFT_GRAD_CKPT", "0") == "1"  # off by default = faster; on if you hit OOM
 # ─────────────────────────────────────────────────────────────────────
 
 HERE = Path(__file__).resolve().parent
@@ -82,7 +83,7 @@ def main():
         logging_steps=max(1, 20 if MAX_STEPS < 0 else 1),
         save_strategy=("no" if MAX_STEPS > 0 else "epoch"),
         bf16=(dtype == torch.bfloat16), fp16=(dtype == torch.float16),
-        gradient_checkpointing=True, gradient_checkpointing_kwargs={"use_reentrant": False},
+        gradient_checkpointing=GRAD_CKPT, gradient_checkpointing_kwargs={"use_reentrant": False},
         warmup_ratio=0.03, lr_scheduler_type="cosine",
         report_to="none", dataset_text_field="text",   # train on the pre-rendered text field
     )
