@@ -42,7 +42,13 @@ OUT = HERE / "out"
 
 def main():
     cuda = torch.cuda.is_available()
-    dtype = torch.bfloat16 if (cuda and torch.cuda.is_bf16_supported()) else (torch.float16 if cuda else torch.float32)
+    if cuda:
+        # bf16 is only real on Ampere+ (compute capability >= 8.0).  On T4 (7.5) bf16 is emulated
+        # and breaks matmul ("gemm input BFloat16 output float") — use fp16 there.
+        cap = torch.cuda.get_device_capability()[0]
+        dtype = torch.bfloat16 if cap >= 8 else torch.float16
+    else:
+        dtype = torch.float32
     print(f"device: {'cuda:'+torch.cuda.get_device_name(0) if cuda else 'CPU (slow — prefer a GPU profile)'}  dtype={dtype}")
 
     tok = AutoTokenizer.from_pretrained(MODEL)
@@ -76,7 +82,8 @@ def main():
         logging_steps=max(1, 20 if MAX_STEPS < 0 else 1),
         save_strategy=("no" if MAX_STEPS > 0 else "epoch"),
         bf16=(dtype == torch.bfloat16), fp16=(dtype == torch.float16),
-        gradient_checkpointing=True, warmup_ratio=0.03, lr_scheduler_type="cosine",
+        gradient_checkpointing=True, gradient_checkpointing_kwargs={"use_reentrant": False},
+        warmup_ratio=0.03, lr_scheduler_type="cosine",
         report_to="none", dataset_text_field="text",   # train on the pre-rendered text field
     )
     if MAX_STEPS > 0:
