@@ -11,7 +11,13 @@ Then download training/out/ and run the local Lean-verified eval (training/eval_
 
 Tune the CONFIG block.  No GPU? set MODEL to the 0.5B and expect it slow on CPU.
 """
-import json
+import os, sys, subprocess, json
+# Colab preinstalls an OLD torchao that recent transformers rejects (ImportError in get_peft_model).
+# We don't use torchao (plain LoRA) — remove it BEFORE importing transformers so is_torchao_available()
+# is False and the version check is skipped.  No-op (silent) if torchao isn't installed.
+subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "-q", "torchao"],
+               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 from pathlib import Path
 
 import torch
@@ -20,14 +26,15 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig
 from trl import SFTTrainer, SFTConfig
 
-# ────────────────────────────── CONFIG ──────────────────────────────
-MODEL      = "Qwen/Qwen2.5-Coder-1.5B-Instruct"   # ← 0.5B option: "Qwen/Qwen2.5-Coder-0.5B-Instruct"
-EPOCHS     = 3
-LR         = 2e-4
-MAX_SEQ    = 2048
-BATCH      = 2            # per-device; lower to 1 if OOM
-GRAD_ACCUM = 8           # effective batch = BATCH * GRAD_ACCUM
-LORA_R     = 16
+# ───────────────── CONFIG (env-overridable, e.g. for a quick smoke test) ──────────────
+MODEL      = os.environ.get("SFT_MODEL", "Qwen/Qwen2.5-Coder-1.5B-Instruct")  # 0.5B: "...Coder-0.5B-Instruct"
+EPOCHS     = float(os.environ.get("SFT_EPOCHS", "3"))
+MAX_STEPS  = int(os.environ.get("SFT_MAX_STEPS", "-1"))   # >0 overrides EPOCHS (smoke test)
+LR         = float(os.environ.get("SFT_LR", "2e-4"))
+MAX_SEQ    = int(os.environ.get("SFT_MAX_SEQ", "2048"))
+BATCH      = int(os.environ.get("SFT_BATCH", "2"))        # per-device; lower to 1 if OOM
+GRAD_ACCUM = int(os.environ.get("SFT_GRAD_ACCUM", "8"))   # effective batch = BATCH * GRAD_ACCUM
+LORA_R     = int(os.environ.get("SFT_LORA_R", "16"))
 # ─────────────────────────────────────────────────────────────────────
 
 HERE = Path(__file__).resolve().parent
@@ -45,6 +52,13 @@ def main():
                                                  device_map="auto" if cuda else None)
 
     ds = load_dataset("json", data_files=str(HERE / "data" / "train.jsonl"), split="train")
+    # Pre-render each chat into a single text string with the model's template, and train on that
+    # plain-text field.  This sidesteps TRL's messages-mode chat-template validation (which requires
+    # `{% generation %}` markers that stock Qwen/SmolLM templates lack).
+    def _to_text(ex):
+        return {"text": tok.apply_chat_template(ex["messages"], tokenize=False,
+                                                add_generation_prompt=False)}
+    ds = ds.map(_to_text, remove_columns=ds.column_names)
     print(f"train examples: {len(ds)}")
 
     peft = LoraConfig(r=LORA_R, lora_alpha=LORA_R * 2, lora_dropout=0.05, bias="none",
@@ -59,11 +73,14 @@ def main():
         output_dir=str(OUT), num_train_epochs=EPOCHS, learning_rate=LR,
         per_device_train_batch_size=BATCH, gradient_accumulation_steps=GRAD_ACCUM,
         max_length=MAX_SEQ, max_seq_length=MAX_SEQ,
-        logging_steps=20, save_strategy="epoch",
+        logging_steps=max(1, 20 if MAX_STEPS < 0 else 1),
+        save_strategy=("no" if MAX_STEPS > 0 else "epoch"),
         bf16=(dtype == torch.bfloat16), fp16=(dtype == torch.float16),
         gradient_checkpointing=True, warmup_ratio=0.03, lr_scheduler_type="cosine",
-        report_to="none", assistant_only_loss=True,   # loss on the proof only, not the prompt
+        report_to="none", dataset_text_field="text",   # train on the pre-rendered text field
     )
+    if MAX_STEPS > 0:
+        desired["max_steps"] = MAX_STEPS
     valid = {f.name for f in dataclasses.fields(SFTConfig)}
     dropped = sorted(set(desired) - valid)
     if dropped:
