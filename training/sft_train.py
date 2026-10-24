@@ -52,14 +52,23 @@ def main():
                       target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
                                       "gate_proj", "up_proj", "down_proj"])
 
-    cfg = SFTConfig(
+    # Build SFTConfig robustly across TRL versions: keep only the args this version accepts
+    # (arg names drift between releases — e.g. max_length vs max_seq_length, warmup_ratio).
+    import dataclasses
+    desired = dict(
         output_dir=str(OUT), num_train_epochs=EPOCHS, learning_rate=LR,
         per_device_train_batch_size=BATCH, gradient_accumulation_steps=GRAD_ACCUM,
-        max_length=MAX_SEQ, logging_steps=20, save_strategy="epoch",
+        max_length=MAX_SEQ, max_seq_length=MAX_SEQ,
+        logging_steps=20, save_strategy="epoch",
         bf16=(dtype == torch.bfloat16), fp16=(dtype == torch.float16),
         gradient_checkpointing=True, warmup_ratio=0.03, lr_scheduler_type="cosine",
         report_to="none", assistant_only_loss=True,   # loss on the proof only, not the prompt
     )
+    valid = {f.name for f in dataclasses.fields(SFTConfig)}
+    dropped = sorted(set(desired) - valid)
+    if dropped:
+        print("  (SFTConfig: this TRL version ignores:", dropped, ")")
+    cfg = SFTConfig(**{k: v for k, v in desired.items() if k in valid})
     trainer = SFTTrainer(model=model, args=cfg, train_dataset=ds,
                          processing_class=tok, peft_config=peft)
     trainer.train()
