@@ -46,6 +46,10 @@ def first_tactic(proof):
 def lemmas(proof):
     return set(LEMMA_RE.findall(proof))
 
+def _ordinal(n):
+    suf = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suf}"
+
 def classify(err):
     e = err.lower()
     if "unexpected token" in e or "expected" in e and "identifier" in e:
@@ -143,9 +147,11 @@ def main():
                    f"Consider more data, a larger base, or steering the factory toward more uniform / "
                    f"Mathlib-native proof styles.")
 
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    OUTDIR.mkdir(parents=True, exist_ok=True)
+    seq = len(list(OUTDIR.glob("*_training_report-*.md"))) + 1   # 1st, 2nd, 3rd, ... run
+    date = datetime.now().strftime("%Y%m%d")
     L = []
-    L.append(f"# nano-prover assessment — {ts}\n")
+    L.append(f"# nano-prover assessment — {_ordinal(seq)} training ({date})\n")
     L.append(f"Evaluated **{n}** held-out statements, **{k}** sample(s) each, Lean-kernel verified "
              f"(no `sorry`, standard axioms).\n")
     L.append(f"## Result\n\n**pass@{k} = {npass}/{n} = {100*npass/n:.1f}%**\n")
@@ -169,8 +175,7 @@ def main():
              f"(learned *which* project lemmas to cite)")
     L.append("\n## Is the upstream corpus still useful for the nano-LLM?\n")
     L.append(verdict + "\n")
-    OUTDIR.mkdir(parents=True, exist_ok=True)
-    out = OUTDIR / f"report-{ts}.md"
+    out = OUTDIR / f"{_ordinal(seq)}_training_report-{date}.md"
     out.write_text("\n".join(L))
     print(f"\npass@{k} = {npass}/{n} = {100*npass/n:.1f}%   → report: {out.relative_to(ROOT)}")
 
