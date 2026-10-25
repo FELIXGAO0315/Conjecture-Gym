@@ -274,20 +274,18 @@ training/
 
 The ML stack is `requirements_training.txt` at the repo root (the upstream factory needs none of it).
 
-## Workflow (local dev → cloud training → local assessment)
+## Workflow (fixed Kaggle cell — edit config in the repo, just re-run on Kaggle)
 
-1. **Local:** commit + push the repo (the corpus `output/train_corpus.jsonl` is included). The Lean
-   verifier stays here for evaluation.
-2. **On the GPU box** (Kaggle: GPU T4 x2, Internet On) — run `training/train_kaggle.ipynb`, or manually:
-   ```bash
-   git pull
-   pip install -r requirements_training.txt
-   python training/scripts/prepare_data.py
-   python training/scripts/sft_train.py
-   python training/scripts/gen_preds.py --n 100 --k 1
-   ```
-   then push the small `training/scripts/preds.jsonl` back.
-3. **Local:** pull, then run the assessment:
+The Kaggle notebook (`training/train_kaggle.ipynb`) is **one fixed cell** that never needs editing: it
+pulls the latest repo, runs `training/scripts/run_kaggle.sh`, and pushes the generated `preds.jsonl`
+back (authenticating with a Kaggle Secret `GITHUB_TOKEN`). The run config lives in the repo, so you
+change the *next* run by editing a file here and pushing — not by touching Kaggle.
+
+1. **One-time (Kaggle):** GPU T4 x2 + Internet On; Add-ons → Secrets → add `GITHUB_TOKEN` (scope `repo`).
+2. **Each round (local):** edit the CONFIG block in **`training/scripts/run_kaggle.sh`**
+   (`SFT_MODEL`, `SFT_EPOCHS`, `GEN_K`, `GEN_MAXTOK`, …), then `git push`.
+3. **Each round (Kaggle):** press ▶ on the one cell. It pulls, trains, and pushes `preds.jsonl` back.
+4. **Each round (local):** pull, then run the assessment:
    ```bash
    git pull
    python training/assessment/assessment.py       # Lean pass@k + report → training/output/
