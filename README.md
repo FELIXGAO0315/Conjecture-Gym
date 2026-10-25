@@ -6,13 +6,18 @@
 Conjecture-Gym has two stages connected by a single file, the corpus:
 
 ```
-  ┌─────────────────────────────┐        ┌─────────────────────────────┐
-  │  UPSTREAM — PolyForge        │        │  DOWNSTREAM — nano-prover    │
-  │  graph facts → forward       │  corpus │  LoRA-SFT a small LLM on it,│
-  │  deduction → Lean kernel →   │ ──────▶ │  score it by REAL Lean      │
-  │  train_corpus.jsonl          │ .jsonl  │  pass@k                     │
-  │  (no LLM in the loop)        │        │                             │
-  └─────────────────────────────┘        └─────────────────────────────┘
+   ┌────────────────────────────────────────────────────────┐
+   │  UPSTREAM — PolyForge            (no LLM in the loop)    │
+   │  graph facts  →  forward deduction  →  Lean 4 kernel     │
+   └───────────────────────────┬────────────────────────────┘
+                               │
+                               ▼   output/train_corpus.jsonl
+                               │   one Lean-verified (statement, proof) / line
+                               ▼
+   ┌────────────────────────────────────────────────────────┐
+   │  DOWNSTREAM — nano-prover                               │
+   │  LoRA-SFT a small LLM  →  score it by REAL Lean pass@k  │
+   └────────────────────────────────────────────────────────┘
 ```
 
 - **Upstream** (`PolyForge/`, `run.py`) manufactures the corpus by *symbolic* deduction, keeping a
