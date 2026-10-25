@@ -288,7 +288,7 @@ change the *next* run by editing a file here and pushing — not by touching Kag
 4. **Each round (local):** pull, then run the assessment:
    ```bash
    git pull
-   python training/assessment/assessment.py       # Lean pass@k + report → training/output/
+   python -m assess       # Lean pass@k + report → training/output/
    ```
 
 ## The assessment report
