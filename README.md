@@ -1,40 +1,51 @@
 # Conjecture-Gym / PolyForge
 
-> **A graph-theory conjecture factory that manufactures Lean-verified `(statement, proof)` pairs
-> for training a downstream theorem prover — no language model in the generation loop.**
+> **A graph-theory conjecture factory that manufactures Lean-verified `(statement, proof)` pairs,
+> and a nano-LLM prover trained on them — no language model in the generation loop.**
 
-PolyForge mines inequalities and identities about graphs, proves each one by **symbolic forward
-deduction**, and keeps it only if the generated `.lean` file compiles against the **Lean 4 kernel**
-with no `sorry` and only the standard axioms. The output is a single training corpus —
-`output/train_corpus.jsonl`, one row per theorem — built to give a downstream prover the three
-things it needs at once: **volume, a difficulty gradient, and proof-paradigm diversity.**
+Conjecture-Gym has two stages connected by a single file, the corpus:
+
+```
+  ┌─────────────────────────────┐        ┌─────────────────────────────┐
+  │  UPSTREAM — PolyForge        │        │  DOWNSTREAM — nano-prover    │
+  │  graph facts → forward       │  corpus │  LoRA-SFT a small LLM on it,│
+  │  deduction → Lean kernel →   │ ──────▶ │  score it by REAL Lean      │
+  │  train_corpus.jsonl          │ .jsonl  │  pass@k                     │
+  │  (no LLM in the loop)        │        │                             │
+  └─────────────────────────────┘        └─────────────────────────────┘
+```
+
+- **Upstream** (`PolyForge/`, `run.py`) manufactures the corpus by *symbolic* deduction, keeping a
+  theorem only if its `.lean` compiles against the **Lean 4 kernel** (no `sorry`, standard axioms).
+  Truth is decided by exact arithmetic, so the search is untrusted and disposable — a bug there wastes
+  compile time but can never put a false theorem into the corpus.
+- **Downstream** (`training/`) fine-tunes a small code LLM to produce proofs for those statements, and
+  scores it by compiling its output through the *same* kernel.
+
+| Stage | Where | What it does |
+|-------|-------|--------------|
+| **Upstream — PolyForge** | `PolyForge/`, `run.py` | manufactures the Lean-verified `(statement, proof)` corpus — no LLM in the loop |
+| **Downstream — nano-prover** | `training/` | fine-tunes a small LLM on the corpus (LoRA SFT), scores it by real Lean pass@k |
+
+The only thing the two stages share is `output/train_corpus.jsonl` — the factory grows it, the prover
+trains on it. Each stage below is self-contained, with its own architecture **and its own changelog**.
+
+<br>
+
+---
+---
+
+# Upstream — the conjecture factory (PolyForge)
+
+PolyForge mines inequalities and identities about graphs, proves each by symbolic forward deduction,
+and keeps it only if the generated `.lean` compiles with no `sorry` and only the standard axioms. The
+output is one training corpus — `output/train_corpus.jsonl`, one row per theorem — engineered to give
+a prover three things at once: **volume, a difficulty gradient, and proof-paradigm diversity.**
 
 ```
    graph facts ──▶ forward deduction ──▶ candidate theorem ──▶ Lean 4 kernel ──▶ train_corpus.jsonl
     (invariants)      (LP, no LLM)        (filtered, scored)    (verify / reject)   (statement, proof)
 ```
-
-Truth is decided by exact arithmetic and the Lean kernel, so the search that proposes conjectures is
-*untrusted and disposable*: a bug there can waste compile time, but it can never put a false theorem
-into the corpus. That is what makes the data safe to train on.
-
----
-
-## Two stages: factory → prover
-
-Conjecture-Gym is an upstream **factory** and a downstream **prover**, connected only by the corpus
-file. Everything below up to *Design principles* documents the upstream; the prover has its own
-section ([Downstream](#downstream--training--evaluating-the-prover)) at the end.
-
-| Stage | Where | What it does | Framework |
-|-------|-------|--------------|-----------|
-| **Upstream — PolyForge** | `PolyForge/`, `run.py` | manufactures the Lean-verified `(statement, proof)` corpus — **no LLM in the loop** (symbolic deduction + Lean kernel) | [Architecture](#architecture) |
-| **Downstream — nano-prover** | `training/` | fine-tunes a small LLM on that corpus (LoRA SFT) and scores it by **real Lean pass@k** | [Downstream](#downstream--training--evaluating-the-prover) |
-
-The only thing the two stages share is `output/train_corpus.jsonl` — the factory grows it, the prover
-trains on it.
-
----
 
 ## One command
 
@@ -63,7 +74,7 @@ its new theorems into the existing corpus, **deduplicated by formula**, so repea
 keeps a **seed cursor** (`output/.corpus_state.json`) and advances it each run, so a later run explores
 *new* premise sets instead of re-deriving the same theorems. The previous corpus is backed up
 (`output/backups/`) before each write. When a run reports `+0 new`, the carrier is saturated at those
-seeds — see below.
+seeds — see *Is this infinite?* below.
 
 **Scheduling** (tuned for a typical 16-core / 15 GB box): `curated` and `harvest` each saturate all
 cores and are Lean-memory-heavy, so they run in **sequence** (running them together would
@@ -77,8 +88,6 @@ The raw curated engine is still available on its own (the build calls it interna
 python -m run polyforge graph 80           # 80 curated conjectures, then an easy tier
 python -m run polyforge graph --minutes 30 # or a fixed budget
 ```
-
----
 
 ## What a row looks like
 
@@ -101,16 +110,12 @@ is shown and the **target** it must produce:
 - `difficulty` — a *hardness* score (proof cost / statement length); the corpus spans easy→hard.
 - `tactics` / `source` — the proof paradigm, for diversity analysis.
 
----
-
 ## The trust boundary
 
 **Nothing enters the corpus unless the Lean 4 kernel accepts it.** A proposal becomes a record only
 if its `.lean` file compiles with no `sorry` and depends only on the standard axioms
 `propext`, `Quot.sound`, `Classical.choice` (the usual Mathlib trio). Verification is independent of
 generation, so the correctness of the corpus rests on Lean + Mathlib, never on the search heuristics.
-
----
 
 ## Is this "infinite"? No — and that is by design
 
@@ -134,8 +139,6 @@ So PolyForge is a *bounded but deep* graph corpus, engineered for the three trai
 a claim of inexhaustibility.  **Growing it further means adding proof paradigms and families here (each
 a hand-authored, Lean-verified strategy), not inflating family instances** — the downstream prover
 learns from distinct strategies, not from the 100th specialization of one theorem.
-
----
 
 ## Architecture
 
@@ -185,8 +188,6 @@ premises → deducer → generator (select/filter) → formalizer (Lean) → sco
    axioms) survive.
 5. **scoring** attaches a *hardness* score and an *interestingness* score (orthogonal signals).
 
----
-
 ## Quickstart
 
 ```bash
@@ -201,8 +202,7 @@ python -m run graph
 
 The pipeline is reproducible (deterministic premise order, seeded work budgets) and crash-safe
 (atomic writes, an exclusive record lock, a per-run write token, workers killed with the parent).
-
----
+Its test-only deps are `requirements_graph.txt`; the factory itself needs only Lean + the stdlib.
 
 ## Design principles
 
@@ -216,74 +216,7 @@ The pipeline is reproducible (deterministic premise order, seeded work budgets) 
   from relaxed harvest and diversity from parametric families, not from pretending the space is
   bottomless.
 
----
-
-## Downstream — training & evaluating the prover
-
-The `training/` stage fine-tunes a small LLM to prove the corpus theorems (input = Lean statement,
-output = Lean proof), then scores it the only honest way: by compiling the generated proofs through
-the **same Lean kernel** the corpus was verified with.
-
-```
-prepare_data.py  →  sft_train.py  →  gen_preds.py  →  assessment.py
-   split corpus      LoRA SFT        sample proofs      Lean-verified pass@k + report
-```
-
-### Framework
-
-```
-training/
-├── train_kaggle.ipynb         # one-click: clone + install + train 0.5B + gen preds (free T4)
-├── scripts/                   # the pipeline (train + generate run on the GPU box)
-│   ├── prepare_data.py        # output/train_corpus.jsonl → scripts/data/{train,test}.jsonl
-│   ├── sft_train.py           # LoRA SFT of a small instruct model → scripts/out/ (adapter)
-│   ├── gen_preds.py           # sample k proofs per held-out statement → scripts/preds.jsonl
-│   └── preds.jsonl            # the generated proofs (small, pushed back from Kaggle)
-├── assessment/
-│   └── assessment.py          # Lean-verify preds + write a report   (run LOCALLY)
-└── output/                    # generated assessment reports (git-ignored)
-```
-
-The ML stack for this stage is `requirements_training.txt` at the repo root; the upstream factory
-needs none of it (only Lean + the stdlib — its test-only deps are `requirements_graph.txt`).
-
-### Workflow (local dev → Kaggle training → local eval)
-
-1. **Local:** commit + push the repo (the corpus `output/train_corpus.jsonl` is included). The Lean
-   verifier stays here for evaluation.
-2. **On Kaggle** (GPU T4 x2, Internet On) — run `training/train_kaggle.ipynb`, or manually:
-   ```bash
-   git pull
-   pip install -r requirements_training.txt
-   python training/scripts/prepare_data.py
-   python training/scripts/sft_train.py
-   python training/scripts/gen_preds.py --n 100 --k 1
-   ```
-   then push the small `training/scripts/preds.jsonl` back.
-3. **Local:** pull, then run the assessment:
-   ```bash
-   git pull
-   python training/assessment/assessment.py           # Lean pass@k + report → training/output/
-   ```
-
-### Model choice
-
-- Default: **Qwen/Qwen2.5-Coder-1.5B-Instruct** (T4 / 12 GB-class GPU friendly, knows Lean).
-- CPU-only / fast iteration: **Qwen/Qwen2.5-Coder-0.5B-Instruct** (what the Kaggle notebook uses).
-- Bigger GPU (24 GB+): try 3B, or the domain-specialized **DeepSeek-Prover-V2-7B** as the base.
-
-### Notes
-
-- Loss is computed on the proof only (`assistant_only_loss`), not the prompt.
-- `assessment.py` is the *only* honest metric here: a proof counts iff the Lean 4 kernel accepts it
-  (no `sorry`, standard axioms) — not string match. It also reports *why* proofs fail and whether the
-  corpus is still teaching the model (lemma overlap, first-tactic match, truncation rate).
-- The corpus is small; LoRA SFT teaches the proof *style/format*. Scale the corpus (more
-  `python -m run graph` runs / more parametric families) before expecting hard wins.
-
----
-
-## History (abridged)
+## Upstream changelog
 
 - **v2.1–2.2** — the corpus accumulates across runs (dedup-append, advancing seed cursor); parametric
   grown from 8→**20 families** / 15→**30 proof paradigms** (circulant, complete-multipartite, Hasse,
@@ -299,7 +232,99 @@ needs none of it (only Lean + the stdlib — its test-only deps are `requirement
   deterministic runs.
 - **v1.0** — the domain-agnostic engine + the `domains/` split.
 
+<br>
+
+---
 ---
 
-**In one line:** PolyForge turns graph facts into Lean-proven `(statement, proof)` pairs with no model
-in the loop — a bounded but deep corpus engineered for volume, difficulty, and proof diversity.
+# Downstream — the nano-prover
+
+The `training/` stage fine-tunes a small LLM to prove the corpus theorems (input = Lean statement,
+output = Lean proof), then scores it the only honest way: by compiling the generated proofs through
+the **same Lean kernel** the corpus was verified with.
+
+```
+prepare_data.py  →  sft_train.py  →  gen_preds.py  →  assessment.py
+   split corpus      LoRA SFT        sample proofs      Lean-verified pass@k + report
+```
+
+Training needs a GPU, which the dev box doesn't have — so training + generation run on a **free cloud
+GPU** (Kaggle T4, no quota wall), and only the tiny `preds.jsonl` of generated proofs is pushed back;
+the Lean-verified scoring runs **locally** (that's where the Mathlib workspace is).
+
+## Framework
+
+```
+training/
+├── train_kaggle.ipynb         # one-click: clone + install + train 0.5B + gen preds (free T4)
+├── scripts/                   # the pipeline (train + generate run on the GPU box)
+│   ├── prepare_data.py        # output/train_corpus.jsonl → scripts/data/{train,test}.jsonl
+│   ├── sft_train.py           # LoRA SFT of a small instruct model → scripts/out/ (adapter)
+│   ├── gen_preds.py           # sample k proofs per held-out statement → scripts/preds.jsonl
+│   └── preds.jsonl            # the generated proofs (small, pushed back from the GPU box)
+├── assessment/
+│   └── assessment.py          # Lean-verify preds + write a report   (run LOCALLY)
+└── output/                    # generated assessment reports: <ordinal>_training_report-<date>.md (git-ignored)
+```
+
+The ML stack is `requirements_training.txt` at the repo root (the upstream factory needs none of it).
+
+## Workflow (local dev → cloud training → local assessment)
+
+1. **Local:** commit + push the repo (the corpus `output/train_corpus.jsonl` is included). The Lean
+   verifier stays here for evaluation.
+2. **On the GPU box** (Kaggle: GPU T4 x2, Internet On) — run `training/train_kaggle.ipynb`, or manually:
+   ```bash
+   git pull
+   pip install -r requirements_training.txt
+   python training/scripts/prepare_data.py
+   python training/scripts/sft_train.py
+   python training/scripts/gen_preds.py --n 100 --k 1
+   ```
+   then push the small `training/scripts/preds.jsonl` back.
+3. **Local:** pull, then run the assessment:
+   ```bash
+   git pull
+   python training/assessment/assessment.py       # Lean pass@k + report → training/output/
+   ```
+
+## The assessment report
+
+`assessment.py` re-verifies every generated proof through the Mathlib + GraphLemmas REPL and writes
+`training/output/<ordinal>_training_report-<date>.md` (`1st_…`, `2nd_…`, auto-incrementing per run)
+containing:
+
+- **pass@k** (Lean-kernel verified) and *which* theorems were solved;
+- **why the rest failed**, bucketed by Lean error (parse/truncation, unknown lemma, unsolved goals,
+  tactic-failed, type mismatch, …);
+- **did the model learn?** — truncation rate, first-tactic match, and lemma-name overlap with the
+  reference proofs;
+- a **verdict** on whether the upstream corpus is still useful for this nano-LLM.
+
+This is the *only* honest metric here: a proof counts iff the Lean 4 kernel accepts it (no `sorry`,
+standard axioms) — never string match against the reference.
+
+## Model choice
+
+- Default: **Qwen/Qwen2.5-Coder-1.5B-Instruct** (T4 / 12 GB-class GPU friendly, knows Lean).
+- Fast iteration: **Qwen/Qwen2.5-Coder-0.5B-Instruct** (what the Kaggle notebook uses).
+- Bigger GPU (24 GB+): try 3B, or the domain-specialized **DeepSeek-Prover-V2-7B** as the base.
+
+All knobs are env-overridable, e.g. `SFT_MODEL=…`, `SFT_EPOCHS=3`, `SFT_MAX_SEQ=…`.
+
+## Downstream changelog
+
+- **1st training (2026-10-25)** — first end-to-end run: Kaggle LoRA SFT of Qwen2.5-Coder-0.5B
+  (1 epoch, fp16 on T4), split **generate-on-GPU / verify-locally** flow, and `assessment.py`
+  (pass@k + failure buckets + learning signals + corpus verdict, reports named `<ordinal>_training_report`).
+  **Result: pass@1 = 2/100.** Diagnosis — lemma-name overlap with references **0.58** (the model cites
+  the *right* project lemmas) but **59% of generations were truncated** at 512 tokens → the corpus is
+  clearly teaching the model; 2% is a decoding/capacity limit, not a data problem. Next levers:
+  raise `max_new_tokens`, train 1.5B for 3 epochs, sample `--k 5`.
+
+<br>
+
+---
+
+**In one line:** Conjecture-Gym turns graph facts into Lean-proven `(statement, proof)` pairs with no
+model in the loop (upstream), then trains and honestly Lean-scores a small prover on them (downstream).
