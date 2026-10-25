@@ -332,3 +332,67 @@ One row per run. Full per-run detail (failure buckets, learning signals, verdict
 
 **In one line:** Conjecture-Gym turns graph facts into Lean-proven `(statement, proof)` pairs with no
 model in the loop (upstream), then trains and honestly Lean-scores a small prover on them (downstream).
+
+<br>
+
+---
+---
+
+# Model — the trained nano-prover
+
+> **The deliverable.** A small LLM fine-tuned to prove graph-theory theorems in Lean 4. Download it,
+> give it a statement, get back a Lean proof the kernel accepts.
+
+## What it is
+
+- **Base:** `Qwen/Qwen2.5-Coder-1.5B-Instruct` (public; auto-downloaded) **+** a **LoRA adapter** at
+  [`training/model/`](training/model/) — the adapter *is* the trained part (a few tens of MB of weights).
+- **Input:** a Lean 4 theorem **statement** (a graph-invariant inequality/identity, in the corpus's
+  format — the signature up to `:=`).
+- **Output:** a candidate Lean 4 **proof** (a `by …` tactic block).
+- **Quality:** Lean-kernel-verified **pass@3 = 54%** on held-out statements (run 2 — see the Training
+  report above). A proof "counts" only if Lean 4 compiles it with no `sorry` and standard axioms.
+
+## How to use it
+
+```bash
+git clone https://github.com/FELIXGAO0315/Conjecture-Gym.git && cd Conjecture-Gym
+pip install transformers peft torch
+```
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
+
+base = "Qwen/Qwen2.5-Coder-1.5B-Instruct"                 # auto-downloaded from Hugging Face
+tok   = AutoTokenizer.from_pretrained(base)
+model = PeftModel.from_pretrained(AutoModelForCausalLM.from_pretrained(base), "training/model")
+
+statement = "theorem ex (G : SimpleGraph V) [Fintype V] ... : 2 * G.edgeFinset.card ≥ 3 * Fintype.card V"
+msgs = [{"role": "user", "content": f"Prove this Lean 4 theorem:\n\n```lean\n{statement} :=\n```"}]
+ids  = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt")
+print(tok.decode(model.generate(ids, max_new_tokens=1024)[0][ids.shape[1]:], skip_special_tokens=True))
+```
+
+To **check** a generated proof, compile `statement := proof` against the Lean workspace in
+`PolyForge/lean` (that is exactly what `training/assessment/assessment.py` does). A GPU makes
+generation fast; CPU works but is slow.
+
+## The goal — and where this model honestly stands
+
+The north star: **feed in a conjecture — including an existing unsolved one — and get back both a
+machine-checked Lean proof and a readable written proof (Markdown / PDF).** That is what would make
+this a genuinely useful prover.
+
+| capability | status |
+|---|---|
+| prove graph-theory statements *in the corpus's Lean format* | ✅ **working** — 54% Lean-verified (pass@3) |
+| output a Lean proof the kernel accepts | ✅ working |
+| render the Lean proof into a written Markdown / PDF proof | ⏳ **not yet** — planned (next: a `prove.py` that generates → verifies → renders) |
+| take a conjecture in **plain natural language** (not pre-formalized Lean) | ⏳ not yet — needs an autoformalization front-end |
+| attack **open / unsolved** conjectures | ✖ **out of scope for a 1.5B model** — that is research-frontier; this model proves *in-distribution* graph theorems, not open problems |
+
+So today it is an honest, Lean-verified **graph-theory proof assistant for formalized statements**, not
+an open-problem solver — and every claim it makes is checked by the Lean kernel, never asserted.
+Growing the corpus (upstream) and scaling the model lift the 54%; the written-proof rendering and the
+natural-language front-end are the next milestones toward the north star.
