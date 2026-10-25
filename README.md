@@ -317,15 +317,19 @@ standard axioms) — never string match against the reference.
 
 All knobs are env-overridable, e.g. `SFT_MODEL=…`, `SFT_EPOCHS=3`, `SFT_MAX_SEQ=…`.
 
-## Downstream changelog
+## Training report
 
-- **1st training (2026-10-25)** — first end-to-end run: Kaggle LoRA SFT of Qwen2.5-Coder-0.5B
-  (1 epoch, fp16 on T4), split **generate-on-GPU / verify-locally** flow, and `assessment.py`
-  (pass@k + failure buckets + learning signals + corpus verdict, reports named `<ordinal>_training_report`).
-  **Result: pass@1 = 2/100.** Diagnosis — lemma-name overlap with references **0.58** (the model cites
-  the *right* project lemmas) but **59% of generations were truncated** at 512 tokens → the corpus is
-  clearly teaching the model; 2% is a decoding/capacity limit, not a data problem. Next levers:
-  raise `max_new_tokens`, train 1.5B for 3 epochs, sample `--k 5`.
+### 1st training — 2026-10-25
+
+- **Model / setup:** Qwen2.5-Coder-0.5B · LoRA SFT · 1 epoch · fp16 on a Kaggle T4
+- **Flow:** generate proofs on the GPU box → Lean-verify locally (`assessment.py` → report)
+- **Result:** **pass@1 = 2 / 100**
+- **Did it learn?** lemma-name overlap with the reference proofs = **0.58** — cites the *right* project lemmas
+- **First tactic match:** 38% — learned how to *open* the proofs
+- **Main failure:** **59% of generations truncated** at 512 tokens (parse errors)
+- **Other failures:** tactic didn't close 27% · unknown/hallucinated lemma 7% · type mismatch / other 5%
+- **Verdict:** the corpus is clearly teaching the model — 2% is a decoding/capacity limit, **not a data problem**
+- **Next levers:** raise `max_new_tokens` · train 1.5B for 3 epochs · sample `--k 5`
 
 <br>
 
