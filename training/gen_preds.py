@@ -22,7 +22,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=100)
     ap.add_argument("--k", type=int, default=1)
-    ap.add_argument("--base", default=BASE_DEFAULT)
+    ap.add_argument("--base", default=None, help="base model; auto-read from the adapter if omitted")
     ap.add_argument("--adapter", default=str(HERE / "out"))
     ap.add_argument("--out", default=str(HERE / "preds.jsonl"))
     args = ap.parse_args()
@@ -30,9 +30,14 @@ def main():
     tests = [json.loads(l) for l in (HERE / "data" / "test.jsonl").read_text().splitlines() if l.strip()]
     tests = tests[:args.n]
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    tok = AutoTokenizer.from_pretrained(args.base)
-    model = AutoModelForCausalLM.from_pretrained(args.base, dtype="auto").to(dev)
-    if Path(args.adapter).exists():
+    # resolve the base: explicit flag > the base the adapter was trained on > default
+    adapter_ok = Path(args.adapter).exists()
+    cfgp = Path(args.adapter) / "adapter_config.json"
+    base = args.base or (json.loads(cfgp.read_text()).get("base_model_name_or_path") if cfgp.exists() else None) or BASE_DEFAULT
+    print("base:", base)
+    tok = AutoTokenizer.from_pretrained(base)
+    model = AutoModelForCausalLM.from_pretrained(base, dtype="auto").to(dev)
+    if adapter_ok:
         model = PeftModel.from_pretrained(model, args.adapter); print("adapter:", args.adapter)
     else:
         print("!! no adapter — generating from BASE model (baseline)")
