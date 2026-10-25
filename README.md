@@ -323,6 +323,7 @@ One row per run. Full per-run detail (failure buckets, learning signals, verdict
 | # | date | base · config | pass@k | lemma overlap | top failure | takeaway |
 |---|------|---------------|-------:|--------------:|-------------|----------|
 | 1 | 2026-10-25 | 0.5B · 1 ep · gen 512 · k1 | **2/100** | 0.58 | 59% truncated | corpus is teaching; decoding-limited → raise gen length, 1.5B, 3 ep |
+| 2 | 2026-10-25 | 1.5B · 3 ep · gen 1024 · k3 | **54/100** | 0.81 | tactic not closed (23%) | big jump from 2%; truncation 59%→17%, first-tactic 38%→82% — levers worked; next: `--k 5`, grow corpus |
 
 <br>
 
