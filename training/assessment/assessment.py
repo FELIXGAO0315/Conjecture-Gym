@@ -178,6 +178,11 @@ def main():
     out = OUTDIR / f"{_ordinal(seq)}_training_report-{date}.md"
     out.write_text("\n".join(L))
     print(f"\npass@{k} = {npass}/{n} = {100*npass/n:.1f}%   → report: {out.relative_to(ROOT)}")
+    # ready-to-paste row for the README "Training report" table (fill in base · config)
+    top_fail = reasons.most_common(1)[0][0] if reasons else "—"
+    pretty = f"{date[:4]}-{date[4:6]}-{date[6:]}"
+    print("\nREADME table row (paste under '## Training report', fill in base · config):")
+    print(f"| {seq} | {pretty} | <base · N ep · gen T · k{k}> | **{npass}/{n}** | {overlap_mean:.2f} | {top_fail} | <takeaway> |")
 
 if __name__ == "__main__":
     main()

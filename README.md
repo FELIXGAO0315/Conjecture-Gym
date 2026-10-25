@@ -319,17 +319,12 @@ All knobs are env-overridable, e.g. `SFT_MODEL=…`, `SFT_EPOCHS=3`, `SFT_MAX_SE
 
 ## Training report
 
-### 1st training — 2026-10-25
+One row per run. Full per-run detail (failure buckets, learning signals, verdict) is in the generated
+`training/output/<ordinal>_training_report-<date>.md` from `assessment.py`.
 
-- **Model / setup:** Qwen2.5-Coder-0.5B · LoRA SFT · 1 epoch · fp16 on a Kaggle T4
-- **Flow:** generate proofs on the GPU box → Lean-verify locally (`assessment.py` → report)
-- **Result:** **pass@1 = 2 / 100**
-- **Did it learn?** lemma-name overlap with the reference proofs = **0.58** — cites the *right* project lemmas
-- **First tactic match:** 38% — learned how to *open* the proofs
-- **Main failure:** **59% of generations truncated** at 512 tokens (parse errors)
-- **Other failures:** tactic didn't close 27% · unknown/hallucinated lemma 7% · type mismatch / other 5%
-- **Verdict:** the corpus is clearly teaching the model — 2% is a decoding/capacity limit, **not a data problem**
-- **Next levers:** raise `max_new_tokens` · train 1.5B for 3 epochs · sample `--k 5`
+| # | date | base · config | pass@k | lemma overlap | top failure | takeaway |
+|---|------|---------------|-------:|--------------:|-------------|----------|
+| 1 | 2026-10-25 | 0.5B · 1 ep · gen 512 · k1 | **2/100** | 0.58 | 59% truncated | corpus is teaching; decoding-limited → raise gen length, 1.5B, 3 ep |
 
 <br>
 

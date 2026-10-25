@@ -25,6 +25,8 @@ def main():
     ap.add_argument("--base", default=None, help="base model; auto-read from the adapter if omitted")
     ap.add_argument("--adapter", default=str(HERE / "out"))
     ap.add_argument("--out", default=str(HERE / "preds.jsonl"))
+    ap.add_argument("--max-new-tokens", type=int, default=1024, dest="max_new_tokens",
+                    help="cap on generated proof length (512 truncated most proofs — 1024 is safer)")
     args = ap.parse_args()
 
     tests = [json.loads(l) for l in (HERE / "data" / "test.jsonl").read_text().splitlines() if l.strip()]
@@ -48,7 +50,7 @@ def main():
                 {"role": "user", "content": f"Prove this Lean 4 theorem:\n\n```lean\n{statement} :=\n```"}]
         enc = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt",
                                       return_dict=True).to(dev)
-        kw = dict(max_new_tokens=512, pad_token_id=tok.eos_token_id)
+        kw = dict(max_new_tokens=args.max_new_tokens, pad_token_id=tok.eos_token_id)
         if args.k > 1:
             kw.update(do_sample=True, temperature=0.7, top_p=0.95)
         out = model.generate(**enc, **kw)
