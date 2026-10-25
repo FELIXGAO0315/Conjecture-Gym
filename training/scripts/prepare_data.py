@@ -5,14 +5,14 @@ instruction sample: the model is shown the theorem signature (up to `:=`) and mu
 produce the proof.  Train rows are chat messages (user→assistant); test rows keep the
 raw statement/proof so the local Lean verifier can check generated proofs.
 
-Run from the repo root (after a `git pull` on Workbench):
-    python training/prepare_data.py
-Writes training/data/train.jsonl and training/data/test.jsonl.
+Run from the repo root (after a `git pull` on Kaggle):
+    python training/scripts/prepare_data.py
+Writes training/scripts/data/train.jsonl and training/scripts/data/test.jsonl.
 """
 import json, random
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 CORPUS = ROOT / "output" / "train_corpus.jsonl"
 OUT = Path(__file__).resolve().parent / "data"
 TEST_FRACTION = 0.05

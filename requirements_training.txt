@@ -1,0 +1,12 @@
+# Downstream nano-prover SFT stack (the `training/` stage). The upstream PolyForge
+# corpus factory needs none of this — only Lean + the stdlib. Install on the GPU box
+# (Kaggle); the Kaggle notebook pip-installs these inline, so this file is for a manual run:
+#   pip install -r requirements_training.txt
+# On an NVIDIA GPU, install a CUDA build of torch FIRST, e.g.:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch>=2.3
+transformers>=4.46
+trl>=0.12
+peft>=0.13
+datasets>=3.0
+accelerate>=1.0

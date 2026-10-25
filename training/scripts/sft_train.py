@@ -1,18 +1,18 @@
 """LoRA SFT of a nano Lean prover on the graph corpus (portable: GPU or CPU).
 
-Reads training/data/train.jsonl (chat messages), fine-tunes a small instruct model with
-LoRA, saves the adapter to training/out/.  Auto-detects CUDA (bf16) and falls back to CPU.
+Reads training/scripts/data/train.jsonl (chat messages), fine-tunes a small instruct model with
+LoRA, saves the adapter to training/scripts/out/.  Auto-detects CUDA (bf16) and falls back to CPU.
 
-On Posit Workbench (JupyterLab or VS Code session):
-    pip install -r training/requirements.txt
-    python training/prepare_data.py
-    python training/sft_train.py
-Then download training/out/ and run the local Lean-verified eval (training/eval_lean.py).
+On the GPU box (Kaggle):
+    pip install -r requirements_training.txt
+    python training/scripts/prepare_data.py
+    python training/scripts/sft_train.py
+Then download training/scripts/out/ and run the local Lean-verified eval (training/scripts/eval_lean.py).
 
 Tune the CONFIG block.  No GPU? set MODEL to the 0.5B and expect it slow on CPU.
 """
 import os, sys, subprocess, json
-# Colab preinstalls an OLD torchao that recent transformers rejects (ImportError in get_peft_model).
+# Some GPU hosts (e.g. Kaggle) preinstall an OLD torchao that recent transformers rejects (ImportError in get_peft_model).
 # We don't use torchao (plain LoRA) — remove it BEFORE importing transformers so is_torchao_available()
 # is False and the version check is skipped.  No-op (silent) if torchao isn't installed.
 subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "-q", "torchao"],

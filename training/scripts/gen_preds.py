@@ -1,10 +1,10 @@
-"""Generate proofs on the GPU box (Colab), where the base model + LoRA adapter live.
+"""Generate proofs on the GPU box (Kaggle), where the base model + LoRA adapter live.
 
-Loads base + training/out/ adapter, samples k proofs for each held-out test statement, and
-writes training/preds.jsonl — a SMALL text file (statements + generated proofs).  Push that
+Loads base + training/scripts/out/ adapter, samples k proofs for each held-out test statement, and
+writes training/scripts/preds.jsonl — a SMALL text file (statements + generated proofs).  Push that
 back (it's tiny, no 100 MB issue); the Lean-verified scoring runs locally via verify_preds.py.
 
-    python training/gen_preds.py --n 100 --k 1
+    python training/scripts/gen_preds.py --n 100 --k 1
 """
 import argparse, json
 from pathlib import Path

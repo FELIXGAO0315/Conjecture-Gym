@@ -13,3 +13,5 @@ output/backups/
 output/.corpus_state.json
 # derived SFT splits (regenerated on the training box by training/prepare_data.py)
 training/data/
+# nano-prover assessment reports (generated)
+training/output/
