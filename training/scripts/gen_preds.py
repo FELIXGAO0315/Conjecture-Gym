@@ -23,7 +23,7 @@ def main():
     ap.add_argument("--n", type=int, default=100)
     ap.add_argument("--k", type=int, default=1)
     ap.add_argument("--base", default=None, help="base model; auto-read from the adapter if omitted")
-    ap.add_argument("--adapter", default=str(HERE / "out"))
+    ap.add_argument("--adapter", default=str(HERE.parents[1] / "model"))   # repo/training/model
     ap.add_argument("--out", default=str(HERE / "preds.jsonl"))
     ap.add_argument("--max-new-tokens", type=int, default=1024, dest="max_new_tokens",
                     help="cap on generated proof length (512 truncated most proofs — 1024 is safer)")

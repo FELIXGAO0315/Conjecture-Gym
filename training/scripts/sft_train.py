@@ -39,7 +39,7 @@ GRAD_CKPT  = os.environ.get("SFT_GRAD_CKPT", "0") == "1"  # off by default = fas
 # ─────────────────────────────────────────────────────────────────────
 
 HERE = Path(__file__).resolve().parent
-OUT = HERE / "out"
+OUT = HERE.parents[1] / "model"      # repo/training/model — the trained adapter (the deliverable)
 
 def main():
     cuda = torch.cuda.is_available()
@@ -81,7 +81,7 @@ def main():
         per_device_train_batch_size=BATCH, gradient_accumulation_steps=GRAD_ACCUM,
         max_length=MAX_SEQ, max_seq_length=MAX_SEQ,
         logging_steps=max(1, 20 if MAX_STEPS < 0 else 1),
-        save_strategy=("no" if MAX_STEPS > 0 else "epoch"),
+        save_strategy="no",   # no mid-training checkpoints; trainer.save_model() writes only the final adapter
         bf16=(dtype == torch.bfloat16), fp16=(dtype == torch.float16),
         gradient_checkpointing=GRAD_CKPT, gradient_checkpointing_kwargs={"use_reentrant": False},
         warmup_ratio=0.03, lr_scheduler_type="cosine",
@@ -99,7 +99,7 @@ def main():
     trainer.train()
     trainer.save_model(str(OUT))
     tok.save_pretrained(str(OUT))
-    print(f"\nadapter saved → {OUT}/   (download this, then run training/eval_lean.py locally)")
+    print(f"\nadapter saved → {OUT}/   (the trained model; pushed back to the repo as the deliverable)")
 
 if __name__ == "__main__":
     main()

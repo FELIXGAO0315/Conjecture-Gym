@@ -264,9 +264,10 @@ training/
 ├── train_kaggle.ipynb         # one-click: clone + install + train 0.5B + gen preds (free T4)
 ├── scripts/                   # the pipeline (train + generate run on the GPU box)
 │   ├── prepare_data.py        # output/train_corpus.jsonl → scripts/data/{train,test}.jsonl
-│   ├── sft_train.py           # LoRA SFT of a small instruct model → scripts/out/ (adapter)
+│   ├── sft_train.py           # LoRA SFT of a small instruct model → training/model/ (adapter)
 │   ├── gen_preds.py           # sample k proofs per held-out statement → scripts/preds.jsonl
 │   └── preds.jsonl            # the generated proofs (small, pushed back from the GPU box)
+├── model/                     # the TRAINED ADAPTER (your deliverable: base + this LoRA = the prover)
 ├── assessment/
 │   └── assessment.py          # Lean-verify preds + write a report   (run LOCALLY)
 └── output/                    # generated assessment reports: <ordinal>_training_report-<date>.md (git-ignored)
