@@ -7,16 +7,16 @@ Conjecture-Gym has two stages connected by a single file, the corpus:
 
 ```
    ┌────────────────────────────────────────────────────────┐
-   │  UPSTREAM — PolyForge            (no LLM in the loop)    │
-   │  graph facts  →  forward deduction  →  Lean 4 kernel     │
+   │  UPSTREAM — PolyForge            (no LLM in the loop)  │
+   │  graph facts  →  forward deduction  →  Lean 4 kernel   │
    └───────────────────────────┬────────────────────────────┘
                                │
                                ▼   output/train_corpus.jsonl
                                │   one Lean-verified (statement, proof) / line
                                ▼
    ┌────────────────────────────────────────────────────────┐
-   │  DOWNSTREAM — nano-prover                               │
-   │  LoRA-SFT a small LLM  →  score it by REAL Lean pass@k  │
+   │  DOWNSTREAM — nano-prover                              │
+   │  LoRA-SFT a small LLM  →  score it by REAL Lean pass@k │
    └────────────────────────────────────────────────────────┘
 ```
 
