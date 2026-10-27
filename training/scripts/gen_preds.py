@@ -27,6 +27,9 @@ def main():
     ap.add_argument("--out", default=str(HERE / "preds.jsonl"))
     ap.add_argument("--max-new-tokens", type=int, default=1024, dest="max_new_tokens",
                     help="cap on generated proof length (512 truncated most proofs — 1024 is safer)")
+    ap.add_argument("--limit", type=int, default=0,
+                    help="generate at most this many NEW statements this call (0 = all remaining); "
+                         "enables resumable chunked runs")
     args = ap.parse_args()
 
     tests = [json.loads(l) for l in (HERE / "data" / "test.jsonl").read_text().splitlines() if l.strip()]
@@ -56,13 +59,25 @@ def main():
         out = model.generate(**enc, **kw)
         return tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
 
-    with open(args.out, "w") as f:
-        for i, t in enumerate(tests):
+    # RESUMABLE: skip statements already in preds.jsonl, append new ones one-by-one (flushed), so a
+    # timeout only loses the current one — re-running continues from where it stopped.
+    out = Path(args.out)
+    done = set()
+    if out.exists():
+        done = {json.loads(l)["id"] for l in out.read_text().splitlines() if l.strip()}
+    todo = [t for t in tests if t.get("id") not in done]
+    if args.limit > 0:
+        todo = todo[:args.limit]
+    print(f"{len(done)}/{len(tests)} already done; generating {len(todo)} more this call", flush=True)
+    with open(out, "a") as f:
+        for j, t in enumerate(todo):
             gens = [gen(t["statement_lean"]) for _ in range(args.k)]
             f.write(json.dumps({"id": t.get("id"), "statement_lean": t["statement_lean"],
                                 "proof_ref": t.get("proof_lean"), "gens": gens}, ensure_ascii=False) + "\n")
-            print(f"[{i+1}/{len(tests)}] generated {t.get('id','')}")
-    print(f"\nwrote {len(tests)} rows → {args.out}  (push this small file back; verify locally)")
+            f.flush()
+            print(f"[{len(done)+j+1}/{len(tests)}] generated {t.get('id','')}", flush=True)
+    total = len(done) + len(todo)
+    print(f"\npreds.jsonl now has {total}/{len(tests)}  →  {out}")
 
 if __name__ == "__main__":
     main()

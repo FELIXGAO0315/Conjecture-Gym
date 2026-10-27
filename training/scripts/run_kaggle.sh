@@ -19,6 +19,7 @@ export SFT_LORA_R=32        # bigger adapter than run 2 (was 16)
 GEN_N=100
 GEN_K=2                     # k=2 (generation on 3B is slow — k=5 is what blew past 12 h last time)
 GEN_MAXTOK=1024
+GEN_LIMIT=20                # resumable: generate this many NEW per `gen` call, then the cell pushes
 # -----------------------------------------------------------------------------------
 
 case "${1:-}" in
@@ -27,7 +28,8 @@ case "${1:-}" in
     python training/scripts/prepare_data.py
     python training/scripts/sft_train.py ;;
   gen)
-    python training/scripts/gen_preds.py --n "$GEN_N" --k "$GEN_K" --max-new-tokens "$GEN_MAXTOK" ;;
+    python training/scripts/gen_preds.py --n "$GEN_N" --k "$GEN_K" \
+      --max-new-tokens "$GEN_MAXTOK" --limit "$GEN_LIMIT" ;;
   *)
     echo "usage: bash training/scripts/run_kaggle.sh train|gen" ; exit 1 ;;
 esac
