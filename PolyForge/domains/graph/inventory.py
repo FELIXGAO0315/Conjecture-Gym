@@ -42,8 +42,13 @@ from __future__ import annotations
 from fractions import Fraction
 
 # ── variables ────────────────────────────────────────────────────────────────
-VARS = ["n", "m", "max_deg", "min_deg", "chi", "omega", "alpha", "tau",
+VARS = ["n", "m", "max_deg", "min_deg", "chi", "omega", "alpha", "tau", "nu",
+        "gamma", "kappa",
         "diam", "radius", "girth", "s2"]      # s2 = Σ deg²  (B §P1, Cauchy-Schwarz)
+# nu    = matching number (max-cardinality matching, #edges).  v2.1 §M.
+# gamma = domination number (min dominating set size).         v2.2 §D.
+# kappa = vertex connectivity (κ; 0 if disconnected, n−1 if complete).  v2.2 §K.
+# All always finite; each backed by self-proved GraphLemmas defs + ℤ bounds.
 
 # variables whose finiteness is conditional, and the property that grants it
 FINITENESS = {
@@ -234,6 +239,46 @@ INVENTORY = [
     {"name": "cycle_three_le_card", "lean_name": "PolyForge.Graph.three_le_card_of_cycle_int",
      "source": "GraphLemmas", "properties": ["has_cycle"], "finite": [], "guards": [], "param": None,
      "conclusion": {"coeffs": _lin(n=1), "rel": ">=", "rhs": 3}},
+    # ── v2.1 §M: matching number ν (self-proved matchingNumber + ℤ bounds) ──────
+    # 31 — 2ν ≤ n   (a matching saturates 2ν distinct vertices)
+    {"name": "nu_bound_card", "lean_name": "PolyForge.Graph.two_mul_matchingNumber_le_card_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(nu=2, n=-1), "rel": "<=", "rhs": 0}},
+    # 32 — ν ≤ m   (matching edges ⊆ edges)
+    {"name": "nu_le_m", "lean_name": "PolyForge.Graph.matchingNumber_le_edges_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(nu=1, m=-1), "rel": "<=", "rhs": 0}},
+    # 33 — ν ≤ τ   (weak LP duality: each matching edge needs a distinct cover vertex)
+    {"name": "nu_le_tau", "lean_name": "PolyForge.Graph.matchingNumber_le_vertexCoverNum_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(nu=1, tau=-1), "rel": "<=", "rhs": 0}},
+    # ── v2.2 §D: domination number γ (self-proved dominationNumber + ℤ bounds) ──
+    # 34 — γ ≤ n   (the whole vertex set dominates)
+    {"name": "gamma_le_n", "lean_name": "PolyForge.Graph.dominationNumber_le_card_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(gamma=1, n=-1), "rel": "<=", "rhs": 0}},
+    # 35 — γ ≥ 1   (nonempty graph needs at least one dominator)
+    {"name": "gamma_ge_one", "lean_name": "PolyForge.Graph.one_le_dominationNumber_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(gamma=1), "rel": ">=", "rhs": 1}},
+    # 36 — γ ≤ α   (a maximum independent set is dominating)
+    {"name": "gamma_le_alpha", "lean_name": "PolyForge.Graph.dominationNumber_le_indepNum_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(gamma=1, alpha=-1), "rel": "<=", "rhs": 0}},
+    # ── v2.2 §K: vertex connectivity κ (self-proved vertexConnectivity + ℤ bounds) ─
+    # 37 — κ ≤ n − 1
+    {"name": "kappa_le_n_sub_one", "lean_name": "PolyForge.Graph.vertexConnectivity_le_card_sub_one_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(kappa=1, n=-1), "rel": "<=", "rhs": -1}},
+    # 38 — κ ≤ δ   (Whitney: remove a min-degree vertex's neighborhood)
+    {"name": "kappa_le_mindeg", "lean_name": "PolyForge.Graph.vertexConnectivity_le_minDegree_int",
+     "source": "GraphLemmas", "properties": [], "finite": [], "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(kappa=1, min_deg=-1), "rel": "<=", "rhs": 0}},
+    # 39 — is_connected ∧ nontrivial : κ ≥ 1  (gives κ a LOWER bound → generativity)
+    {"name": "conn_kappa_ge_one", "lean_name": "PolyForge.Graph.one_le_vertexConnectivity_int",
+     "source": "GraphLemmas", "properties": ["is_connected", "nontrivial"], "finite": [],
+     "guards": [], "param": None,
+     "conclusion": {"coeffs": _lin(kappa=1), "rel": ">=", "rhs": 1}},
 ]
 
 INVENTORY_BY_NAME = {e["name"]: e for e in INVENTORY}
@@ -346,6 +391,9 @@ def _values_of(g: dict) -> dict:
         "alpha": g["independence_number"], "tau": g["vertex_cover_number"],
         "diam": g["diameter"], "radius": g["radius"], "girth": g["girth"],
         "s2": g["sum_deg_sq"],                 # B §P1: Σ deg²
+        "nu": g["matching_number"],            # v2.1 §M: matching number
+        "gamma": g["domination_number"],       # v2.2 §D: domination number
+        "kappa": g["vertex_connectivity"],     # v2.2 §K: vertex connectivity
     }
     # v1.2: exact product-variable values (real products; §VI.3 regression)
     for pv, (a, b) in PRODUCT_VARS.items():

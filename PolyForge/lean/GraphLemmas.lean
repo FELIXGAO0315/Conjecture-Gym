@@ -671,4 +671,360 @@ theorem isTree_acyclic (h : G.IsTree) : G.IsAcyclic := h.isAcyclic
 theorem isAcyclic_bipartite (h : G.IsAcyclic) : G.IsBipartite :=
   chromaticNumber_le_two_iff_isBipartite.mp h.chromaticNumber_le_two
 
+/-! ### matching number (ν) -/
+
+-- Base instances so Mathlib's canonical `fintypeEdgeSet` synthesizes for `M.coe`.
+-- `Fintype (Sym2 M.verts)` is then derived uniquely via `Sym2.instFintype`.
+noncomputable instance subgraphVertsFintype (M : G.Subgraph) : Fintype M.verts :=
+  Fintype.ofFinite _
+noncomputable instance subgraphCoeAdjDecidable (M : G.Subgraph) : DecidableRel M.coe.Adj :=
+  Classical.decRel _
+
+/-- The matching number ν(G): the largest number of edges in a matching subgraph. -/
+noncomputable def _root_.SimpleGraph.matchingNumber (G : SimpleGraph V) : ℕ :=
+  sSup {k | ∃ M : G.Subgraph, M.IsMatching ∧ M.coe.edgeFinset.card = k}
+
+/-- For a matching `M`, the number of matched vertices is `2·(#edges)`.
+(Replicates the technique of `SimpleGraph.Subgraph.IsMatching.even_card`.) -/
+theorem verts_toFinset_card_eq (M : G.Subgraph) (h : M.IsMatching) [Fintype M.verts] :
+    M.verts.toFinset.card = 2 * M.coe.edgeFinset.card := by
+  classical
+  rw [SimpleGraph.Subgraph.isMatching_iff_forall_degree] at h
+  have hsum := SimpleGraph.sum_degrees_eq_twice_card_edges (G := M.coe)
+  rw [← hsum]
+  rw [Set.toFinset_card]
+  rw [Finset.sum_congr rfl (g := fun _ => 1) (by
+    intro x _
+    have hd : M.degree x.val = 1 := by convert h x.val x.property using 2
+    have hc : M.coe.degree x = M.degree x.val := M.coe_degree x
+    have : M.coe.degree x = 1 := hc.trans hd
+    convert this using 2)]
+  rw [Finset.sum_const, smul_eq_mul, mul_one, Finset.card_univ]
+
+/-- The core bound: a matching has at most `card V / 2` edges. -/
+theorem two_mul_edges_le_card (M : G.Subgraph) (h : M.IsMatching) :
+    2 * M.coe.edgeFinset.card ≤ Fintype.card V := by
+  classical
+  have heq := verts_toFinset_card_eq G M h
+  rw [← heq]
+  rw [Set.toFinset_card]
+  exact Fintype.card_le_of_injective (fun x => x.val) Subtype.val_injective
+
+/-- The edges of a subgraph's coercion inject into the edges of `G`. -/
+theorem edges_coe_le_edges (M : G.Subgraph) :
+    M.coe.edgeFinset.card ≤ G.edgeFinset.card := by
+  classical
+  rw [SimpleGraph.edgeFinset_card, SimpleGraph.edgeFinset_card]
+  rw [Set.fintypeCard_eq_ncard, Set.fintypeCard_eq_ncard]
+  apply Set.ncard_le_ncard_of_injOn (f := Sym2.map (Subtype.val : M.verts → V))
+  · intro e he
+    have hmem : (Sym2.map (Subtype.val) e) ∈ M.edgeSet := by
+      rw [← M.image_coe_edgeSet_coe]
+      exact ⟨e, he, rfl⟩
+    exact M.edgeSet_subset hmem
+  · exact (Sym2.map.injective Subtype.val_injective).injOn
+
+/-- The set of achievable matching sizes. -/
+def matchingSet (G : SimpleGraph V) : Set ℕ :=
+  {k | ∃ M : G.Subgraph, M.IsMatching ∧ M.coe.edgeFinset.card = k}
+
+theorem matchingSet_nonempty : (matchingSet G).Nonempty := by
+  refine ⟨0, (⊥ : G.Subgraph), ?_, ?_⟩
+  · intro v hv
+    simp only [SimpleGraph.Subgraph.verts_bot, Set.mem_empty_iff_false] at hv
+  · rw [Finset.card_eq_zero, SimpleGraph.edgeFinset_eq_empty,
+      SimpleGraph.Subgraph.coe_bot]
+
+theorem matchingSet_bddAbove : BddAbove (matchingSet G) := by
+  refine ⟨Fintype.card V, ?_⟩
+  rintro k ⟨M, hM, rfl⟩
+  have := two_mul_edges_le_card G M hM
+  omega
+
+theorem matchingNumber_eq_sSup : matchingNumber G = sSup (matchingSet G) := rfl
+
+theorem matchingNumber_mem : matchingNumber G ∈ matchingSet G :=
+  Nat.sSup_mem (matchingSet_nonempty G) (matchingSet_bddAbove G)
+
+/-- ν : 2·ν ≤ n. -/
+theorem two_mul_matchingNumber_le_card_int :
+    2 * (G.matchingNumber : ℤ) ≤ (Fintype.card V : ℤ) := by
+  obtain ⟨M, hM, hMcard⟩ := matchingNumber_mem G
+  have hle := two_mul_edges_le_card G M hM
+  rw [hMcard] at hle
+  exact_mod_cast hle
+
+/-- ν ≤ m  (matching number ≤ edges). -/
+theorem matchingNumber_le_edges_int :
+    (G.matchingNumber : ℤ) ≤ (G.edgeFinset.card : ℤ) := by
+  have hle : G.matchingNumber ≤ G.edgeFinset.card := by
+    apply csSup_le (matchingSet_nonempty G)
+    rintro k ⟨M, hM, rfl⟩
+    exact edges_coe_le_edges G M
+  exact_mod_cast hle
+
+/-- `#M.coe.edgeFinset = #M.edgeSet` (as `ncard`), via the injective image map. -/
+theorem coe_edges_card_eq_edgeSet_ncard (M : G.Subgraph) :
+    M.coe.edgeFinset.card = M.edgeSet.ncard := by
+  classical
+  rw [SimpleGraph.edgeFinset_card, Set.fintypeCard_eq_ncard]
+  rw [← M.image_coe_edgeSet_coe]
+  rw [Set.ncard_image_of_injective _ (Sym2.map.injective Subtype.val_injective)]
+
+/-- In a matching, the edge containing a given vertex is unique. -/
+theorem matching_edge_unique (M : G.Subgraph) (hM : M.IsMatching)
+    {v : V} {e1 e2 : Sym2 V} (he1 : e1 ∈ M.edgeSet) (he2 : e2 ∈ M.edgeSet)
+    (hv1 : v ∈ e1) (hv2 : v ∈ e2) : e1 = e2 := by
+  classical
+  obtain ⟨w1, rfl⟩ := Sym2.mem_iff_exists.mp hv1
+  obtain ⟨w2, rfl⟩ := Sym2.mem_iff_exists.mp hv2
+  have hadj1 : M.Adj v w1 := he1
+  have hadj2 : M.Adj v w2 := he2
+  have hvmem : v ∈ M.verts := hadj1.fst_mem
+  obtain ⟨w, _, hwuniq⟩ := hM hvmem
+  have h1 := hwuniq w1 hadj1
+  have h2 := hwuniq w2 hadj2
+  rw [h1, h2]
+
+/-- For any matching `M` and vertex cover `c`, `#M.edgeSet ≤ #c`
+(each matching edge injects to one of its endpoints in the cover). -/
+theorem matching_edges_le_cover (M : G.Subgraph) (hM : M.IsMatching)
+    {c : Set V} (hc : G.IsVertexCover c) :
+    M.edgeSet.ncard ≤ c.ncard := by
+  classical
+  have hpick : ∀ e ∈ M.edgeSet, ∃ v ∈ c, v ∈ e := by
+    intro e he
+    induction e using Sym2.ind with
+    | _ a b =>
+      have hadj : M.Adj a b := he
+      have hGadj : G.Adj a b := M.adj_sub hadj
+      rcases hc hGadj with ha | hb
+      · exact ⟨a, ha, by simp⟩
+      · exact ⟨b, hb, by simp [Sym2.mem_iff]⟩
+  choose f hfc hfmem using hpick
+  apply Set.ncard_le_ncard_of_injOn
+    (f := fun e => if h : e ∈ M.edgeSet then f e h else e.out.1)
+  · intro e he
+    simp only [he, ↓reduceDIte]
+    exact hfc e he
+  · intro e1 h1 e2 h2 heq
+    simp only [h1, h2, ↓reduceDIte] at heq
+    have hv1 : f e1 h1 ∈ e1 := hfmem e1 h1
+    have hv2 : f e2 h2 ∈ e2 := hfmem e2 h2
+    rw [heq] at hv1
+    exact matching_edge_unique G M hM h1 h2 hv1 hv2
+
+/-- ν ≤ τ  (matching number ≤ vertex-cover number; weak LP duality). -/
+theorem matchingNumber_le_vertexCoverNum_int :
+    (G.matchingNumber : ℤ) ≤ (G.vertexCoverNum.toNat : ℤ) := by
+  classical
+  obtain ⟨c, hc_enc, hc_cover⟩ := G.vertexCoverNum_exists
+  have hc_ncard : c.ncard = G.vertexCoverNum.toNat := by rw [Set.ncard, hc_enc]
+  have hle : G.matchingNumber ≤ G.vertexCoverNum.toNat := by
+    rw [← hc_ncard]
+    apply csSup_le (matchingSet_nonempty G)
+    rintro k ⟨M, hM, rfl⟩
+    rw [coe_edges_card_eq_edgeSet_ncard]
+    exact matching_edges_le_cover G M hM hc_cover
+  exact_mod_cast hle
+
+/-! ### domination number (γ) — v2.2 §D -/
+
+/-- The domination number γ(G): the smallest size of a dominating finset (every
+vertex is in the set or adjacent to it). -/
+noncomputable def _root_.SimpleGraph.dominationNumber (G : SimpleGraph V) : ℕ :=
+  sInf {k | ∃ s : Finset V, (∀ v, v ∈ s ∨ ∃ w ∈ s, G.Adj v w) ∧ s.card = k}
+
+theorem dominationNumber_univ_mem_set :
+    (Fintype.card V) ∈ {k | ∃ s : Finset V, (∀ v, v ∈ s ∨ ∃ w ∈ s, G.Adj v w) ∧ s.card = k} := by
+  refine ⟨Finset.univ, ?_, ?_⟩
+  · intro v; exact Or.inl (Finset.mem_univ v)
+  · simp [Finset.card_univ]
+
+/-- γ ≤ n  (the whole vertex set dominates). -/
+theorem dominationNumber_le_card_int :
+    (G.dominationNumber : ℤ) ≤ (Fintype.card V : ℤ) := by
+  have h : G.dominationNumber ≤ Fintype.card V := Nat.sInf_le (dominationNumber_univ_mem_set G)
+  exact_mod_cast h
+
+/-- γ ≥ 1  (a nonempty graph needs at least one dominator). -/
+theorem one_le_dominationNumber_int [Nonempty V] :
+    (1 : ℤ) ≤ (G.dominationNumber : ℤ) := by
+  have hne : {k | ∃ s : Finset V, (∀ v, v ∈ s ∨ ∃ w ∈ s, G.Adj v w) ∧ s.card = k}.Nonempty :=
+    ⟨Fintype.card V, dominationNumber_univ_mem_set G⟩
+  have h1 : 1 ≤ G.dominationNumber := by
+    rw [SimpleGraph.dominationNumber]
+    apply le_csInf hne
+    intro k hk
+    obtain ⟨s, hdom, hcard⟩ := hk
+    by_contra hc
+    push Not at hc
+    interval_cases k
+    · have hempty : s = ∅ := Finset.card_eq_zero.mp hcard
+      obtain ⟨v⟩ := ‹Nonempty V›
+      rcases hdom v with hv | ⟨w, hw, _⟩
+      · rw [hempty] at hv; exact absurd hv (Finset.notMem_empty v)
+      · rw [hempty] at hw; exact absurd hw (Finset.notMem_empty w)
+  exact_mod_cast h1
+
+/-- γ ≤ α  (a maximum independent set is dominating). -/
+theorem dominationNumber_le_indepNum_int :
+    (G.dominationNumber : ℤ) ≤ (G.indepNum : ℤ) := by
+  obtain ⟨s, hs⟩ := G.exists_isNIndepSet_indepNum
+  have hindep : G.IsIndepSet s := hs.isIndepSet
+  have hcard : s.card = G.indepNum := hs.card_eq
+  have hdom : ∀ v, v ∈ s ∨ ∃ w ∈ s, G.Adj v w := by
+    intro v
+    by_contra hc
+    push Not at hc
+    obtain ⟨hvs, hvadj⟩ := hc
+    have hvindep : G.IsIndepSet (insert v s : Finset V) := by
+      rw [SimpleGraph.isIndepSet_iff] at hindep ⊢
+      intro x hx y hy hxy
+      simp only [Finset.coe_insert, Set.mem_insert_iff, Finset.mem_coe] at hx hy
+      rcases hx with hx | hx <;> rcases hy with hy | hy
+      · exact absurd (hx ▸ hy ▸ rfl) hxy
+      · subst hx
+        intro hadj
+        exact hvadj y hy hadj
+      · subst hy
+        intro hadj
+        exact hvadj x hx hadj.symm
+      · exact hindep hx hy hxy
+    have hvcard : (insert v s).card = G.indepNum + 1 := by
+      rw [Finset.card_insert_of_notMem hvs, hcard]
+    have hle : (insert v s).card ≤ G.indepNum := hvindep.card_le_indepNum
+    omega
+  have h : G.dominationNumber ≤ s.card := Nat.sInf_le ⟨s, hdom, rfl⟩
+  rw [hcard] at h
+  exact_mod_cast h
+
+/-! ### vertex connectivity (κ) — v2.2 §K -/
+
+/-- The vertex connectivity κ(G): the smallest size of a vertex set whose removal
+disconnects the graph or leaves ≤ 1 vertex (the latter gives the κ = n−1 convention
+for complete graphs). -/
+noncomputable def _root_.SimpleGraph.vertexConnectivity (G : SimpleGraph V) : ℕ :=
+  sInf {k | ∃ s : Finset V,
+    (¬ (G.induce (↑sᶜ : Set V)).Connected ∨ (sᶜ : Finset V).card ≤ 1) ∧ s.card = k}
+
+theorem vertexConnectivity_le_of_cut (s : Finset V)
+    (h : ¬ (G.induce (↑sᶜ : Set V)).Connected ∨ (sᶜ : Finset V).card ≤ 1) :
+    G.vertexConnectivity ≤ s.card := by
+  apply Nat.sInf_le
+  exact ⟨s, h, rfl⟩
+
+/-- κ ≤ n − 1. -/
+theorem vertexConnectivity_le_card_sub_one_int [Nonempty V] :
+    (G.vertexConnectivity : ℤ) ≤ (Fintype.card V : ℤ) - 1 := by
+  obtain ⟨v₀⟩ := (inferInstance : Nonempty V)
+  set s : Finset V := univ \ {v₀} with hs
+  have hcompl : sᶜ = {v₀} := by
+    rw [hs]
+    ext x
+    simp [Finset.mem_compl, Finset.mem_sdiff]
+  have hcut : ¬ (G.induce (↑sᶜ : Set V)).Connected ∨ (sᶜ : Finset V).card ≤ 1 := by
+    right
+    rw [hcompl]
+    simp
+  have hle := vertexConnectivity_le_of_cut G s hcut
+  have hsum : s.card + sᶜ.card = Fintype.card V := Finset.card_add_card_compl s
+  have hscard : s.card = Fintype.card V - 1 := by
+    rw [hcompl, Finset.card_singleton] at hsum
+    omega
+  rw [hscard] at hle
+  have hpos : 1 ≤ Fintype.card V := Fintype.card_pos
+  have : (G.vertexConnectivity : ℤ) ≤ ((Fintype.card V - 1 : ℕ) : ℤ) := by exact_mod_cast hle
+  rw [Nat.cast_sub hpos] at this
+  push_cast at this ⊢
+  linarith
+
+/-- If a vertex `a` has no neighbor in `H` and there is a different vertex `b`, then
+`H` is not connected. -/
+theorem not_connected_of_isolated {W : Type*} (H : SimpleGraph W)
+    (a b : W) (hab : a ≠ b) (hiso : ∀ c, ¬ H.Adj a c) :
+    ¬ H.Connected := by
+  intro hconn
+  have hr : H.Reachable a b := hconn.preconnected a b
+  rw [reachable_iff_reflTransGen] at hr
+  rcases Relation.ReflTransGen.cases_head hr with h | ⟨c, hac, _⟩
+  · exact hab h
+  · exact hiso c hac
+
+/-- κ ≤ δ  (Whitney: deleting the neighborhood of a minimum-degree vertex is a cut). -/
+theorem vertexConnectivity_le_minDegree_int :
+    (G.vertexConnectivity : ℤ) ≤ (G.minDegree : ℤ) := by
+  rcases isEmpty_or_nonempty V with hV | hV
+  · have h0 : G.vertexConnectivity ≤ 0 := by
+      have := vertexConnectivity_le_of_cut G (univ : Finset V) (Or.inr (by simp))
+      simpa using this
+    have : (G.vertexConnectivity : ℤ) ≤ 0 := by exact_mod_cast h0
+    have hmd : (0 : ℤ) ≤ (G.minDegree : ℤ) := by positivity
+    linarith
+  · obtain ⟨v, hv⟩ := G.exists_minimal_degree_vertex
+    set s : Finset V := G.neighborFinset v with hs
+    have hv_notmem : v ∉ s := by
+      rw [hs, mem_neighborFinset]; exact G.irrefl
+    have hv_compl : v ∈ sᶜ := by rw [Finset.mem_compl]; exact hv_notmem
+    have hscard : s.card = G.minDegree := by
+      rw [hs, card_neighborFinset_eq_degree, ← hv]
+    have hcut : ¬ (G.induce (↑sᶜ : Set V)).Connected ∨ (sᶜ : Finset V).card ≤ 1 := by
+      by_cases hcard : (sᶜ : Finset V).card ≤ 1
+      · exact Or.inr hcard
+      · left
+        push Not at hcard
+        have : ∃ u ∈ sᶜ, u ≠ v := by
+          by_contra hcon
+          push Not at hcon
+          have : (sᶜ : Finset V) ⊆ {v} := by
+            intro x hx; simp [hcon x hx]
+          have := Finset.card_le_card this
+          simp at this
+          omega
+        obtain ⟨u, hu_mem, hu_ne⟩ := this
+        apply not_connected_of_isolated (G.induce (↑sᶜ : Set V))
+          (⟨v, by simpa using hv_compl⟩) (⟨u, by simpa using hu_mem⟩)
+        · simp only [ne_eq, Subtype.mk.injEq]
+          exact fun h => hu_ne h.symm
+        · rintro ⟨c, hc⟩
+          rw [induce_adj]
+          intro hadj
+          have hc_in_s : c ∈ s := by rw [hs, mem_neighborFinset]; exact hadj
+          have hc_in_compl : c ∈ sᶜ := by simpa using hc
+          rw [Finset.mem_compl] at hc_in_compl
+          exact hc_in_compl hc_in_s
+    have hle := vertexConnectivity_le_of_cut G s hcut
+    rw [hscard] at hle
+    exact_mod_cast hle
+
+/-- κ ≥ 1  (a connected graph on ≥ 2 vertices cannot be split by removing nothing). -/
+theorem one_le_vertexConnectivity_int (h : G.Connected) (hn : 2 ≤ Fintype.card V) :
+    (1 : ℤ) ≤ (G.vertexConnectivity : ℤ) := by
+  set S : Set ℕ := {k | ∃ s : Finset V,
+    (¬ (G.induce (↑sᶜ : Set V)).Connected ∨ (sᶜ : Finset V).card ≤ 1) ∧ s.card = k} with hS
+  have hne : S.Nonempty := by
+    refine ⟨(univ : Finset V).card, (univ : Finset V), Or.inr ?_, rfl⟩
+    simp
+  have hge : ∀ k ∈ S, (1 : ℕ) ≤ k := by
+    intro k hk
+    obtain ⟨s, hcut, hcard⟩ := hk
+    rcases Nat.eq_zero_or_pos k with hk0 | hkpos
+    · subst hk0
+      exfalso
+      have hsempty : s = ∅ := Finset.card_eq_zero.mp hcard
+      subst hsempty
+      rw [Finset.compl_empty] at hcut
+      rcases hcut with hnc | hcle
+      · apply hnc
+        have hcoe : (↑(univ : Finset V) : Set V) = Set.univ := by simp
+        rw [hcoe]
+        exact (SimpleGraph.induceUnivIso G).connected_iff.mpr h
+      · rw [Finset.card_univ] at hcle
+        omega
+    · exact hkpos
+  have : (1 : ℕ) ≤ G.vertexConnectivity := by
+    rw [SimpleGraph.vertexConnectivity, ← hS]
+    exact le_csInf hne hge
+  exact_mod_cast this
+
 end PolyForge.Graph

@@ -38,6 +38,9 @@ _Z = {
     "radius": "(G.radius.toNat : ℤ)",
     "girth": "(G.girth : ℤ)",
     "s2": "(∑ v, (G.degree v : ℤ) ^ 2)",      # B §P1: Σ deg²  (matches deg_cauchy_int)
+    "nu": "(G.matchingNumber : ℤ)",           # v2.1 §M: matching number
+    "gamma": "(G.dominationNumber : ℤ)",      # v2.2 §D: domination number
+    "kappa": "(G.vertexConnectivity : ℤ)",    # v2.2 §K: vertex connectivity
 }
 # v1.2 §III.1: product (auxiliary) variables render as the literal product of
 # their factor atoms, in the SAME factor order the GraphLemmas ℤ wrappers use
@@ -98,6 +101,18 @@ WRAPPER = {
     "girth_le_card": ("girth_le_card_int", ["has_cycle"], None),
     "cycle_three_le_edges": ("three_le_edges_int", ["has_cycle"], None),
     "cycle_three_le_card": ("three_le_card_of_cycle_int", ["has_cycle"], None),
+    # v2.1 §M: matching number ν bounds (self-proved)
+    "nu_bound_card": ("two_mul_matchingNumber_le_card_int", [], None),
+    "nu_le_m": ("matchingNumber_le_edges_int", [], None),
+    "nu_le_tau": ("matchingNumber_le_vertexCoverNum_int", [], None),
+    # v2.2 §D: domination number γ bounds (self-proved)
+    "gamma_le_n": ("dominationNumber_le_card_int", [], None),
+    "gamma_ge_one": ("one_le_dominationNumber_int", [], None),
+    "gamma_le_alpha": ("dominationNumber_le_indepNum_int", [], None),
+    # v2.2 §K: vertex connectivity κ bounds (self-proved)
+    "kappa_le_n_sub_one": ("vertexConnectivity_le_card_sub_one_int", [], None),
+    "kappa_le_mindeg": ("vertexConnectivity_le_minDegree_int", [], None),
+    "conn_kappa_ge_one": ("one_le_vertexConnectivity_int", ["is_connected"], "n2"),
 }
 
 # v1.2.1 §VI.2 / v1.2.2 §II: conditional theorems whose numeric hypothesis is

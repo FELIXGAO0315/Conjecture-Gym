@@ -350,13 +350,21 @@ class Context:
 
     def __init__(self, premises=None, assumptions=None, depth=DEFAULT_SPLIT_DEPTH,
                  max_rounds=DEFAULT_MAX_ROUNDS, extra_directions=None, label="",
-                 use_conditional_split=True, use_bnb=True, use_lemmas=True):
+                 use_conditional_split=True, use_bnb=True, use_lemmas=True,
+                 use_base_directions=True):
         self.facts: list = []
         self._by_lhs: dict = {}     # lhs_key -> Fact (strongest)
         self._markers: set = set()  # triggered-conditional / attempted-split keys
         self.depth = depth
         self.max_rounds = max_rounds
-        self.directions = list(BASE_DIRECTIONS) + list(extra_directions or [])
+        # v2.3 perf: a targeted derivability check (reverse-prune step 2) only needs the
+        # goal directions — the 30 BASE_DIRECTIONS build the full invariant closure, which
+        # is wasteful when we only ask "is THIS goal derivable from these facts?".  Omitting
+        # them can only REDUCE the derived set, so a check can only ever under-derive (= the
+        # prune under-fires, keeping a record — safe for soundness, never deletes a
+        # non-redundant record).  Default True preserves the original behaviour everywhere.
+        self.directions = (list(BASE_DIRECTIONS) if use_base_directions else []) \
+            + list(extra_directions or [])
         self.label = label
         # v0.6.7 §1: restrict the split kinds (used by cost-bounded re-proving to
         # search for a cheaper proof under different method restrictions).

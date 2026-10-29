@@ -162,6 +162,9 @@ def vars_from_graph(g: dict) -> dict:
         "alpha": val(g["independence_number"]), "tau": val(g["vertex_cover_number"]),
         "diam": val(g["diameter"]), "radius": val(g["radius"]), "girth": val(g["girth"]),
         "s2": val(g["sum_deg_sq"]),             # B §P1: Σ deg²
+        "nu": val(g["matching_number"]),        # v2.1 §M: matching number
+        "gamma": val(g["domination_number"]),   # v2.2 §D: domination number
+        "kappa": val(g["vertex_connectivity"]), # v2.2 §K: vertex connectivity
     }
     # v1.2 §VI.3: exact product-variable values (real products)
     for pv, (a, b) in PRODUCT_VARS.items():

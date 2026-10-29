@@ -1817,8 +1817,13 @@ def _restricted_derive(numeric, goal, extra_facts):
         extra.append({"coeffs": {k: int(v) for k, v in concl["coeffs"].items()},
                       "rel": concl["rel"], "rhs": int(concl["rhs"]), "text": tag})
         tags.append(tag)
+    # v2.3 perf: step 1 (no extra facts) keeps full base directions so the
+    # "derivable from inventory alone → NOT redundant" classification stays exact;
+    # step 2 (with record facts) uses goal-only directions — a targeted derivability
+    # check that can only under-fire (keep a redundant record), never over-prune.
     ctx = Context(premises=extra, depth=0, use_conditional_split=False, use_bnb=False,
-                  use_lemmas=False, extra_directions=[d0, _neg(d0)])
+                  use_lemmas=False, extra_directions=[d0, _neg(d0)],
+                  use_base_directions=(len(extra_facts) == 0))
     ctx.saturate()
     fact = _find_fact(ctx, goal)
     if fact is None:
@@ -1874,10 +1879,20 @@ def _redundant_restricted(S, candidates):
     redundant (it genuinely needs an existing record).  Returns
     ``(is_redundant, [used_record_id, …])``; S itself never participates."""
     avail_views = [E for E in candidates if E["id"] != S["id"] and _premises_imply(S, E)]
+    dt = S.get("depth_type")
     DED.set_active_inventory(S["pset"], S["params"])
     with _restricted_inventory():
-        if _restricted_derive(S["numeric"], S["canon"], []) is not None:
-            return (False, [])                       # step 1: Inventory alone suffices
+        # Step 1: is S's conclusion derivable from the Inventory ALONE (linear + rounding)?
+        # v2.3 perf: for a COMMITTED record this equals depth_type == "rounding_only" —
+        # generation classifies each record by its minimal proof method, so a record whose
+        # proof needs a case split / product ("split_needed" / "product_needed") is by
+        # construction NOT linear+rounding-derivable (verified: 0 mismatches over the full
+        # record set).  Use the O(1) field when present (reverse-prune); fall back to the
+        # solve when absent (the forward check runs on a fresh candidate with no depth_type).
+        step1 = (dt == "rounding_only") if dt is not None \
+            else (_restricted_derive(S["numeric"], S["canon"], []) is not None)
+        if step1:
+            return (False, [])                       # Inventory alone suffices ⇒ not redundant
         if not avail_views:
             return (False, [])
         avail = [(f"__REC__{E['id']}", E["disp"]) for E in avail_views]
@@ -1929,7 +1944,8 @@ def _record_premise_view(data):
             "rel": concl["rel"], "rhs": int(concl["rhs"])}
     _, _, canon = _record_props_canon(data)
     return {"id": data["id"], "props": props, "pset": pset, "params": params,
-            "numeric": numeric, "disp": disp, "canon": canon}
+            "numeric": numeric, "disp": disp, "canon": canon,
+            "depth_type": data.get("depth_type")}      # v2.3: step-1 fast-path
 
 
 _SKIP_RULE = True   # v1.4.2 §C1 — toggled off only by the C3 equivalence test
