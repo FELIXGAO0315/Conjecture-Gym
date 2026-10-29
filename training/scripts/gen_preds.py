@@ -1,6 +1,6 @@
 """Generate proofs on the GPU box, where the base model + LoRA adapter live.
 
-Loads base + training/model/ adapter, samples k proofs for each held-out test statement, and
+Loads base + model/ adapter (repo root), samples k proofs for each held-out test statement, and
 writes training/scripts/preds.jsonl (statements + generated proofs).  Then score locally with
 `python -m assess` (Lean-verified).  Resume-safe: re-running skips statements already in preds.jsonl.
 
@@ -23,7 +23,7 @@ def main():
     ap.add_argument("--n", type=int, default=100)
     ap.add_argument("--k", type=int, default=1)
     ap.add_argument("--base", default=None, help="base model; auto-read from the adapter if omitted")
-    ap.add_argument("--adapter", default=str(HERE.parents[1] / "model"))   # repo/training/model
+    ap.add_argument("--adapter", default=str(HERE.parents[1] / "model"))   # repo-root/model
     ap.add_argument("--out", default=str(HERE / "preds.jsonl"))
     ap.add_argument("--max-new-tokens", type=int, default=1024, dest="max_new_tokens",
                     help="cap on generated proof length (512 truncated most proofs — 1024 is safer)")

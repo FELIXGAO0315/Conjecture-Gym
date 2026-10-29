@@ -2,7 +2,7 @@
 # ============================================================================
 #  nano-prover run config — local GPU box.
 #    bash training/scripts/run.sh train   → install deps + prepare data + LoRA fine-tune
-#                                            (adapter → training/model/)
+#                                            (adapter → model/, at repo root)
 #    bash training/scripts/run.sh gen      → generate eval proofs → training/scripts/preds.jsonl
 #    bash training/scripts/run.sh all      → train, then gen
 #  Then score locally:  python -m assess

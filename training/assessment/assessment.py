@@ -148,7 +148,19 @@ def main():
                    f"Mathlib-native proof styles.")
 
     OUTDIR.mkdir(parents=True, exist_ok=True)
-    seq = len(list(OUTDIR.glob("*_training_report-*.md"))) + 1   # 1st, 2nd, 3rd, ... run
+    # run number: next after the max row in the README training-report table (committed, always
+    # present) — robust on a fresh clone where the generated reports are git-ignored.  Falls back
+    # to the local report count if the table can't be read.
+    seq = None
+    _rm = ROOT / "README.md"
+    if _rm.exists():
+        _txt = _rm.read_text(); _i = _txt.find("## Training report")
+        if _i >= 0:
+            _nums = [int(m.group(1)) for m in re.finditer(r"(?m)^\|\s*(\d+)\s*\|", _txt[_i:])]
+            if _nums:
+                seq = max(_nums) + 1
+    if seq is None:
+        seq = len(list(OUTDIR.glob("*_training_report-*.md"))) + 1
     date = datetime.now().strftime("%Y%m%d")
     L = []
     L.append(f"# nano-prover assessment — {_ordinal(seq)} training ({date})\n")
@@ -183,7 +195,7 @@ def main():
     top_fail = reasons.most_common(1)[0][0] if reasons else "—"
     pretty = f"{date[:4]}-{date[4:6]}-{date[6:]}"
     meta = {}
-    mp = ROOT / "training" / "model" / "run_meta.json"   # written by sft_train.py / gen_preds.py
+    mp = ROOT / "model" / "run_meta.json"   # the adapter dir (sft_train.py OUT); written by sft_train/gen_preds
     if mp.exists():
         try: meta = json.loads(mp.read_text())
         except Exception: meta = {}

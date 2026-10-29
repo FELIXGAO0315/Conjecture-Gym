@@ -1,7 +1,7 @@
 """LoRA SFT of a nano Lean prover on the graph corpus (portable: GPU or CPU).
 
 Reads training/scripts/data/train.jsonl (chat messages), fine-tunes a small instruct model with
-LoRA, saves the adapter to training/model/.  Auto-detects CUDA (bf16) and falls back to CPU.
+LoRA, saves the adapter to model/ (repo root).  Auto-detects CUDA (bf16) and falls back to CPU.
 
 On a GPU box:
     pip install -r requirements_training.txt
@@ -39,7 +39,7 @@ GRAD_CKPT  = os.environ.get("SFT_GRAD_CKPT", "0") == "1"  # off by default = fas
 # ─────────────────────────────────────────────────────────────────────
 
 HERE = Path(__file__).resolve().parent
-OUT = HERE.parents[1] / "model"      # repo/training/model — the trained adapter (the deliverable)
+OUT = HERE.parents[1] / "model"      # repo-root/model — the trained adapter (the deliverable)
 
 def main():
     cuda = torch.cuda.is_available()

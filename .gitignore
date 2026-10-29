@@ -13,7 +13,7 @@ output/backups/
 output/.corpus_state.json
 # derived SFT splits (regenerated on the training box by training/scripts/prepare_data.py)
 training/scripts/data/
-# trained LoRA adapter (large; produced by sft_train.py, reproduced by a training run)
-training/model/
+# trained LoRA adapter (produced by sft_train.py at repo-root/model; reproduced by a training run)
+/model/
 # nano-prover assessment reports (generated)
 training/output/

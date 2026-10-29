@@ -280,7 +280,7 @@ training/
 ├── scripts/                   # the pipeline (train + generate run on the GPU box)
 │   ├── run.sh                 # one entry: `run.sh train|gen|all` (install + prepare + train + generate)
 │   ├── prepare_data.py        # output/train_corpus.jsonl → scripts/data/{train,test}.jsonl
-│   ├── sft_train.py           # LoRA SFT of a small instruct model → training/model/ (adapter)
+│   ├── sft_train.py           # LoRA SFT of a small instruct model → model/ (adapter, at repo root)
 │   ├── gen_preds.py           # sample k proofs per held-out statement → scripts/preds.jsonl
 │   └── preds.jsonl            # the generated proofs (small text file)
 ├── model/                     # the TRAINED ADAPTER (your deliverable: base + this LoRA = the prover)
@@ -387,7 +387,7 @@ model in the loop (upstream), then trains and honestly Lean-scores a small prove
 ## What it is
 
 - **Base:** `Qwen/Qwen2.5-Coder-1.5B-Instruct` (public; auto-downloaded) **+** a **LoRA adapter** at
-  [`training/model/`](training/model/) — the adapter *is* the trained part (a few tens of MB of weights).
+  [`model/`](model/) — the adapter *is* the trained part (a few tens of MB of weights).
 - **Input:** a Lean 4 theorem **statement** (a graph-invariant inequality/identity, in the corpus's
   format — the signature up to `:=`).
 - **Output:** a candidate Lean 4 **proof** (a `by …` tactic block).
@@ -407,7 +407,7 @@ from peft import PeftModel
 
 base = "Qwen/Qwen2.5-Coder-1.5B-Instruct"                 # auto-downloaded from Hugging Face
 tok   = AutoTokenizer.from_pretrained(base)
-model = PeftModel.from_pretrained(AutoModelForCausalLM.from_pretrained(base), "training/model")
+model = PeftModel.from_pretrained(AutoModelForCausalLM.from_pretrained(base), "model")
 
 statement = "theorem ex (G : SimpleGraph V) [Fintype V] ... : 2 * G.edgeFinset.card ≥ 3 * Fintype.card V"
 msgs = [{"role": "user", "content": f"Prove this Lean 4 theorem:\n\n```lean\n{statement} :=\n```"}]
