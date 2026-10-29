@@ -99,6 +99,9 @@ def main():
     trainer.train()
     trainer.save_model(str(OUT))
     tok.save_pretrained(str(OUT))
+    # run manifest — read by the assessment to auto-fill the README training-report row
+    (OUT / "run_meta.json").write_text(json.dumps(
+        {"base": MODEL, "epochs": EPOCHS, "max_seq": MAX_SEQ, "lora_r": LORA_R}, indent=2))
     print(f"\nadapter saved → {OUT}/   (the trained model; next: gen_preds.py then `python -m assess`)")
 
 if __name__ == "__main__":

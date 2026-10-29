@@ -258,7 +258,7 @@ output = Lean proof), then scores it the only honest way: by compiling the gener
 the **same Lean kernel** the corpus was verified with.
 
 > **Versioning.** The downstream nano-prover is versioned independently of the upstream PolyForge
-> factory above. It is at **v0.2** (two training rounds so far — see `training/output/`); the upstream
+> factory above. It is at **v0.2** (2 training rounds so far — see `training/output/`); the upstream
 > changelog (…, v2.3) tracks the corpus generator, not this model. Each nano-prover run just consumes
 > whatever `output/train_corpus.jsonl` currently holds (now 6413 theorems, incl. the v2.3 ν/γ/κ set).
 > It trains on the **full corpus** (a small held-out split is kept only for the Lean-verified pass@k).

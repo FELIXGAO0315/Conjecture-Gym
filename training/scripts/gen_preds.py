@@ -77,6 +77,13 @@ def main():
             f.flush()
             print(f"[{len(done)+j+1}/{len(tests)}] generated {t.get('id','')}", flush=True)
     total = len(done) + len(todo)
+    # record the generation config in the adapter's run manifest (read by the assessment
+    # to auto-fill the README training-report row)
+    if adapter_ok:
+        mp = Path(args.adapter) / "run_meta.json"
+        meta = json.loads(mp.read_text()) if mp.exists() else {}
+        meta.update({"base": base, "k": args.k, "max_new_tokens": args.max_new_tokens})
+        mp.write_text(json.dumps(meta, indent=2))
     print(f"\npreds.jsonl now has {total}/{len(tests)}  →  {out}")
 
 if __name__ == "__main__":

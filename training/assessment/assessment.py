@@ -178,11 +178,32 @@ def main():
     out = OUTDIR / f"{_ordinal(seq)}_training_report-{date}.md"
     out.write_text("\n".join(L))
     print(f"\npass@{k} = {npass}/{n} = {100*npass/n:.1f}%   → report: {out.relative_to(ROOT)}")
-    # ready-to-paste row for the README "Training report" table (fill in base · config)
+
+    # ── auto-filled README training-report row + machine-readable summary (read by `python -m assess`) ──
     top_fail = reasons.most_common(1)[0][0] if reasons else "—"
     pretty = f"{date[:4]}-{date[4:6]}-{date[6:]}"
-    print("\nREADME table row (paste under '## Training report', fill in base · config):")
-    print(f"| {seq} | {pretty} | <base · N ep · gen T · k{k}> | **{npass}/{n}** | {overlap_mean:.2f} | {top_fail} | <takeaway> |")
+    meta = {}
+    mp = ROOT / "training" / "model" / "run_meta.json"   # written by sft_train.py / gen_preds.py
+    if mp.exists():
+        try: meta = json.loads(mp.read_text())
+        except Exception: meta = {}
+    msz = re.search(r"\d+\.?\d*B", meta.get("base", "") or "")
+    base_short = msz.group(0) if msz else ((meta.get("base", "") or "?").split("/")[-1] or "?")
+    bits = [base_short]
+    if meta.get("epochs") is not None: bits.append(f"{float(meta['epochs']):g} ep")
+    if meta.get("max_new_tokens"):     bits.append(f"gen {meta['max_new_tokens']}")
+    bits.append(f"k{k}")
+    config_str = " · ".join(bits)
+    lever = ("raise max_new_tokens" if trunc_pct >= 20
+             else "sample k↑ / grow corpus" if overlap_mean >= 0.30
+             else "bigger base / more epochs")
+    takeaway = f"overlap {overlap_mean:.2f}, {trunc_pct:.0f}% truncated, first-tactic {tac_pct:.0f}% — {lever}"
+    row = f"| {seq} | {pretty} | {config_str} | **{npass}/{n}** | {overlap_mean:.2f} | {top_fail} | {takeaway} |"
+    (OUTDIR / f"{_ordinal(seq)}_summary.json").write_text(json.dumps(
+        {"seq": seq, "date": pretty, "config": config_str, "npass": npass, "n": n, "k": k,
+         "overlap": round(overlap_mean, 2), "top_fail": top_fail, "takeaway": takeaway, "row": row}, indent=2))
+    print("\nREADME table row (auto-applied by `python -m assess`):")
+    print(row)
 
 if __name__ == "__main__":
     main()
