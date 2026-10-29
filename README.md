@@ -253,42 +253,57 @@ prepare_data.py  →  sft_train.py  →  gen_preds.py  →  assessment.py
    split corpus      LoRA SFT        sample proofs      Lean-verified pass@k + report
 ```
 
-Training needs a GPU, which the dev box doesn't have — so training + generation run on a **free cloud
-GPU** (Kaggle T4, no quota wall), and only the tiny `preds.jsonl` of generated proofs is pushed back;
-the Lean-verified scoring runs **locally** (that's where the Mathlib workspace is).
+Training + generation run on the local GPU; the Lean-verified scoring runs on the same box (where the
+Mathlib workspace is). One `bash training/scripts/run.sh all` does train + generate; `python -m assess`
+scores the generated `preds.jsonl`.
 
 ## Framework
 
 ```
 training/
-├── train_kaggle.ipynb         # one-click: clone + install + train 0.5B + gen preds (free T4)
 ├── scripts/                   # the pipeline (train + generate run on the GPU box)
+│   ├── run.sh                 # one entry: `run.sh train|gen|all` (install + prepare + train + generate)
 │   ├── prepare_data.py        # output/train_corpus.jsonl → scripts/data/{train,test}.jsonl
 │   ├── sft_train.py           # LoRA SFT of a small instruct model → training/model/ (adapter)
 │   ├── gen_preds.py           # sample k proofs per held-out statement → scripts/preds.jsonl
-│   └── preds.jsonl            # the generated proofs (small, pushed back from the GPU box)
+│   └── preds.jsonl            # the generated proofs (small text file)
 ├── model/                     # the TRAINED ADAPTER (your deliverable: base + this LoRA = the prover)
 ├── assessment/
-│   └── assessment.py          # Lean-verify preds + write a report   (run LOCALLY)
+│   └── assessment.py          # Lean-verify preds + write a report
 └── output/                    # generated assessment reports: <ordinal>_training_report-<date>.md (git-ignored)
 ```
 
 The ML stack is `requirements_training.txt` at the repo root (the upstream factory needs none of it).
 
-## Workflow (fixed Kaggle cell — edit config in the repo, just re-run on Kaggle)
+## Setup (one-time, on the GPU box)
 
-The Kaggle notebook (`training/train_kaggle.ipynb`) is **one fixed cell** that never needs editing: it
-pulls the latest repo, runs `training/scripts/run_kaggle.sh`, and pushes the generated `preds.jsonl`
-back (authenticating with a Kaggle Secret `GITHUB_TOKEN`). The run config lives in the repo, so you
-change the *next* run by editing a file here and pushing — not by touching Kaggle.
+```bash
+# 1. Python / ML stack — install a CUDA build of torch FIRST (match your CUDA), then the rest:
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+pip install -r requirements_training.txt
 
-1. **One-time (Kaggle):** GPU T4 x2 + Internet On; Add-ons → Secrets → add `GITHUB_TOKEN` (scope `repo`).
-2. **Each round (local):** edit the CONFIG block in **`training/scripts/run_kaggle.sh`**
-   (`SFT_MODEL`, `SFT_EPOCHS`, `GEN_K`, `GEN_MAXTOK`, …), then `git push`.
-3. **Each round (Kaggle):** press ▶ on the one cell. It pulls, trains, and pushes `preds.jsonl` back.
-4. **Each round (local):** pull, then run the assessment:
+# 2. Lean workspace — needed only for `python -m assess` (compiles generated proofs):
+bash PolyForge/env/setup_repl.sh          # builds the pinned Lean REPL (v4.34.0)
+( cd PolyForge/lean && lake build GraphLemmas )
+```
+
+`run.sh train` also pip-installs the transformers stack inline, so step 1's torch install is the only
+hard prerequisite for training/generation; the Lean build is only required for the assessment step.
+
+## Workflow (local GPU — edit config, run, assess)
+
+The whole loop runs on one GPU box. The run config lives in `training/scripts/run.sh`; edit it to
+change a run.
+
+1. **Edit the CONFIG block** in **`training/scripts/run.sh`** (`SFT_MODEL`, `SFT_EPOCHS`, `GEN_K`,
+   `GEN_MAXTOK`, …).
+2. **Train + generate:**
    ```bash
-   git pull
+   bash training/scripts/run.sh all     # install deps, prepare data, LoRA fine-tune, then generate proofs
+   # or run the phases separately:  run.sh train   |   run.sh gen
+   ```
+3. **Assess (Lean-verified):**
+   ```bash
    python -m assess       # Lean pass@k + report → training/output/
    ```
 
@@ -310,9 +325,9 @@ standard axioms) — never string match against the reference.
 
 ## Model choice
 
-- Default: **Qwen/Qwen2.5-Coder-1.5B-Instruct** (T4 / 12 GB-class GPU friendly, knows Lean).
-- Fast iteration: **Qwen/Qwen2.5-Coder-0.5B-Instruct** (what the Kaggle notebook uses).
-- Bigger GPU (24 GB+): try 3B, or the domain-specialized **DeepSeek-Prover-V2-7B** as the base.
+- Default (`run.sh`): **Qwen/Qwen2.5-Coder-3B-Instruct** (knows Lean; fine on a 24 GB-class GPU).
+- Fast iteration: **Qwen/Qwen2.5-Coder-1.5B-Instruct** or **0.5B-Instruct**.
+- Bigger GPU: try 7B/14B, or the domain-specialized **DeepSeek-Prover-V2-7B** as the base.
 
 All knobs are env-overridable, e.g. `SFT_MODEL=…`, `SFT_EPOCHS=3`, `SFT_MAX_SEQ=…`.
 

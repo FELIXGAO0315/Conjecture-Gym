@@ -1,14 +1,14 @@
 """Assess a nano-prover run and write a human-readable report.
 
-Reads the pushed-back generations (training/scripts/preds.jsonl), Lean-verifies each proof
+Reads the generated proofs (training/scripts/preds.jsonl), Lean-verifies each proof
 with the real Mathlib + GraphLemmas preamble, then reports:
   - pass@k (Lean-kernel verified) and WHICH theorems were solved
   - WHY the rest failed, bucketed by Lean error category
   - whether the model actually LEARNED the corpus (truncation / first-tactic match / lemma overlap)
   - a verdict on whether the upstream corpus is still useful for this nano-LLM
 
-Run LOCALLY (the Lean workspace lives here):
-    python training/assessment/assessment.py          # -> training/output/report-<ts>.md
+Needs the Lean workspace (PolyForge/lean built + the REPL from PolyForge/env/setup_repl.sh):
+    python -m assess                                   # -> training/output/<ordinal>_training_report-<date>.md
 """
 import json, re, sys, argparse
 from pathlib import Path

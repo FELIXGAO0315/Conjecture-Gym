@@ -1,18 +1,18 @@
 """LoRA SFT of a nano Lean prover on the graph corpus (portable: GPU or CPU).
 
 Reads training/scripts/data/train.jsonl (chat messages), fine-tunes a small instruct model with
-LoRA, saves the adapter to training/scripts/out/.  Auto-detects CUDA (bf16) and falls back to CPU.
+LoRA, saves the adapter to training/model/.  Auto-detects CUDA (bf16) and falls back to CPU.
 
-On the GPU box (Kaggle):
+On a GPU box:
     pip install -r requirements_training.txt
     python training/scripts/prepare_data.py
-    python training/scripts/sft_train.py
-Then download training/scripts/out/ and run the local Lean-verified eval (training/scripts/eval_lean.py).
+    python training/scripts/sft_train.py        # or: bash training/scripts/run.sh train
+Then generate proofs (gen_preds.py) and score them locally (python -m assess).
 
 Tune the CONFIG block.  No GPU? set MODEL to the 0.5B and expect it slow on CPU.
 """
 import os, sys, subprocess, json
-# Some GPU hosts (e.g. Kaggle) preinstall an OLD torchao that recent transformers rejects (ImportError in get_peft_model).
+# Some GPU hosts preinstall an OLD torchao that recent transformers rejects (ImportError in get_peft_model).
 # We don't use torchao (plain LoRA) — remove it BEFORE importing transformers so is_torchao_available()
 # is False and the version check is skipped.  No-op (silent) if torchao isn't installed.
 subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "-q", "torchao"],
@@ -99,7 +99,7 @@ def main():
     trainer.train()
     trainer.save_model(str(OUT))
     tok.save_pretrained(str(OUT))
-    print(f"\nadapter saved → {OUT}/   (the trained model; pushed back to the repo as the deliverable)")
+    print(f"\nadapter saved → {OUT}/   (the trained model; next: gen_preds.py then `python -m assess`)")
 
 if __name__ == "__main__":
     main()

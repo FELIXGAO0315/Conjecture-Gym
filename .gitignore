@@ -11,7 +11,9 @@ PolyForge/domains/*/record_parametric/
 # corpus itself lives at output/train_corpus.jsonl
 output/backups/
 output/.corpus_state.json
-# derived SFT splits (regenerated on the training box by training/prepare_data.py)
-training/data/
+# derived SFT splits (regenerated on the training box by training/scripts/prepare_data.py)
+training/scripts/data/
+# trained LoRA adapter (large; produced by sft_train.py, reproduced by a training run)
+training/model/
 # nano-prover assessment reports (generated)
 training/output/

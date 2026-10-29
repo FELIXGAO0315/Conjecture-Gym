@@ -1,11 +1,11 @@
-"""`python -m assess` — pull the latest predictions and write the assessment report.
+"""`python -m assess` — write the Lean-verified assessment report from local predictions.
 
-After a Kaggle run pushes `training/scripts/preds.jsonl` back, run this from the repo root:
-it `git pull`s the newest preds, then runs the Lean-verified assessment, writing
+Predictions are generated locally by `training/scripts/gen_preds.py` into
+`training/scripts/preds.jsonl`.  This runs the Lean-verified assessment over them, writing
 `training/output/<ordinal>_training_report-<date>.md` and printing a ready-to-paste README row.
 
-    python -m assess            # pull + assess
-    python -m assess --no-pull  # assess whatever preds.jsonl is already local
+    python -m assess            # assess the local preds.jsonl
+    python -m assess --pull     # git pull first (if preds were produced on another machine)
 
 Any other flags (e.g. `--preds PATH`) are forwarded to the assessment.
 """
@@ -18,9 +18,8 @@ ASSESSMENT = ROOT / "training" / "assessment" / "assessment.py"
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if "--no-pull" in argv:
-        argv.remove("--no-pull")
-    else:
+    if "--pull" in argv:
+        argv.remove("--pull")
         print("→ git pull (fetching the latest preds.jsonl) …", flush=True)
         subprocess.run(["git", "pull", "--no-edit", "origin", "main"], cwd=str(ROOT))
     print("→ Lean-verified assessment …\n", flush=True)
