@@ -207,7 +207,8 @@ python -m run graph
 
 The pipeline is reproducible (deterministic premise order, seeded work budgets) and crash-safe
 (atomic writes, an exclusive record lock, a per-run write token, workers killed with the parent).
-Its test-only deps are `requirements_graph.txt`; the factory itself needs only Lean + the stdlib.
+Its Python deps are `requirements_graph.txt` (numpy/scipy for the LP engine, networkx) plus Lean for
+verification; it needs none of the downstream ML stack.
 
 ## Design principles
 
@@ -288,22 +289,32 @@ training/
 └── output/                    # generated assessment reports: <ordinal>_training_report-<date>.md (git-ignored)
 ```
 
-The ML stack is `requirements_training.txt` at the repo root (the upstream factory needs none of it).
+The ML stack is `requirements_training.txt` at the repo root (the upstream factory needs none of it —
+its own deps are `requirements_graph.txt` + Lean).
 
 ## Setup (one-time, on the GPU box)
 
-```bash
-# 1. Python / ML stack — install a CUDA build of torch FIRST (match your CUDA), then the rest:
-pip install torch --index-url https://download.pytorch.org/whl/cu121
-pip install -r requirements_training.txt
+Use `python -m pip` (in a bare conda env the `pip` shim is often absent; `python -m pip` always
+works — if even that is missing, `python -m ensurepip --upgrade` or `conda install pip` first).
 
-# 2. Lean workspace — needed only for `python -m assess` (compiles generated proofs):
-bash PolyForge/env/setup_repl.sh          # builds the pinned Lean REPL (v4.34.0)
-( cd PolyForge/lean && lake build GraphLemmas )
+```bash
+# 1. Python deps.  Engine (numpy/scipy/networkx) — needed by BOTH the corpus factory and the
+#    assessment — plus a CUDA build of torch (match your CUDA) and the SFT stack:
+python -m pip install -r requirements_graph.txt
+python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+python -m pip install -r requirements_training.txt
+
+# 2. Lean workspace — needed for `python -m assess` (it compiles the generated proofs).
+#    (a) Lean toolchain (provides `lake`), if not already installed:
+curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y && source "$HOME/.elan/env"
+#    (b) the pinned REPL + the GraphLemmas library — `cache get` pulls PREBUILT Mathlib
+#        oleans so this is minutes, not the hours a full Mathlib compile would take:
+bash PolyForge/env/setup_repl.sh
+( cd PolyForge/lean && lake exe cache get && lake build GraphLemmas )
 ```
 
-`run.sh train` also pip-installs the transformers stack inline, so step 1's torch install is the only
-hard prerequisite for training/generation; the Lean build is only required for the assessment step.
+`run.sh train` also `python -m pip`-installs the transformers stack inline. Training/generation need
+step 1 (torch); only the assessment needs the step 2 Lean build.
 
 ## Workflow (local GPU — edit config, run, assess)
 

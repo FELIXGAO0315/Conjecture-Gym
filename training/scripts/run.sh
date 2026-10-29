@@ -26,7 +26,7 @@ GEN_LIMIT=0                  # 0 = generate ALL remaining in one pass (resume-sa
 # -----------------------------------------------------------------------------------
 
 do_train() {
-  pip install -q -U transformers trl peft datasets accelerate
+  python -m pip install -q -U transformers trl peft datasets accelerate
   python training/scripts/prepare_data.py
   python training/scripts/sft_train.py
 }

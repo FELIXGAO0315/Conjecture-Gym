@@ -1,4 +1,9 @@
-# Upstream (graph / PolyForge) dependencies — test-only, NOT runtime.
-# The corpus-factory pipeline itself adds no pip runtime dependency; pytest is used only to run
-# pf_trust/tests and tests/ (v1.4.6+). Install with:  pip install -r requirements_graph.txt
-pytest==8.4.2
+# Upstream (graph / PolyForge) runtime dependencies. The deduction engine solves LPs
+# (scipy.optimize) over invariant vectors (numpy); pool / graph construction uses networkx.
+# These are ALSO required by the downstream assessment — it imports the PolyForge Lean
+# verifier, whose import chain pulls in the engine (numpy/scipy).
+#   python -m pip install -r requirements_graph.txt
+numpy>=1.24
+scipy>=1.9          # needs HiGHS linprog + milp
+networkx>=3.0
+pytest>=8.0         # tests only (pf_trust/tests, tests/)

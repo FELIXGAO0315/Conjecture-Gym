@@ -1,6 +1,7 @@
 # Downstream nano-prover SFT stack (the `training/` stage). The upstream PolyForge
-# corpus factory needs none of this — only Lean + the stdlib. Install on the GPU box:
-#   pip install -r requirements_training.txt
+# corpus factory needs none of this (its deps are requirements_graph.txt + Lean).
+# Install on the GPU box:
+#   python -m pip install -r requirements_training.txt
 # On an NVIDIA GPU, install a CUDA build of torch FIRST (match your CUDA), e.g.:
 #   pip install torch --index-url https://download.pytorch.org/whl/cu121
 # (training/scripts/run.sh also pip-installs the transformers stack inline on `train`.)
