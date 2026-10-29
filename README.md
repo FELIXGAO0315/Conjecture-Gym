@@ -217,12 +217,21 @@ Its test-only deps are `requirements_graph.txt`; the factory itself needs only L
 - **Quality is a filter, not an afterthought.** Redundancy pruning keeps the curated set a
   non-redundant basis; decomposability / degeneracy / weakened-form filters remove padding; hardness
   and interestingness are scored and separated.
-- **Be honest about the carrier.** The graph invariant space is finite and saturates; volume comes
-  from relaxed harvest and diversity from parametric families, not from pretending the space is
-  bottomless.
+- **Be honest about the carrier.** For a *fixed* invariant set the graph space is finite and saturates;
+  volume comes from relaxed harvest and diversity from parametric families, not from pretending the
+  space is bottomless. The lever that genuinely re-opens it is **adding invariants** (v2.3: ν/γ/κ) —
+  each one, with its Lean-verified bounds, enlarges the reachable conjecture space and the difficulty
+  ceiling.
 
 ## Upstream changelog
 
+- **v2.3** — **new graph invariants: matching number ν, domination number γ, vertex-connectivity κ** —
+  each self-defined in `GraphLemmas.lean` with Lean-verified ℤ bound lemmas (2ν≤n, ν≤τ, γ≤α, κ≤δ, …;
+  zero `sorry`, standard axioms) and wired end-to-end, de-saturating the carrier (one round adds
+  hundreds of fresh ν/γ/κ theorems, difficulty up to ~15, including conjectures coupling two new
+  invariants). Reverse-prune made **~100–500× faster** (goal-only directions for the record-fact
+  derivability check + an O(1) `depth_type` fast-path for the inventory-alone check), verified to
+  leave the pruned set byte-for-byte identical.
 - **v2.1–2.2** — the corpus accumulates across runs (dedup-append, advancing seed cursor); parametric
   grown from 8→**20 families** / 15→**30 proof paradigms** (circulant, complete-multipartite, Hasse,
   egirth, diameter, eccentricity, complement, `compl_compl`, antitone, graph-order `≤`, `decide`,
@@ -242,11 +251,17 @@ Its test-only deps are `requirements_graph.txt`; the factory itself needs only L
 ---
 ---
 
-# Downstream — the nano-prover
+# Downstream — the nano-prover (v0.2)
 
 The `training/` stage fine-tunes a small LLM to prove the corpus theorems (input = Lean statement,
 output = Lean proof), then scores it the only honest way: by compiling the generated proofs through
 the **same Lean kernel** the corpus was verified with.
+
+> **Versioning.** The downstream nano-prover is versioned independently of the upstream PolyForge
+> factory above. It is at **v0.2** (two training rounds so far — see `training/output/`); the upstream
+> changelog (…, v2.3) tracks the corpus generator, not this model. Each nano-prover run just consumes
+> whatever `output/train_corpus.jsonl` currently holds (now 6413 theorems, incl. the v2.3 ν/γ/κ set).
+> It trains on the **full corpus** (a small held-out split is kept only for the Lean-verified pass@k).
 
 ```
 prepare_data.py  →  sft_train.py  →  gen_preds.py  →  assessment.py
