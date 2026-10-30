@@ -252,14 +252,14 @@ verification; it needs none of the downstream ML stack.
 ---
 ---
 
-# Downstream — the nano-prover (v0.2)
+# Downstream — the nano-prover (v0.3)
 
 The `training/` stage fine-tunes a small LLM to prove the corpus theorems (input = Lean statement,
 output = Lean proof), then scores it the only honest way: by compiling the generated proofs through
 the **same Lean kernel** the corpus was verified with.
 
 > **Versioning.** The downstream nano-prover is versioned independently of the upstream PolyForge
-> factory above. It is at **v0.2** (2 training rounds so far — see `training/output/`); the upstream
+> factory above. It is at **v0.3** (3 training rounds so far — see `training/output/`); the upstream
 > changelog (…, v2.3) tracks the corpus generator, not this model. Each nano-prover run just consumes
 > whatever `output/train_corpus.jsonl` currently holds (now 6413 theorems, incl. the v2.3 ν/γ/κ set).
 > It trains on the **full corpus** (a small held-out split is kept only for the Lean-verified pass@k).
@@ -366,6 +366,7 @@ One row per run. Full per-run detail (failure buckets, learning signals, verdict
 |---|------|---------------|-------:|--------------:|-------------|----------|
 | 1 | 2026-10-25 | 0.5B · 1 ep · gen 512 · k1 | **2/100** | 0.58 | 59% truncated | corpus is teaching; decoding-limited → raise gen length, 1.5B, 3 ep |
 | 2 | 2026-10-25 | 1.5B · 3 ep · gen 1024 · k3 | **54/100** | 0.81 | tactic not closed (23%) | big jump from 2%; truncation 59%→17%, first-tactic 38%→82% — levers worked; next: `--k 5`, grow corpus |
+| 3 | 2026-10-29 | 3B · 2 ep · gen 1280 · k3 | **77/104** | 0.87 | tactic failed to close | overlap 0.87, 9% truncated, first-tactic 91% — sample k↑ / grow corpus |
 
 <br>
 
