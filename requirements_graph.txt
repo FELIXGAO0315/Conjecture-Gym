@@ -5,5 +5,8 @@
 #   python -m pip install -r requirements_graph.txt
 numpy>=1.24
 scipy>=1.9          # needs HiGHS linprog + milp
-networkx>=3.0
+networkx>=3.0       # graph construction + empirical screening (Hamiltonicity / planarity)
 pytest>=8.0         # tests only (pf_trust/tests, tests/)
+# pynauty — ONLY to REBUILD the extended screening pool (pool_ext.py); not needed at run time
+# (graph_pool_ext.json is committed). Install only if regenerating the pool.
+# pynauty>=2.8

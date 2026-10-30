@@ -140,10 +140,21 @@ honest negative result, and it shapes the whole design:
   term-mode citation — over invariants the fixed engine never sees (girth/egirth, diameter,
   eccentricity, chromatic/clique number, connectivity, matchings).
 
-So PolyForge is a *bounded but deep* graph corpus, engineered for the three training properties — not
-a claim of inexhaustibility.  **Growing it further means adding proof paradigms and families here (each
-a hand-authored, Lean-verified strategy), not inflating family instances** — the downstream prover
-learns from distinct strategies, not from the 100th specialization of one theorem.
+So the LP inequality carrier is a *bounded but deep* graph corpus, engineered for the three training
+properties — not a claim of inexhaustibility.  **Growing it further means adding proof paradigms and
+families here (each a hand-authored, Lean-verified strategy), not inflating family instances** — the
+downstream prover learns from distinct strategies, not from the 100th specialization of one theorem.
+
+**v3.0 opens two axes the inequality carrier structurally could not reach** (see changelog):
+- a **structural carrier** (`structural.py`) — Lean-verified conjectures over graph *predicates*
+  (implications / equivalences / monotonicities, incl. deep citations like **Tutte's theorem**), proved
+  by ~18 non-`linarith` paradigms. Still bounded by what is *derivable from known lemmas*, but a
+  genuinely different KIND of theorem and proof than a linear inequality.
+- an **empirical carrier** (`empirical.py`) — **unproven, Barnette-level conjectures** screened for
+  falsification against the enlarged pool. This is the one carrier that is *not* bounded by
+  provability: it proposes `class → structure` statements at the level of open problems (output goes to
+  `output/open_conjectures.jsonl`, never to the prover's training set). The honest limit is screening
+  depth, not a finite theorem space — which is exactly why the pool **must keep growing**.
 
 ## Architecture
 
@@ -165,12 +176,15 @@ PolyForge/
 │   ├── base.py             #   the Domain interface
 │   └── graph/
 │       ├── domain.py       #     wires the engine to graph
-│       ├── build.py        #     THE pipeline: curated + harvest + parametric → train_corpus.jsonl
+│       ├── build.py        #     THE pipeline: curated + harvest + parametric + structural + empirical
 │       ├── generator.py    #     fixed-graph LP engine (curated + harvest modes)
 │       ├── parametric.py   #     ∀n family generator (proof-paradigm diversity)
+│       ├── structural.py   #     v3.0 structural-theorem engine (predicate implications/iffs, ~18 paradigms)
+│       ├── empirical.py    #     v3.0 empirical engine (UNPROVEN Barnette-level conjectures, screened)
+│       ├── pool_ext.py     #     v3.0 enlarged screening pool (hard graphs + sampling, n→46)
 │       ├── deduction.py · formalizer.py · inventory.py
-│       ├── data/           #     the graph pool (invariants per sample graph)
-│       └── record/ · record_train/ · record_parametric/   # curated · harvest · parametric (git-ignored)
+│       ├── data/           #     graph pool: graph_pool.json (n≤7) + graph_pool_ext.json (hard+sampled)
+│       └── record/ · record_train/ · record_parametric/ · record_structural/ · record_empirical/   # (git-ignored)
 ├── env/                    # Lean verification toolkit: verifier, tasks, closure_complete,
 │   │                       #   discardlog, replace_gate, analysis/ (audits), setup_repl.sh
 ├── lean/                   # shared Lean 4 + Mathlib v4.34.0 workspace (GraphLemmas; .lake git-ignored)
@@ -218,14 +232,45 @@ verification; it needs none of the downstream ML stack.
 - **Quality is a filter, not an afterthought.** Redundancy pruning keeps the curated set a
   non-redundant basis; decomposability / degeneracy / weakened-form filters remove padding; hardness
   and interestingness are scored and separated.
-- **Be honest about the carrier.** For a *fixed* invariant set the graph space is finite and saturates;
-  volume comes from relaxed harvest and diversity from parametric families, not from pretending the
-  space is bottomless. The lever that genuinely re-opens it is **adding invariants** (v2.3: ν/γ/κ) —
-  each one, with its Lean-verified bounds, enlarges the reachable conjecture space and the difficulty
-  ceiling.
+- **Be honest about the carrier.** For a *fixed* invariant set the inequality graph space is finite and
+  saturates; volume comes from relaxed harvest and diversity from parametric families, not from
+  pretending the space is bottomless. Adding invariants (v2.3: ν/γ/κ) widens the *vocabulary* but not
+  the *kind*. The lever that genuinely changes kind is **adding a new carrier** (v3.0: the structural
+  and empirical engines) — a different shape of conjecture and proof, not the 100th linear inequality.
+- **Separate proved from conjectured.** Lean-verified theorems (LP + structural) go to
+  `train_corpus.jsonl` and are prover targets; the empirical carrier's **unproven** conjectures go to
+  `output/open_conjectures.jsonl` and are *never* fed to the prover as something to prove. A false or
+  open statement must never masquerade as a theorem.
 
 ## Upstream changelog
 
+- **v3.0** — **two new conjecture carriers beyond the LP inequality engine.** Until now the corpus was
+  one *kind* of conjecture (a linear inequality among invariants) with one *family* of proof
+  (`linarith`/`omega`/`by_cases`/`mul_nonneg`); adding invariants (v2.3) widened the vocabulary but not
+  the kind. v3.0 adds genuinely different kinds of conjecture **and** proof:
+  - **structural engine** (`domains/graph/structural.py`) — Lean-verified conjectures over graph
+    *predicates* (`IsTree`, `Connected`, `CliqueFree`, `Colorable`, `IsBipartite`,
+    `IsPerfectMatching`, …): implications, equivalences, parameter monotonicities, and concrete-family
+    instances, proved by a portfolio of **~18 non-`linarith` paradigms** (term-mode destructure, `iff`
+    projection, implication chaining `∘`, parity-case, `simp`/`decide`, and deep-theorem citation incl.
+    **Tutte's 1-factor theorem**). It is an *engine* — a curated inventory of verified Mathlib facts ×
+    composition rules → many theorems — mirroring how the LP engine stands on `GraphLemmas`.
+  - **empirical engine** (`domains/graph/empirical.py`) — **UNPROVEN, Barnette-level conjectures**:
+    `class → structural conclusion` statements (e.g. `bipartite ∧ cubic → Hamiltonian`) screened for
+    falsification against the enlarged pool. Kept iff no counterexample, non-trivial support, and
+    **irredundant** (dropping any one hypothesis introduces a counterexample). It rediscovers real
+    theorems (Dirac) and surfaces famous open/false ones (Tait, Barnette sub-cases); the false ones with
+    reachable counterexamples (Petersen, the Tutte graph) are correctly filtered out. These are written
+    to **`output/open_conjectures.jsonl`** and kept OUT of `train_corpus.jsonl` — they have no proof, so
+    they are never a prover target (they are the north-star *output*: hard conjectures, and a brutal
+    held-out benchmark).
+  - **enlarged screening pool** (`domains/graph/pool_ext.py`) — the n≤7 atlas is extended with famous
+    hard graphs (Petersen n=10, the Tutte graph n=46, Chvátal, Heawood, …) + structured random sampling
+    (cubic / k-regular / bipartite / planar) up to n=24, pynauty-deduped, so Barnette-level conjectures
+    are screened at a scale that actually catches their counterexamples.
+  - **technique-aware difficulty** (`scoring/hardness.py`) — structural proofs are scored by proof
+    *technique* (not LP step-count), on the same scale as the LP `hardness`, so they tier together
+    instead of being mis-scored as trivial.
 - **v2.3** — **new graph invariants: matching number ν, domination number γ, vertex-connectivity κ** —
   each self-defined in `GraphLemmas.lean` with Lean-verified ℤ bound lemmas (2ν≤n, ν≤τ, γ≤α, κ≤δ, …;
   zero `sorry`, standard axioms) and wired end-to-end, de-saturating the carrier (one round adds

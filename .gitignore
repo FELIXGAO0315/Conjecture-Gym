@@ -3,10 +3,13 @@ __pycache__/
 *.pyc
 # vendored Lean REPL build (rebuilt via PolyForge/env/setup_repl.sh; commit pinned there)
 PolyForge/env/vendor/
-# generated record dirs (curated / harvest / parametric) — local artifacts, regenerated each run
+# generated record dirs (curated / harvest / parametric / structural / empirical) — local
+# artifacts, regenerated each run
 PolyForge/domains/*/record/
 PolyForge/domains/*/record_train/
 PolyForge/domains/*/record_parametric/
+PolyForge/domains/*/record_structural/
+PolyForge/domains/*/record_empirical/
 # pre-write corpus backups + local run state — kept locally, not committed; the growing
 # corpus itself lives at output/train_corpus.jsonl
 output/backups/

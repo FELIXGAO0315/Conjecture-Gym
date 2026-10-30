@@ -112,3 +112,54 @@ def hardness(steps, premises, conclusion, inventory_theorems=(), aux_vars=()) ->
     if length == 0:
         return 0.0
     return proof_difficulty(steps, inventory_theorems, aux_vars) / length
+
+
+# ── structural-conjecture difficulty (technique-aware) ──────────────────────────
+# Structural proofs (structural.py) are term-mode Lean, not LP step-traces, so the
+# step-counting `hardness()` above scores them ~0.  Here we score by PROOF TECHNIQUE
+# (the paradigm), the statement's logical complexity, and composition depth, on a scale
+# comparable to the LP `hardness` (mean ~3) so the two carriers tier together.
+W_TECHNIQUE = {                     # matched by prefix against the record's paradigm
+    "simp": 1.0,                    # decide/simp on a concrete instance — shallow
+    "coloring (witness)": 1.5,      # exhibit an explicit coloring
+    "term-mode": 1.5,
+    "implication (destructure)": 1.5,
+    "implication (cite)": 1.5,
+    "universal": 2.0,
+    "monotone": 2.0,
+    "implication (iff.mp)": 2.0,
+    "implication (iff.mpr)": 2.0,
+    "equivalence (iff cite)": 2.5,  # the full biconditional
+    "implication chain": 3.0,       # composed from ≥2 inventory facts
+    "parity-case": 3.0,             # genuine even/odd case reasoning
+    "matching → parity": 3.5,       # counting + parity
+    "deep theorem": 4.5,            # cites a deep named theorem (Tutte, Hall, …)
+}
+_STRUCT_TOKENS = ("↔", "→", "∧", "∨", "¬", "∀", "∃")
+
+def _technique_weight(paradigm: str) -> float:
+    best = None
+    for key, w in W_TECHNIQUE.items():
+        if paradigm.startswith(key) and (best is None or len(key) > best[0]):
+            best = (len(key), w)
+    return best[1] if best else 1.5
+
+
+def statement_complexity(statement_lean: str) -> int:
+    """Logical richness of a structural statement: count of connectives/quantifiers
+    plus distinct capitalised graph-predicate names (IsTree, Connected, CliqueFree…)."""
+    import re
+    conn = sum(statement_lean.count(t) for t in _STRUCT_TOKENS)
+    preds = set(re.findall(r"\b(?:Is[A-Z]\w+|Connected|Preconnected|Colorable|CliqueFree"
+                           r"|Acyclic|cliqueNum|chromaticNumber|Subsingleton)\b",
+                           statement_lean))
+    return conn + len(preds)
+
+
+def structural_difficulty(paradigm: str, statement_lean: str, meta=None) -> float:
+    """Technique-aware difficulty for a structural record, on the LP `hardness` scale."""
+    meta = meta or {}
+    w = _technique_weight(paradigm)
+    comp = statement_complexity(statement_lean)
+    chain_bonus = 0.75 if ("mid" in meta) else 0.0        # composed implication (pre→mid→post)
+    return round(w + 0.5 * comp + chain_bonus, 3)

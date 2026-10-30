@@ -36,9 +36,10 @@ B2_INSTANCES   = (4, 8, 16, 32)         # parametric: a FEW concrete n per ∀n 
 WORKERS        = 14                     # parallel workers per phase (≈ cores − 2)
 # ─────────────────────────────────────────────────────────────────────
 
-REC_A     = ROOT / "PolyForge/domains/graph/record_train"          # harvest T*
-REC_P     = ROOT / "PolyForge/domains/graph/record"                # curated C*
-REC_PARAM = ROOT / "PolyForge/domains/graph/record_parametric"     # parametric F*
+REC_A      = ROOT / "PolyForge/domains/graph/record_train"          # harvest T*
+REC_P      = ROOT / "PolyForge/domains/graph/record"                # curated C*
+REC_PARAM  = ROOT / "PolyForge/domains/graph/record_parametric"     # parametric F*
+REC_STRUCT = ROOT / "PolyForge/domains/graph/record_structural"     # structural S*
 OUT       = ROOT / "output" / "train_corpus.jsonl"                 # the GROWING corpus (accumulates across runs)
 STATE     = ROOT / "output" / ".corpus_state.json"                 # seed cursors + run log (so runs advance, not repeat)
 BACKUPS   = ROOT / "output" / "backups"                            # pre-write backup of the corpus (safety, not clobbered)
@@ -166,6 +167,17 @@ def _param_row(jf):
             "statement_lean": stmt, "proof_lean": proof, "lean_full": full,
             "tactics": [d.get("paradigm", "family")], "difficulty": None, "verified": True}
 
+def _struct_row(jf):
+    d = json.load(open(jf)); lf = jf[:-5] + ".lean"
+    full = Path(lf).read_text() if Path(lf).exists() else ""
+    stmt, proof = _split_thm(full)
+    return {"id": d["id"], "domain": "graph-structural", "source": "structural",
+            "conjecture_type": d.get("conjecture_type", "structural"),
+            "nl": d["conjecture"].get("statement_lean", ""),
+            "statement_lean": stmt, "proof_lean": proof, "lean_full": full,
+            "tactics": [d.get("paradigm", "structural")],
+            "difficulty": d.get("difficulty"), "verified": True}
+
 def _key(r):
     """Dedup key = the theorem's formula / statement (so a theorem is never stored twice)."""
     return r.get("nl") or r.get("statement_lean") or r.get("id")
@@ -192,6 +204,8 @@ def run_export():
         add(_graph_row(jf, "harvest"))
     for jf in glob.glob(str(REC_PARAM / "F*/F*.json")):
         add(_param_row(jf))
+    for jf in glob.glob(str(REC_STRUCT / "S*/S*.json")):
+        add(_struct_row(jf))
     n_new = len(rows) - before
     if OUT.exists():                                        # safety backup of the pre-write corpus
         BACKUPS.mkdir(parents=True, exist_ok=True)
@@ -226,6 +240,23 @@ def _parametric_proc(instance_ns, q):
     q.put(PARAM.generate(instance_ns=instance_ns, verbose=False))
 
 
+def _structural_proc(q):
+    """Run the structural generator (1 Lean REPL): structural predicate implications /
+    equivalences / monotonicity / instances, proved by NON-linarith paradigms.  Like the
+    parametric phase it is single-REPL and overlaps the heavy LP phases."""
+    from . import structural as STRUCT
+    q.put(STRUCT.generate(verbose=False, workers=4))   # modest: overlaps heavy LP phases
+
+
+def _empirical_proc(q):
+    """Run the empirical conjecture generator (mode C): screens structural class →
+    structural-conclusion implications against the enlarged graph pool, keeping UNPROVEN
+    Barnette-level conjectures.  Pure-Python (no Lean); writes its own open_conjectures.jsonl
+    bank — deliberately NOT merged into train_corpus (these have no proof)."""
+    from . import empirical as EMP
+    q.put(EMP.generate(verbose=False))
+
+
 def build(curated_groups=CURATED_GROUPS, curated_seed=None, a_seeds=A_SEEDS,
           b2_instances=B2_INSTANCES, workers=WORKERS):
     """One graph conjecture generator that ACCUMULATES: curated + harvest + parametric, merged
@@ -246,6 +277,19 @@ def build(curated_groups=CURATED_GROUPS, curated_seed=None, a_seeds=A_SEEDS,
     pq = mp.get_context("fork").SimpleQueue()
     pproc = mp.get_context("fork").Process(target=_parametric_proc, args=(b2_instances, pq))
     pproc.start()
+    # structural engine — the second carrier (structural predicates, non-linarith proofs);
+    # also single-REPL, so it overlaps the heavy LP phases too.
+    print("[structural] (conjecture + proof diversity) — predicate implications / iffs / "
+          "monotonicity / instances — started concurrently", flush=True)
+    sq = mp.get_context("fork").SimpleQueue()
+    sproc = mp.get_context("fork").Process(target=_structural_proc, args=(sq,))
+    sproc.start()
+    # empirical engine — mode C (UNPROVEN Barnette-level conjectures); pure-Python, concurrent.
+    print("[empirical] (open conjectures) — class → structural-conclusion, screened vs the "
+          "enlarged pool → output/open_conjectures.jsonl", flush=True)
+    eq = mp.get_context("fork").SimpleQueue()
+    eproc = mp.get_context("fork").Process(target=_empirical_proc, args=(eq,))
+    eproc.start()
 
     print(f"[1/3] curated  (quality + difficulty) — LP engine, {curated_groups} groups…", flush=True)
     run_curated(curated_groups, cur_seed)
@@ -257,6 +301,14 @@ def build(curated_groups=CURATED_GROUPS, curated_seed=None, a_seeds=A_SEEDS,
     pproc.join()
     rB = pq.get() if not pq.empty() else {"verified": "?", "distinct_parametric_paradigms": "?"}
     print(f"    parametric verified: {rB['verified']}  ({rB['distinct_parametric_paradigms']} paradigms)", flush=True)
+    sproc.join()
+    rS = sq.get() if not sq.empty() else {"verified": "?", "paradigms": {}}
+    print(f"    structural verified: {rS['verified']}  ({len(rS.get('paradigms', {}))} paradigms, "
+          f"types={rS.get('conjecture_types', {})})", flush=True)
+    eproc.join()
+    rE = eq.get() if not eq.empty() else {"kept": "?"}
+    print(f"    empirical open conjectures: {rE.get('kept')}  "
+          f"(by conclusion={rE.get('by_conclusion', {})}) → output/open_conjectures.jsonl", flush=True)
     print(f"[3/3] accumulate → {OUT.name}…", flush=True)
     rows, n_new = run_export()
 
