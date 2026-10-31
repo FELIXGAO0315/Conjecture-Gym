@@ -178,6 +178,35 @@ def main():
     L.append("| reason | count | share | example Lean error |\n|---|---:|---:|---|")
     for reason, c in reasons.most_common():
         L.append(f"| {reason} | {c} | {100*c/n:.0f}% | `{ex[reason][:90].replace('|','¦')}` |")
+
+    # ── pass@k per proof METHOD (which technique did the model actually learn?) ──
+    # map each evaluated id → its proof paradigm, read from the corpus (tactics field).
+    method = {}
+    corpus_fp = ROOT / "output" / "train_corpus.jsonl"
+    if corpus_fp.exists():
+        for line in corpus_fp.read_text().splitlines():
+            if not line.strip():
+                continue
+            try:
+                d = json.loads(line)
+            except Exception:
+                continue
+            tac = d.get("tactics") or []
+            method[d.get("id")] = " + ".join(tac) if tac else (d.get("conjecture_type") or "?")
+    solved_ids = {s["id"] for s in solved}
+    per = {}                       # method → [solved, total]
+    for rrow in rows:
+        m = method.get(rrow.get("id"), "unknown")
+        per.setdefault(m, [0, 0])
+        per[m][1] += 1
+        if rrow.get("id") in solved_ids:
+            per[m][0] += 1
+    L.append("\n## Pass@k by proof method\n")
+    L.append("*Which technique did the model learn? One row per distinct proof paradigm / tactic set.*\n")
+    L.append("| method | solved | total | pass@{} |\n|---|---:|---:|---:|".format(k))
+    for m, (sv, tt) in sorted(per.items(), key=lambda kv: (-kv[1][1], kv[0])):
+        L.append(f"| {m[:60].replace('|','¦')} | {sv} | {tt} | {100*sv/tt:.0f}% |")
+
     L.append("\n## Did the model learn? (signals)\n")
     L.append(f"- **Truncated generations** (hit the token limit): **{trunc_pct:.0f}%** "
              f"{'← raise `max_new_tokens`' if trunc_pct > 15 else ''}")

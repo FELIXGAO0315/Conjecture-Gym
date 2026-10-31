@@ -65,6 +65,22 @@ GENERAL_IMP = [
     ("tutte_iff", GBIND,
         "(∃ M : G.Subgraph, M.IsPerfectMatching) ↔ ∀ u, ¬ G.IsTutteViolator u",
         "G.tutte", "deep theorem (Tutte, iff)"),
+    ("tree_card_edges", GBIND + " [Nonempty V]",
+        "G.IsTree → G.edgeFinset.card + 1 = Fintype.card V",
+        "fun h => h.card_edgeFinset", "deep theorem (tree edge count)"),
+    ("connected_exists_path", GBIND + " (u v : V)",
+        "G.Connected → ∃ p : G.Walk u v, p.IsPath",
+        "fun h => h.exists_isPath u v", "deep theorem (existence)"),
+    ("cliqueFree_anti_order",
+        "{V : Type} [Fintype V] [DecidableEq V] (G H : SimpleGraph V) "
+        "[DecidableRel G.Adj] [DecidableRel H.Adj] (n : ℕ)",
+        "G ≤ H → H.CliqueFree n → G.CliqueFree n",
+        "fun hle h => CliqueFree.anti hle h", "monotone (graph order)"),
+    ("colorable_mono_order",
+        "{V : Type} [Fintype V] [DecidableEq V] (G H : SimpleGraph V) "
+        "[DecidableRel G.Adj] [DecidableRel H.Adj] (n : ℕ)",
+        "G ≤ H → H.Colorable n → G.Colorable n",
+        "fun hle h => Colorable.mono_left hle h", "monotone (graph order)"),
 ]
 
 # Base EQUIVALENCES (iff), cited from Mathlib.  Each emits THREE conjectures: the iff
@@ -80,12 +96,18 @@ EQUIVALENCES = [
         "cliqueNum_eq_natCard", GBIND_FIN),
     ("acyclic_subsingleton_path", "G.IsAcyclic", "∀ u v, Subsingleton (G.Path u v)",
         "isAcyclic_iff_subsingleton_path", GBIND),
+    ("isTree_maximal_acyclic", "G.IsTree", "Nonempty V ∧ Maximal IsAcyclic G",
+        "isTree_iff_maximal_isAcyclic", GBIND),
 ]
 
 # Universal structural facts (no premise): (key, binder, stmt, proof, paradigm)
 UNIVERSAL = [
     ("colorable_card", GBIND, "G.Colorable (Fintype.card V)", "colorable_of_fintype G",
         "universal (coloring)"),
+    ("acyclic_bot", "{V : Type} [Fintype V] [DecidableEq V]",
+        "(⊥ : SimpleGraph V).IsAcyclic", "isAcyclic_bot", "term (acyclic bot)"),
+    ("cliqueFree_card_lt", GBIND + " (n : ℕ) (hc : Fintype.card V < n)",
+        "G.CliqueFree n", "cliqueFree_of_card_lt hc", "term (cardinality bound)"),
 ]
 
 # Parameter-monotone predicate facts (over a numeric parameter, not graph order).
